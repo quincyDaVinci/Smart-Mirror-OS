@@ -11,6 +11,7 @@ type ServerMessage =
 
 const WS_URL = "ws://localhost:8787";
 
+// Centrale live state voor mirror en admin via WebSocket
 export function useMirrorSocket() {
   const socketRef = useRef<WebSocket | null>(null);
   const [layout, setLayout] = useState<LayoutItem[]>([]);
@@ -31,7 +32,10 @@ export function useMirrorSocket() {
     socket.addEventListener("message", (event) => {
       const message: ServerMessage = JSON.parse(event.data);
 
-      if (message.type === "state:init" || message.type === "state:update") {
+      if (
+        message.type === "state:init" ||
+        message.type === "state:update"
+      ) {
         setLayout(message.payload.layout);
       }
     });
@@ -52,15 +56,6 @@ export function useMirrorSocket() {
         );
       },
 
-      moveWidget(widgetId: WidgetId, direction: "up" | "down") {
-        socketRef.current?.send(
-          JSON.stringify({
-            type: "widget:move",
-            payload: { widgetId, direction },
-          }),
-        );
-      },
-
       reorderLayout(orderedIds: WidgetId[]) {
         socketRef.current?.send(
           JSON.stringify({
@@ -69,7 +64,6 @@ export function useMirrorSocket() {
           }),
         );
       },
-      
     }),
     [],
   );

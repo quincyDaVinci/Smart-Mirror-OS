@@ -28,17 +28,12 @@ function broadcastState() {
   });
 }
 
-function moveItem(array, fromIndex, toIndex) {
-  const updated = [...array];
-  const [item] = updated.splice(fromIndex, 1);
-  updated.splice(toIndex, 0, item);
-  return updated;
-}
-
 function reorderLayoutByIds(currentLayout, orderedIds) {
   const itemsById = new Map(currentLayout.map((item) => [item.id, item]));
 
-  const nextLayout = orderedIds.map((id) => itemsById.get(id)).filter(Boolean);
+  const nextLayout = orderedIds
+    .map((id) => itemsById.get(id))
+    .filter(Boolean);
 
   if (nextLayout.length !== currentLayout.length) {
     return currentLayout;
@@ -65,37 +60,19 @@ wss.on("connection", (ws) => {
         const { widgetId } = message.payload;
 
         state.layout = state.layout.map((item) =>
-          item.id === widgetId ? { ...item, enabled: !item.enabled } : item,
+          item.id === widgetId
+            ? { ...item, enabled: !item.enabled }
+            : item,
         );
 
         broadcastState();
+        return;
       }
 
       if (message.type === "layout:reorder") {
         const { orderedIds } = message.payload;
 
         state.layout = reorderLayoutByIds(state.layout, orderedIds);
-        broadcastState();
-      }
-
-      if (message.type === "widget:move") {
-        const { widgetId, direction } = message.payload;
-        const currentIndex = state.layout.findIndex(
-          (item) => item.id === widgetId,
-        );
-
-        if (currentIndex === -1) {
-          return;
-        }
-
-        const targetIndex =
-          direction === "up" ? currentIndex - 1 : currentIndex + 1;
-
-        if (targetIndex < 0 || targetIndex >= state.layout.length) {
-          return;
-        }
-
-        state.layout = moveItem(state.layout, currentIndex, targetIndex);
         broadcastState();
       }
     } catch (error) {

@@ -1,13 +1,22 @@
 import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { useMirrorSocket } from "./hooks/useMirrorSocket";
 import { MirrorPage } from "./pages/MirrorPage";
 import { AdminPage } from "./pages/AdminPage";
-import { useMirrorSocket } from "./hooks/useMirrorSocket";
 
 function App() {
-  const { layout, isConnected, toggleWidget, moveWidget } = useMirrorSocket();
+  const {
+    layout,
+    isConnected,
+    toggleWidget,
+    reorderLayout,
+  } = useMirrorSocket();
 
   if (!layout.length) {
-    return <main style={{ padding: 24, color: "white" }}>Verbinden...</main>;
+    return (
+      <main style={{ minHeight: "100vh", padding: 24, background: "black", color: "white" }}>
+        Verbinden...
+      </main>
+    );
   }
 
   return (

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { DragDropProvider } from "@dnd-kit/react";
-import { move } from "@dnd-kit/helpers";
+import { isSortable } from "@dnd-kit/react/sortable";
 import { SortableLayoutItem } from "./SortableLayoutItem";
 import type { LayoutItem, WidgetId } from "../../types/layout";
 
@@ -38,8 +38,23 @@ export function LayoutControls({
           return;
         }
 
+        const { source } = event.operation;
+
+        if (!isSortable(source)) {
+          return;
+        }
+
+        const { initialIndex, index } = source;
+
+        if (initialIndex === index) {
+          return;
+        }
+
         setOrderedIds((currentIds) => {
-          const nextIds = move(currentIds, event) as WidgetId[];
+          const nextIds = [...currentIds];
+          const [movedItem] = nextIds.splice(initialIndex, 1);
+          nextIds.splice(index, 0, movedItem);
+
           onReorderWidgets(nextIds);
           return nextIds;
         });

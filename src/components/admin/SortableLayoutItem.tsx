@@ -1,4 +1,4 @@
-import { useSortable } from "@dnd-kit/react";
+import { useSortable } from "@dnd-kit/react/sortable";
 import type { ReactNode } from "react";
 import type { WidgetId } from "../../types/layout";
 

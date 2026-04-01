@@ -12,25 +12,27 @@ type AdminPageProps = {
 export function AdminPage({
   layout,
   onToggleWidget,
-  onMoveUp,
-  onMoveDown,
+  onReorderWidgets,
   isConnected,
 }: AdminPageProps) {
   return (
     <main className="admin-page">
       <div className="admin-header">
         <h1 className="admin-title">Smart Mirror Admin</h1>
-        <p>{isConnected ? "Live verbonden" : "Niet verbonden"}</p>
         <Link to="/" className="admin-link">
           Ga naar mirror
         </Link>
       </div>
 
+      <p className="admin-status">
+        {isConnected ? "Live verbonden" : "Niet verbonden"}
+      </p>
+
       <LayoutControls
-  layout={layout}
-  onToggleWidget={onToggleWidget}
-  onReorderWidgets={onReorderWidgets}
-/>
+        layout={layout}
+        onToggleWidget={onToggleWidget}
+        onReorderWidgets={onReorderWidgets}
+      />
     </main>
   );
 }
