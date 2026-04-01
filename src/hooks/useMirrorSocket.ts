@@ -31,10 +31,7 @@ export function useMirrorSocket() {
     socket.addEventListener("message", (event) => {
       const message: ServerMessage = JSON.parse(event.data);
 
-      if (
-        message.type === "state:init" ||
-        message.type === "state:update"
-      ) {
+      if (message.type === "state:init" || message.type === "state:update") {
         setLayout(message.payload.layout);
       }
     });
@@ -63,6 +60,16 @@ export function useMirrorSocket() {
           }),
         );
       },
+
+      reorderLayout(orderedIds: WidgetId[]) {
+        socketRef.current?.send(
+          JSON.stringify({
+            type: "layout:reorder",
+            payload: { orderedIds },
+          }),
+        );
+      },
+      
     }),
     [],
   );

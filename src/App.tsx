@@ -4,12 +4,7 @@ import { AdminPage } from "./pages/AdminPage";
 import { useMirrorSocket } from "./hooks/useMirrorSocket";
 
 function App() {
-  const {
-    layout,
-    isConnected,
-    toggleWidget,
-    moveWidget,
-  } = useMirrorSocket();
+  const { layout, isConnected, toggleWidget, moveWidget } = useMirrorSocket();
 
   if (!layout.length) {
     return <main style={{ padding: 24, color: "white" }}>Verbinden...</main>;
@@ -25,8 +20,7 @@ function App() {
             <AdminPage
               layout={layout}
               onToggleWidget={toggleWidget}
-              onMoveUp={(widgetId) => moveWidget(widgetId, "up")}
-              onMoveDown={(widgetId) => moveWidget(widgetId, "down")}
+              onReorderWidgets={reorderLayout}
               isConnected={isConnected}
             />
           }

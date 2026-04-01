@@ -178,3 +178,54 @@ body {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+
+
+
+.sortable-item {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.sortable-item:last-child {
+  border-bottom: none;
+}
+
+.sortable-item--dragging {
+  opacity: 0.6;
+}
+
+.drag-handle {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+  border-radius: 12px;
+  width: 44px;
+  min-width: 44px;
+  cursor: grab;
+  font-size: 1.1rem;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.sortable-item-content {
+  flex: 1;
+}
+
+.admin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.admin-row-left {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}

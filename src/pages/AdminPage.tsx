@@ -1,12 +1,11 @@
 import { Link } from "react-router-dom";
-import { LayoutControls } from "../components/debug/LayoutControls";
+import { LayoutControls } from "../components/admin/LayoutControls";
 import type { LayoutItem, WidgetId } from "../types/layout";
 
 type AdminPageProps = {
   layout: LayoutItem[];
   onToggleWidget: (widgetId: WidgetId) => void;
-  onMoveUp: (widgetId: WidgetId) => void;
-  onMoveDown: (widgetId: WidgetId) => void;
+  onReorderWidgets: (orderedIds: WidgetId[]) => void;
   isConnected: boolean;
 };
 
@@ -28,11 +27,10 @@ export function AdminPage({
       </div>
 
       <LayoutControls
-        layout={layout}
-        onToggleWidget={onToggleWidget}
-        onMoveUp={onMoveUp}
-        onMoveDown={onMoveDown}
-      />
+  layout={layout}
+  onToggleWidget={onToggleWidget}
+  onReorderWidgets={onReorderWidgets}
+/>
     </main>
   );
 }

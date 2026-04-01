@@ -35,6 +35,18 @@ function moveItem(array, fromIndex, toIndex) {
   return updated;
 }
 
+function reorderLayoutByIds(currentLayout, orderedIds) {
+  const itemsById = new Map(currentLayout.map((item) => [item.id, item]));
+
+  const nextLayout = orderedIds.map((id) => itemsById.get(id)).filter(Boolean);
+
+  if (nextLayout.length !== currentLayout.length) {
+    return currentLayout;
+  }
+
+  return nextLayout;
+}
+
 wss.on("connection", (ws) => {
   console.log("client connected");
 
@@ -53,11 +65,16 @@ wss.on("connection", (ws) => {
         const { widgetId } = message.payload;
 
         state.layout = state.layout.map((item) =>
-          item.id === widgetId
-            ? { ...item, enabled: !item.enabled }
-            : item,
+          item.id === widgetId ? { ...item, enabled: !item.enabled } : item,
         );
 
+        broadcastState();
+      }
+
+      if (message.type === "layout:reorder") {
+        const { orderedIds } = message.payload;
+
+        state.layout = reorderLayoutByIds(state.layout, orderedIds);
         broadcastState();
       }
 
@@ -74,10 +91,7 @@ wss.on("connection", (ws) => {
         const targetIndex =
           direction === "up" ? currentIndex - 1 : currentIndex + 1;
 
-        if (
-          targetIndex < 0 ||
-          targetIndex >= state.layout.length
-        ) {
+        if (targetIndex < 0 || targetIndex >= state.layout.length) {
           return;
         }
 
