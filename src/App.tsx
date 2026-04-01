@@ -1,35 +1,18 @@
-import { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { layoutConfig } from "./config/layoutConfig";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { MirrorPage } from "./pages/MirrorPage";
 import { AdminPage } from "./pages/AdminPage";
-import type { LayoutItem, WidgetId } from "./types/layout";
-
-const STORAGE_KEY = "smart-mirror-layout";
+import { useMirrorSocket } from "./hooks/useMirrorSocket";
 
 function App() {
-  const [layout, setLayout] = useState<LayoutItem[]>(() => {
-    const savedLayout = localStorage.getItem(STORAGE_KEY);
+  const {
+    layout,
+    isConnected,
+    toggleWidget,
+    moveWidget,
+  } = useMirrorSocket();
 
-    if (savedLayout) {
-      return JSON.parse(savedLayout);
-    }
-
-    return layoutConfig;
-  });
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(layout));
-  }, [layout]);
-
-  function toggleWidget(widgetId: WidgetId) {
-    setLayout((currentLayout) =>
-      currentLayout.map((item) =>
-        item.id === widgetId
-          ? { ...item, enabled: !item.enabled }
-          : item,
-      ),
-    );
+  if (!layout.length) {
+    return <main style={{ padding: 24, color: "white" }}>Verbinden...</main>;
   }
 
   return (
@@ -39,7 +22,13 @@ function App() {
         <Route
           path="/admin"
           element={
-            <AdminPage layout={layout} onToggleWidget={toggleWidget} />
+            <AdminPage
+              layout={layout}
+              onToggleWidget={toggleWidget}
+              onMoveUp={(widgetId) => moveWidget(widgetId, "up")}
+              onMoveDown={(widgetId) => moveWidget(widgetId, "down")}
+              isConnected={isConnected}
+            />
           }
         />
       </Routes>

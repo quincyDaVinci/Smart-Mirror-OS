@@ -129,13 +129,52 @@ body {
   gap: 12px;
 }
 
+.admin-row-label {
+  text-transform: capitalize;
+}
+
 .admin-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.admin-row-label {
-  text-transform: capitalize;
+.admin-row:last-child {
+  border-bottom: none;
+}
+
+.admin-row-left {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: #cfcfcf;
+}
+
+.admin-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-button {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.admin-button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
