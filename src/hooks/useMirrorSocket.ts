@@ -9,7 +9,7 @@ type ServerMessage =
   | { type: "state:init"; payload: MirrorState }
   | { type: "state:update"; payload: MirrorState };
 
-const WS_URL = "ws://localhost:8787";
+const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost:8787";
 
 // Centrale live state voor mirror en admin via WebSocket
 export function useMirrorSocket() {
