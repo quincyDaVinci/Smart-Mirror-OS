@@ -1,0 +1,141 @@
+:root {
+  font-family: Arial, sans-serif;
+  color: white;
+  background: black;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: black;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.mirror {
+  min-height: 100vh;
+  background: black;
+  display: grid;
+  grid-template-rows: 1.4fr 1fr 1fr 1fr;
+  gap: 12px;
+  padding: 20px;
+}
+
+.widget {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  align-items: center;
+}
+
+.clock {
+  justify-content: center;
+  text-align: center;
+}
+
+.clock-content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.clock-time {
+  margin: 0;
+  font-size: 5rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.clock-date {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #bdbdbd;
+  text-transform: capitalize;
+}
+
+.widget-label {
+  margin: 0 0 10px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8f8f8f;
+}
+
+.widget-value {
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.widget-subtle {
+  margin: 10px 0 0;
+  font-size: 1rem;
+  color: #c9c9c9;
+}
+
+
+
+.admin-page {
+  min-height: 100vh;
+  padding: 24px;
+  background: #0b0b0b;
+  color: white;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.admin-title {
+  margin: 0;
+  font-size: 1.6rem;
+}
+
+.admin-link {
+  color: white;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 10px 14px;
+  border-radius: 12px;
+}
+
+.admin-card {
+  max-width: 420px;
+  padding: 20px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-card-title {
+  margin: 0 0 16px;
+  font-size: 1.1rem;
+}
+
+.admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-row-label {
+  text-transform: capitalize;
+}
