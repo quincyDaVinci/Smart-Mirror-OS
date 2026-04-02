@@ -1,19 +1,19 @@
 {
   "layout": [
     {
-      "id": "calendar",
-      "enabled": true
-    },
-    {
       "id": "clock",
       "enabled": true
     },
     {
-      "id": "weather",
+      "id": "calendar",
       "enabled": true
     },
     {
       "id": "media",
+      "enabled": true
+    },
+    {
+      "id": "weather",
       "enabled": true
     }
   ]

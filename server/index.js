@@ -18,6 +18,12 @@ const defaultState = {
     { id: "media", enabled: true },
     { id: "calendar", enabled: true },
   ],
+  settings: {
+    showSeconds: true,
+    mirrorMode: "normal",
+    autoSleepEnabled: false,
+    sleepTimeoutSeconds: 180,
+  },
 };
 
 function loadState() {
@@ -128,7 +134,9 @@ app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
+
 const PORT = 8787;
-server.listen(PORT, () => {
-  console.log(`server running on http://localhost:${PORT}`);
+
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`server running on port ${PORT}`);
 });
