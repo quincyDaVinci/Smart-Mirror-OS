@@ -1,3 +1,8 @@
+const fs = require("fs");
+const path = require("path");
+
+const STATE_FILE = path.join(__dirname, "state.json");
+
 const express = require("express");
 const http = require("http");
 const { WebSocketServer } = require("ws");
@@ -6,7 +11,7 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
-const state = {
+const defaultState = {
   layout: [
     { id: "clock", enabled: true },
     { id: "weather", enabled: true },
@@ -14,6 +19,39 @@ const state = {
     { id: "calendar", enabled: true },
   ],
 };
+
+function loadState() {
+  try {
+    if (!fs.existsSync(STATE_FILE)) {
+      return structuredClone(defaultState);
+    }
+
+    const raw = fs.readFileSync(STATE_FILE, "utf-8");
+    return JSON.parse(raw);
+  } catch (error) {
+    console.error("failed to load state, using default", error);
+    return structuredClone(defaultState);
+  }
+}
+
+function saveState(nextState) {
+  try {
+    fs.writeFileSync(
+      STATE_FILE,
+      JSON.stringify(nextState, null, 2),
+      "utf-8",
+    );
+  } catch (error) {
+    console.error("failed to save state", error);
+  }
+}
+
+const state = loadState();
+
+function persistAndBroadcast() {
+  saveState(state);
+  broadcastState();
+}
 
 function broadcastState() {
   const message = JSON.stringify({
@@ -65,7 +103,7 @@ wss.on("connection", (ws) => {
             : item,
         );
 
-        broadcastState();
+        persistAndBroadcast();
         return;
       }
 
@@ -73,7 +111,8 @@ wss.on("connection", (ws) => {
         const { orderedIds } = message.payload;
 
         state.layout = reorderLayoutByIds(state.layout, orderedIds);
-        broadcastState();
+        persistAndBroadcast();
+        return;
       }
     } catch (error) {
       console.error("invalid ws message", error);

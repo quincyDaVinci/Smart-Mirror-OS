@@ -1,0 +1,20 @@
+{
+  "layout": [
+    {
+      "id": "calendar",
+      "enabled": true
+    },
+    {
+      "id": "clock",
+      "enabled": true
+    },
+    {
+      "id": "weather",
+      "enabled": true
+    },
+    {
+      "id": "media",
+      "enabled": true
+    }
+  ]
+}
