@@ -6,14 +6,26 @@ import { AdminPage } from "./pages/AdminPage";
 function App() {
   const {
     layout,
+    settings,
+    presence,
+    display,
     isConnected,
     toggleWidget,
     reorderLayout,
+    updateSettings,
+    simulateMotion,
   } = useMirrorSocket();
 
   if (!layout.length) {
     return (
-      <main style={{ minHeight: "100vh", padding: 24, background: "black", color: "white" }}>
+      <main
+        style={{
+          minHeight: "100vh",
+          padding: 24,
+          background: "black",
+          color: "white",
+        }}
+      >
         Verbinden...
       </main>
     );
@@ -22,14 +34,29 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<MirrorPage layout={layout} />} />
+        <Route
+          path="/"
+          element={
+            <MirrorPage
+              layout={layout}
+              settings={settings}
+              presence={presence}
+              display={display}
+            />
+          }
+        />
         <Route
           path="/admin"
           element={
             <AdminPage
               layout={layout}
+              settings={settings}
+              presence={presence}
+              display={display}
               onToggleWidget={toggleWidget}
               onReorderWidgets={reorderLayout}
+              onUpdateSettings={updateSettings}
+              onSimulateMotion={simulateMotion}
               isConnected={isConnected}
             />
           }

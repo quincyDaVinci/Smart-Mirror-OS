@@ -5,7 +5,7 @@
       "enabled": true
     },
     {
-      "id": "calendar",
+      "id": "weather",
       "enabled": true
     },
     {
@@ -13,8 +13,19 @@
       "enabled": true
     },
     {
-      "id": "weather",
+      "id": "calendar",
       "enabled": true
     }
-  ]
+  ],
+  "settings": {
+    "showSeconds": true,
+    "mirrorMode": "normal",
+    "autoSleepEnabled": false,
+    "sleepTimeoutSeconds": 180,
+    "idleTimeoutSeconds": 10
+  },
+  "presence": {
+    "mode": "idle",
+    "lastMotionAt": 1775142593635
+  }
 }

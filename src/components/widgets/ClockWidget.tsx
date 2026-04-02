@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 
-export function ClockWidget() {
+type ClockWidgetProps = {
+  showSeconds: boolean;
+};
+
+export function ClockWidget({ showSeconds }: ClockWidgetProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -20,6 +24,7 @@ export function ClockWidget() {
         {currentTime.toLocaleTimeString("nl-NL", {
           hour: "2-digit",
           minute: "2-digit",
+          second: showSeconds ? "2-digit" : undefined,
         })}
       </p>
 

@@ -24,6 +24,10 @@ const defaultState = {
     autoSleepEnabled: false,
     sleepTimeoutSeconds: 180,
   },
+  presence: {
+    mode: "idle",
+    lastMotionAt: null,
+  },
 };
 
 function loadState() {
@@ -33,7 +37,28 @@ function loadState() {
     }
 
     const raw = fs.readFileSync(STATE_FILE, "utf-8");
-    return JSON.parse(raw);
+    const parsedState = JSON.parse(raw);
+
+    return {
+      ...structuredClone(defaultState),
+      ...parsedState,
+      settings: {
+        ...structuredClone(defaultState).settings,
+        ...parsedState.settings,
+        sleepTimeoutSeconds:
+          parsedState.settings?.sleepTimeoutSeconds ??
+          parsedState.settings?.idleTimeoutSeconds ??
+          defaultState.settings.sleepTimeoutSeconds,
+      },
+      presence: {
+        ...structuredClone(defaultState).presence,
+        ...parsedState.presence,
+      },
+      display: {
+        ...baseState.display,
+        ...parsedState.display,
+      },
+    };
   } catch (error) {
     console.error("failed to load state, using default", error);
     return structuredClone(defaultState);
@@ -42,11 +67,7 @@ function loadState() {
 
 function saveState(nextState) {
   try {
-    fs.writeFileSync(
-      STATE_FILE,
-      JSON.stringify(nextState, null, 2),
-      "utf-8",
-    );
+    fs.writeFileSync(STATE_FILE, JSON.stringify(nextState, null, 2), "utf-8");
   } catch (error) {
     console.error("failed to save state", error);
   }
@@ -58,6 +79,57 @@ function persistAndBroadcast() {
   saveState(state);
   broadcastState();
 }
+
+function markPresenceActive() {
+  state.presence = {
+    mode: "active",
+    lastMotionAt: Date.now(),
+  };
+
+  updateDisplayState("motion");
+  persistAndBroadcast();
+}
+
+function updateDisplayState(reason = "system") {
+  let nextMode = "on";
+
+  if (state.presence.mode === "active") {
+    nextMode = "on";
+  } else if (state.settings.autoSleepEnabled) {
+    nextMode = "sleep";
+  } else {
+    nextMode = "dimmed";
+  }
+
+  state.display = {
+    mode: nextMode,
+    reason,
+    updatedAt: Date.now(),
+  };
+}
+
+setInterval(() => {
+  if (state.presence.mode !== "active") {
+    return;
+  }
+
+  if (!state.presence.lastMotionAt) {
+    return;
+  }
+
+  const timeoutMs = state.settings.sleepTimeoutSeconds * 1000;
+  const elapsedMs = Date.now() - state.presence.lastMotionAt;
+
+  if (elapsedMs >= timeoutMs) {
+    state.presence = {
+      ...state.presence,
+      mode: "idle",
+    };
+
+    updateDisplayState("timeout");
+    persistAndBroadcast();
+  }
+}, 1000);
 
 function broadcastState() {
   const message = JSON.stringify({
@@ -72,12 +144,19 @@ function broadcastState() {
   });
 }
 
+function updateSettings(partialSettings) {
+  state.settings = {
+    ...state.settings,
+    ...partialSettings,
+  };
+
+  persistAndBroadcast();
+}
+
 function reorderLayoutByIds(currentLayout, orderedIds) {
   const itemsById = new Map(currentLayout.map((item) => [item.id, item]));
 
-  const nextLayout = orderedIds
-    .map((id) => itemsById.get(id))
-    .filter(Boolean);
+  const nextLayout = orderedIds.map((id) => itemsById.get(id)).filter(Boolean);
 
   if (nextLayout.length !== currentLayout.length) {
     return currentLayout;
@@ -104,9 +183,7 @@ wss.on("connection", (ws) => {
         const { widgetId } = message.payload;
 
         state.layout = state.layout.map((item) =>
-          item.id === widgetId
-            ? { ...item, enabled: !item.enabled }
-            : item,
+          item.id === widgetId ? { ...item, enabled: !item.enabled } : item,
         );
 
         persistAndBroadcast();
@@ -118,6 +195,24 @@ wss.on("connection", (ws) => {
 
         state.layout = reorderLayoutByIds(state.layout, orderedIds);
         persistAndBroadcast();
+        return;
+      }
+
+      if (message.type === "settings:update") {
+        const nextSettings = message.payload;
+
+        state.settings = {
+          ...state.settings,
+          ...nextSettings,
+        };
+
+        updateDisplayState("settings:update");
+        persistAndBroadcast();
+        return;
+      }
+
+      if (message.type === "presence:motion") {
+        markPresenceActive();
         return;
       }
     } catch (error) {
@@ -133,7 +228,6 @@ wss.on("connection", (ws) => {
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
-
 
 const PORT = 8787;
 

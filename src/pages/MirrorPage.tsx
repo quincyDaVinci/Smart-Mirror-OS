@@ -4,16 +4,27 @@ import { MediaWidget } from "../components/widgets/MediaWidget";
 import { CalendarWidget } from "../components/widgets/CalendarWidget";
 import { dashboardData } from "../data/mockDashboard";
 import type { LayoutItem, WidgetId } from "../types/layout";
+import type { MirrorSettings } from "../types/settings";
+import type { PresenceState } from "../types/presence";
+import type { DisplayState } from "../types/display";
 
 type MirrorPageProps = {
   layout: LayoutItem[];
+  settings: MirrorSettings;
+  presence: PresenceState;
+  display: DisplayState;
 };
 
-export function MirrorPage({ layout }: MirrorPageProps) {
+export function MirrorPage({
+  layout,
+  settings,
+  presence,
+  display,
+}: MirrorPageProps) {
   function renderWidget(widgetId: WidgetId) {
     switch (widgetId) {
       case "clock":
-        return <ClockWidget />;
+        return <ClockWidget showSeconds={settings.showSeconds} />;
 
       case "weather":
         return (
@@ -45,7 +56,13 @@ export function MirrorPage({ layout }: MirrorPageProps) {
   }
 
   return (
-    <main className="mirror">
+    <main
+      className={`mirror-page mirror-page--${presence.mode} mirror-page--display-${display.mode}`}
+    >
+      <div className="mirror-status">
+        Presence: {presence.mode} · Display: {display.mode} · Reason:{" "}
+        {display.reason}
+      </div>
       {layout
         .filter((item) => item.enabled)
         .map((item) => (
