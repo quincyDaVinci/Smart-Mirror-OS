@@ -28,6 +28,11 @@ const defaultState = {
     mode: "idle",
     lastMotionAt: null,
   },
+  display: {
+    mode: "dimmed",
+    reason: "initial",
+    updatedAt: Date.now(),
+  },
 };
 
 function loadState() {
@@ -39,11 +44,13 @@ function loadState() {
     const raw = fs.readFileSync(STATE_FILE, "utf-8");
     const parsedState = JSON.parse(raw);
 
+    const baseState = structuredClone(defaultState);
+
     return {
-      ...structuredClone(defaultState),
+      ...baseState,
       ...parsedState,
       settings: {
-        ...structuredClone(defaultState).settings,
+        ...baseState.settings,
         ...parsedState.settings,
         sleepTimeoutSeconds:
           parsedState.settings?.sleepTimeoutSeconds ??
@@ -51,7 +58,7 @@ function loadState() {
           defaultState.settings.sleepTimeoutSeconds,
       },
       presence: {
-        ...structuredClone(defaultState).presence,
+        ...baseState.presence,
         ...parsedState.presence,
       },
       display: {
