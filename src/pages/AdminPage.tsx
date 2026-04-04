@@ -15,7 +15,30 @@ type AdminPageProps = {
   onUpdateSettings: (nextSettings: Partial<MirrorSettings>) => void;
   onSimulateMotion: () => void;
   isConnected: boolean;
+  connectionStatus:
+    | "connecting"
+    | "connected"
+    | "reconnecting"
+    | "disconnected";
+  connectionError: string | null;
 };
+
+function getConnectionStatusLabel(
+  status: "connecting" | "connected" | "reconnecting" | "disconnected",
+) {
+  switch (status) {
+    case "connecting":
+      return "Verbinden...";
+    case "connected":
+      return "Live verbonden";
+    case "reconnecting":
+      return "Opnieuw verbinden...";
+    case "disconnected":
+      return "Verbinding verbroken";
+    default:
+      return status;
+  }
+}
 
 export function AdminPage({
   layout,
@@ -27,6 +50,8 @@ export function AdminPage({
   onUpdateSettings,
   onSimulateMotion,
   isConnected,
+  connectionStatus,
+  connectionError,
 }: AdminPageProps) {
   return (
     <main className="admin-page">
@@ -38,66 +63,93 @@ export function AdminPage({
       </div>
 
       <p className="admin-status">
-        {isConnected ? "Live verbonden" : "Niet verbonden"}
+        Status: <strong>{getConnectionStatusLabel(connectionStatus)}</strong>
       </p>
+
+      {connectionError ? (
+        <p
+          className="admin-status"
+          style={{ color: "#ffb3b3", marginTop: "-8px" }}
+        >
+          {connectionError}
+        </p>
+      ) : null}
 
       <LayoutControls
         layout={layout}
         onToggleWidget={onToggleWidget}
         onReorderWidgets={onReorderWidgets}
       />
+
       <section className="admin-card">
-  <h2>Mirror instellingen</h2>
+        <h2>Mirror instellingen</h2>
 
-  <label style={{ display: "block", marginBottom: "1rem" }}>
-    <input
-      type="checkbox"
-      checked={settings.showSeconds}
-      onChange={(event) => {
-        onUpdateSettings({ showSeconds: event.target.checked });
-      }}
-    />{" "}
-    Toon seconden in klok
-  </label>
+        <label style={{ display: "block", marginBottom: "1rem" }}>
+          <input
+            type="checkbox"
+            checked={settings.showSeconds}
+            onChange={(event) => {
+              onUpdateSettings({ showSeconds: event.target.checked });
+            }}
+          />{" "}
+          Toon seconden in klok
+        </label>
 
-  <label style={{ display: "block" }}>
-    Idle timeout (seconden)
-    <input
-      type="number"
-      min={10}
-      step={10}
-      value={settings.idleTimeoutSeconds}
-      onChange={(event) => {
-        onUpdateSettings({
-          idleTimeoutSeconds: Number(event.target.value),
-        });
-      }}
-      style={{
-        display: "block",
-        marginTop: "0.5rem",
-        width: "100%",
-      }}
-    />
-  </label>
-</section>
+        <label style={{ display: "block", marginBottom: "1rem" }}>
+          <input
+            type="checkbox"
+            checked={settings.autoSleepEnabled}
+            onChange={(event) => {
+              onUpdateSettings({
+                autoSleepEnabled: event.target.checked,
+              });
+            }}
+          />{" "}
+          Auto sleep inschakelen
+        </label>
 
-<section className="admin-card">
-  <h2>Presence debug</h2>
+        <label style={{ display: "block" }}>
+          Sleep timeout (seconden)
+          <input
+            type="number"
+            min={10}
+            step={10}
+            value={settings.sleepTimeoutSeconds}
+            onChange={(event) => {
+              onUpdateSettings({
+                sleepTimeoutSeconds: Number(event.target.value),
+              });
+            }}
+            style={{
+              display: "block",
+              marginTop: "0.5rem",
+              width: "100%",
+            }}
+          />
+        </label>
+      </section>
 
-  <p>Presence mode: {presence.mode}</p>
-  <p>Display mode: {display.mode}</p>
-  <p>Display reason: {display.reason}</p>
-  <p>
-    Laatste beweging:{" "}
-    {presence.lastMotionAt
-      ? new Date(presence.lastMotionAt).toLocaleTimeString("nl-NL")
-      : "nog geen beweging"}
-  </p>
+      <section className="admin-card">
+        <h2>Presence debug</h2>
 
-  <button type="button" onClick={onSimulateMotion}>
-    Simuleer beweging
-  </button>
-</section>
+        <p>Presence mode: {presence.mode}</p>
+        <p>Display mode: {display.mode}</p>
+        <p>Display reason: {display.reason}</p>
+        <p>
+          Laatste beweging:{" "}
+          {presence.lastMotionAt
+            ? new Date(presence.lastMotionAt).toLocaleTimeString("nl-NL")
+            : "nog geen beweging"}
+        </p>
+
+        <button
+          type="button"
+          onClick={onSimulateMotion}
+          disabled={!isConnected}
+        >
+          Simuleer beweging
+        </button>
+      </section>
     </main>
   );
 }

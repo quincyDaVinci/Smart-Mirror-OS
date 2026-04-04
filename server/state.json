@@ -21,11 +21,15 @@
     "showSeconds": true,
     "mirrorMode": "normal",
     "autoSleepEnabled": false,
-    "sleepTimeoutSeconds": 180,
-    "idleTimeoutSeconds": 10
+    "sleepTimeoutSeconds": 10
   },
   "presence": {
     "mode": "idle",
-    "lastMotionAt": 1775142593635
+    "lastMotionAt": 1775316978007
+  },
+  "display": {
+    "mode": "dimmed",
+    "reason": "timeout",
+    "updatedAt": 1775316988963
   }
 }

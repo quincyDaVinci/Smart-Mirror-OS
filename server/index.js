@@ -35,6 +35,19 @@ const defaultState = {
   },
 };
 
+function normalizeSettings(input = {}) {
+  const { idleTimeoutSeconds, sleepTimeoutSeconds, ...restSettings } = input;
+
+  return {
+    ...defaultState.settings,
+    ...restSettings,
+    sleepTimeoutSeconds:
+      sleepTimeoutSeconds ??
+      idleTimeoutSeconds ??
+      defaultState.settings.sleepTimeoutSeconds,
+  };
+}
+
 function loadState() {
   try {
     if (!fs.existsSync(STATE_FILE)) {
@@ -43,20 +56,12 @@ function loadState() {
 
     const raw = fs.readFileSync(STATE_FILE, "utf-8");
     const parsedState = JSON.parse(raw);
-
     const baseState = structuredClone(defaultState);
 
     return {
       ...baseState,
       ...parsedState,
-      settings: {
-        ...baseState.settings,
-        ...parsedState.settings,
-        sleepTimeoutSeconds:
-          parsedState.settings?.sleepTimeoutSeconds ??
-          parsedState.settings?.idleTimeoutSeconds ??
-          defaultState.settings.sleepTimeoutSeconds,
-      },
+      settings: normalizeSettings(parsedState.settings ?? {}),
       presence: {
         ...baseState.presence,
         ...parsedState.presence,
@@ -151,12 +156,13 @@ function broadcastState() {
   });
 }
 
-function updateSettings(partialSettings) {
-  state.settings = {
+function updateSettings(partialSettings = {}) {
+  state.settings = normalizeSettings({
     ...state.settings,
     ...partialSettings,
-  };
+  });
 
+  updateDisplayState("settings:update");
   persistAndBroadcast();
 }
 
@@ -206,15 +212,7 @@ wss.on("connection", (ws) => {
       }
 
       if (message.type === "settings:update") {
-        const nextSettings = message.payload;
-
-        state.settings = {
-          ...state.settings,
-          ...nextSettings,
-        };
-
-        updateDisplayState("settings:update");
-        persistAndBroadcast();
+        updateSettings(message.payload);
         return;
       }
 
@@ -222,6 +220,7 @@ wss.on("connection", (ws) => {
         markPresenceActive();
         return;
       }
+      
     } catch (error) {
       console.error("invalid ws message", error);
     }

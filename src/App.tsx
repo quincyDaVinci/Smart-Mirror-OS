@@ -10,6 +10,8 @@ function App() {
     presence,
     display,
     isConnected,
+    connectionStatus,
+    connectionError,
     toggleWidget,
     reorderLayout,
     updateSettings,
