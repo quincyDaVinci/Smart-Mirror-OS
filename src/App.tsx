@@ -60,6 +60,8 @@ function App() {
               onUpdateSettings={updateSettings}
               onSimulateMotion={simulateMotion}
               isConnected={isConnected}
+              connectionStatus={connectionStatus}
+              connectionError={connectionError}
             />
           }
         />

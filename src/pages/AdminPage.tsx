@@ -53,6 +53,8 @@ export function AdminPage({
   connectionStatus,
   connectionError,
 }: AdminPageProps) {
+
+  
   return (
     <main className="admin-page">
       <div className="admin-header">
