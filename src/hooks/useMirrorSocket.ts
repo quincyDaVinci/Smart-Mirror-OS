@@ -3,6 +3,7 @@ import type { LayoutItem, WidgetId } from "../types/layout";
 import type { MirrorSettings } from "../types/settings";
 import type { PresenceState } from "../types/presence";
 import type { DisplayState } from "../types/display";
+import { getWebSocketUrl } from "../utils/getWebSocketUrl";
 
 type MirrorState = {
   layout: LayoutItem[];
@@ -21,7 +22,7 @@ type ConnectionStatus =
   | "reconnecting"
   | "disconnected";
 
-const WS_URL = import.meta.env.VITE_WS_URL ?? "ws://localhost:8787";
+const WS_URL = getWebSocketUrl();
 
 const RECONNECT_BASE_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 10000;
