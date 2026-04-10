@@ -4,6 +4,10 @@
   background: black;
 }
 
+#root {
+  min-height: 100vh;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -15,6 +19,22 @@ body {
 
 #root {
   min-height: 100vh;
+}
+
+.mirror-page {
+  position: fixed;
+  top: 0;
+  left: 100vw;
+  width: 100vh;
+  min-height: 100vw;
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
+  background: black;
+  transform-origin: top left;
+  transform: rotate(90deg);
 }
 
 .mirror-page--active {
