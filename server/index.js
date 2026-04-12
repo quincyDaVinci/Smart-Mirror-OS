@@ -136,7 +136,9 @@ async function checkForDeploymentUpdate() {
       remoteCommit,
       hasUpdate,
       lastCheckedAt: Date.now(),
-      message: hasUpdate ? "Nieuwe update beschikbaar." : "Je zit al op de nieuwste versie.",
+      message: hasUpdate
+        ? "Nieuwe update beschikbaar."
+        : "Je zit al op de nieuwste versie.",
     };
 
     persistAndBroadcast();
@@ -182,9 +184,20 @@ async function deployLatestVersion() {
       cwd: __dirname + "/..",
     });
 
+    const { stdout: deployedCommitStdout } = await execAsync(
+      "git rev-parse HEAD",
+      {
+        cwd: __dirname + "/..",
+      },
+    );
+
+    const deployedCommit = deployedCommitStdout.trim();
+
     state.deployment = {
       ...state.deployment,
       status: "success",
+      currentCommit: deployedCommit,
+      remoteCommit: deployedCommit,
       hasUpdate: false,
       lastDeployedAt: Date.now(),
       message: "Deploy gelukt. Services worden herstart.",
@@ -350,7 +363,6 @@ wss.on("connection", (ws) => {
         deployLatestVersion();
         return;
       }
-      
     } catch (error) {
       console.error("invalid ws message", error);
     }

@@ -73,6 +73,7 @@ export function useMirrorSocket() {
   const reconnectTimeoutRef = useRef<number | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const isUnmountedRef = useRef(false);
+  const lastHandledDeployAtRef = useRef<number | null>(null);
 
   const [layout, setLayout] = useState<LayoutItem[]>([]);
   const [settings, setSettings] = useState<MirrorSettings>({
@@ -224,6 +225,26 @@ export function useMirrorSocket() {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (window.location.pathname !== "/") {
+      return;
+    }
+
+    if (!deployment.lastDeployedAt) {
+      return;
+    }
+
+    if (lastHandledDeployAtRef.current === null) {
+      lastHandledDeployAtRef.current = deployment.lastDeployedAt;
+      return;
+    }
+
+    if (deployment.lastDeployedAt !== lastHandledDeployAtRef.current) {
+      lastHandledDeployAtRef.current = deployment.lastDeployedAt;
+      window.location.reload();
+    }
+  }, [deployment.lastDeployedAt]);
 
   function sendMessage(message: unknown) {
     const socket = socketRef.current;
