@@ -16,6 +16,9 @@ function App() {
     reorderLayout,
     updateSettings,
     simulateMotion,
+    deployment,
+    checkDeploymentUpdate,
+    deployLatestVersion,
   } = useMirrorSocket();
 
   if (!layout.length) {
@@ -59,6 +62,9 @@ function App() {
               onReorderWidgets={reorderLayout}
               onUpdateSettings={updateSettings}
               onSimulateMotion={simulateMotion}
+              deployment={deployment}
+              onCheckDeploymentUpdate={checkDeploymentUpdate}
+              onDeployLatestVersion={deployLatestVersion}
               isConnected={isConnected}
               connectionStatus={connectionStatus}
               connectionError={connectionError}

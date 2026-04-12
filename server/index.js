@@ -1,6 +1,11 @@
 const fs = require("fs");
 const path = require("path");
 
+const { exec } = require("child_process");
+const util = require("util");
+
+const execAsync = util.promisify(exec);
+
 const STATE_FILE = path.join(__dirname, "state.json");
 
 const express = require("express");
@@ -32,6 +37,15 @@ const defaultState = {
     mode: "dimmed",
     reason: "initial",
     updatedAt: Date.now(),
+  },
+  deployment: {
+    status: "idle",
+    currentCommit: null,
+    remoteCommit: null,
+    hasUpdate: false,
+    lastCheckedAt: null,
+    lastDeployedAt: null,
+    message: null,
   },
 };
 
@@ -70,6 +84,10 @@ function loadState() {
         ...baseState.display,
         ...parsedState.display,
       },
+      deployment: {
+        ...baseState.deployment,
+        ...parsedState.deployment,
+      },
     };
   } catch (error) {
     console.error("failed to load state, using default", error);
@@ -86,6 +104,108 @@ function saveState(nextState) {
 }
 
 const state = loadState();
+
+async function checkForDeploymentUpdate() {
+  state.deployment = {
+    ...state.deployment,
+    status: "checking",
+    message: "Controleren op updates...",
+  };
+  broadcastState();
+
+  try {
+    const { stdout: localStdout } = await execAsync("git rev-parse HEAD", {
+      cwd: __dirname + "/..",
+    });
+
+    const { stdout: remoteStdout } = await execAsync(
+      "git ls-remote origin refs/heads/main",
+      {
+        cwd: __dirname + "/..",
+      },
+    );
+
+    const currentCommit = localStdout.trim();
+    const remoteCommit = remoteStdout.trim().split(/\s+/)[0] ?? null;
+    const hasUpdate = Boolean(remoteCommit) && currentCommit !== remoteCommit;
+
+    state.deployment = {
+      ...state.deployment,
+      status: hasUpdate ? "update-available" : "up-to-date",
+      currentCommit,
+      remoteCommit,
+      hasUpdate,
+      lastCheckedAt: Date.now(),
+      message: hasUpdate ? "Nieuwe update beschikbaar." : "Je zit al op de nieuwste versie.",
+    };
+
+    persistAndBroadcast();
+  } catch (error) {
+    state.deployment = {
+      ...state.deployment,
+      status: "error",
+      lastCheckedAt: Date.now(),
+      message: "Controleren op updates mislukt.",
+    };
+
+    console.error("failed to check deployment update", error);
+    persistAndBroadcast();
+  }
+}
+
+async function deployLatestVersion() {
+  if (state.deployment.status === "deploying") {
+    return;
+  }
+
+  state.deployment = {
+    ...state.deployment,
+    status: "deploying",
+    message: "Update wordt uitgerold...",
+  };
+  broadcastState();
+
+  try {
+    await execAsync("git fetch origin && git reset --hard origin/main", {
+      cwd: __dirname + "/..",
+    });
+
+    await execAsync("npm ci", {
+      cwd: __dirname + "/..",
+    });
+
+    await execAsync("npm ci", {
+      cwd: path.join(__dirname),
+    });
+
+    await execAsync("npm run build", {
+      cwd: __dirname + "/..",
+    });
+
+    state.deployment = {
+      ...state.deployment,
+      status: "success",
+      hasUpdate: false,
+      lastDeployedAt: Date.now(),
+      message: "Deploy gelukt. Services worden herstart.",
+    };
+
+    persistAndBroadcast();
+
+    setTimeout(() => {
+      exec("sudo systemctl restart smart-mirror-backend smart-mirror-frontend");
+    }, 1000);
+  } catch (error) {
+    state.deployment = {
+      ...state.deployment,
+      status: "error",
+      message: "Deploy mislukt. Check server logs.",
+    };
+
+    console.error("failed to deploy latest version", error);
+    persistAndBroadcast();
+  }
+}
 
 function persistAndBroadcast() {
   saveState(state);
@@ -218,6 +338,16 @@ wss.on("connection", (ws) => {
 
       if (message.type === "presence:motion") {
         markPresenceActive();
+        return;
+      }
+
+      if (message.type === "deployment:check") {
+        checkForDeploymentUpdate();
+        return;
+      }
+
+      if (message.type === "deployment:deploy") {
+        deployLatestVersion();
         return;
       }
       

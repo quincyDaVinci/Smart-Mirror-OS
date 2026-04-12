@@ -4,6 +4,7 @@ import type { LayoutItem, WidgetId } from "../types/layout";
 import type { MirrorSettings } from "../types/settings";
 import type { PresenceState } from "../types/presence";
 import type { DisplayState } from "../types/display";
+import type { DeploymentState } from "../types/deployment";
 
 type AdminPageProps = {
   layout: LayoutItem[];
@@ -21,6 +22,9 @@ type AdminPageProps = {
     | "reconnecting"
     | "disconnected";
   connectionError: string | null;
+  deployment: DeploymentState;
+  onCheckDeploymentUpdate: () => void;
+  onDeployLatestVersion: () => void;
 };
 
 function getConnectionStatusLabel(
@@ -52,9 +56,10 @@ export function AdminPage({
   isConnected,
   connectionStatus,
   connectionError,
+  deployment,
+  onCheckDeploymentUpdate,
+  onDeployLatestVersion,
 }: AdminPageProps) {
-
-  
   return (
     <main className="admin-page">
       <div className="admin-header">
@@ -151,6 +156,45 @@ export function AdminPage({
         >
           Simuleer beweging
         </button>
+      </section>
+
+      <section className="admin-card">
+        <h2>Deployment</h2>
+
+        <p>Status: {deployment.status}</p>
+        <p>Huidige commit: {deployment.currentCommit ?? "onbekend"}</p>
+        <p>
+          Remote commit: {deployment.remoteCommit ?? "nog niet gecontroleerd"}
+        </p>
+        <p>Update beschikbaar: {deployment.hasUpdate ? "ja" : "nee"}</p>
+        <p>{deployment.message ?? "Nog geen update-check uitgevoerd."}</p>
+
+        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          <button
+            type="button"
+            onClick={onCheckDeploymentUpdate}
+            disabled={
+              !isConnected ||
+              deployment.status === "checking" ||
+              deployment.status === "deploying"
+            }
+          >
+            Check for updates
+          </button>
+
+          <button
+            type="button"
+            onClick={onDeployLatestVersion}
+            disabled={
+              !isConnected ||
+              !deployment.hasUpdate ||
+              deployment.status === "checking" ||
+              deployment.status === "deploying"
+            }
+          >
+            Deploy update
+          </button>
+        </div>
       </section>
     </main>
   );

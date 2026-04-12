@@ -4,12 +4,14 @@ import type { MirrorSettings } from "../types/settings";
 import type { PresenceState } from "../types/presence";
 import type { DisplayState } from "../types/display";
 import { getWebSocketUrl } from "../utils/getWebSocketUrl";
+import type { DeploymentState } from "../types/deployment";
 
 type MirrorState = {
   layout: LayoutItem[];
   settings: MirrorSettings;
   presence: PresenceState;
   display: DisplayState;
+  deployment: DeploymentState;
 };
 
 type ServerMessage =
@@ -87,6 +89,15 @@ export function useMirrorSocket() {
     mode: "dimmed",
     reason: "initial",
     updatedAt: Date.now(),
+  });
+  const [deployment, setDeployment] = useState<DeploymentState>({
+    status: "idle",
+    currentCommit: null,
+    remoteCommit: null,
+    hasUpdate: false,
+    lastCheckedAt: null,
+    lastDeployedAt: null,
+    message: null,
   });
 
   const [isConnected, setIsConnected] = useState(false);
@@ -168,7 +179,10 @@ export function useMirrorSocket() {
 
         setConnectionError("Er ging iets mis met de WebSocket-verbinding.");
 
-        if (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING) {
+        if (
+          socket.readyState === WebSocket.OPEN ||
+          socket.readyState === WebSocket.CONNECTING
+        ) {
           socket.close();
         }
       });
@@ -190,6 +204,7 @@ export function useMirrorSocket() {
           setSettings(parsedMessage.payload.settings);
           setPresence(parsedMessage.payload.presence);
           setDisplay(parsedMessage.payload.display);
+          setDeployment(parsedMessage.payload.deployment);
         } catch (error) {
           console.error("failed to parse ws message", error);
           setConnectionError("Kon serverbericht niet verwerken.");
@@ -248,6 +263,18 @@ export function useMirrorSocket() {
     });
   }
 
+  function checkDeploymentUpdate() {
+    sendMessage({
+      type: "deployment:check",
+    });
+  }
+
+  function deployLatestVersion() {
+    sendMessage({
+      type: "deployment:deploy",
+    });
+  }
+
   return {
     layout,
     settings,
@@ -256,9 +283,12 @@ export function useMirrorSocket() {
     isConnected,
     connectionStatus,
     connectionError,
+    deployment,
     toggleWidget,
     reorderLayout,
     updateSettings,
     simulateMotion,
+    checkDeploymentUpdate,
+    deployLatestVersion,
   };
 }
