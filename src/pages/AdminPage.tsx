@@ -60,6 +60,14 @@ export function AdminPage({
   onCheckDeploymentUpdate,
   onDeployLatestVersion,
 }: AdminPageProps) {
+  const isExpectedReconnect =
+    (deployment.status === "deploying" || deployment.status === "success") &&
+    connectionStatus !== "connected";
+
+  const deploymentMessage = isExpectedReconnect
+    ? "Services herstarten. De pagina verbindt zo opnieuw."
+    : (deployment.message ?? "Nog geen update-check uitgevoerd.");
+
   return (
     <main className="admin-page">
       <div className="admin-header">
@@ -73,12 +81,21 @@ export function AdminPage({
         Status: <strong>{getConnectionStatusLabel(connectionStatus)}</strong>
       </p>
 
-      {connectionError ? (
+      {connectionError && !isExpectedReconnect ? (
         <p
           className="admin-status"
           style={{ color: "#ffb3b3", marginTop: "-8px" }}
         >
           {connectionError}
+        </p>
+      ) : null}
+
+      {isExpectedReconnect ? (
+        <p
+          className="admin-status"
+          style={{ color: "#cfcfcf", marginTop: "-8px" }}
+        >
+          Services herstarten. Even wachten...
         </p>
       ) : null}
 
@@ -167,7 +184,7 @@ export function AdminPage({
           Remote commit: {deployment.remoteCommit ?? "nog niet gecontroleerd"}
         </p>
         <p>Update beschikbaar: {deployment.hasUpdate ? "ja" : "nee"}</p>
-        <p>{deployment.message ?? "Nog geen update-check uitgevoerd."}</p>
+        <p>{deploymentMessage}</p>
 
         <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
           <button
