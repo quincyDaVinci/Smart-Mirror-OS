@@ -34,7 +34,7 @@ body {
   overflow: hidden;
   background: black;
   transform-origin: top left;
-  transform: rotate(-90deg);
+  transform: rotate(90deg);
 }
 
 .mirror-page--active {
