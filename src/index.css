@@ -23,8 +23,8 @@ body {
 
 .mirror-page {
   position: fixed;
-  top: 0;
-  left: 100vw;
+  top: 100vh;
+  left: 0;
   width: 100vh;
   min-height: 100vw;
   padding: 32px;
@@ -34,7 +34,7 @@ body {
   overflow: hidden;
   background: black;
   transform-origin: top left;
-  transform: rotate(90deg);
+  transform: rotate(-90deg);
 }
 
 .mirror-page--active {
