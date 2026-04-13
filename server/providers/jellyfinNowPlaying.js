@@ -73,12 +73,30 @@ function buildSecondaryText(item, session) {
   return "";
 }
 
-function buildArtworkUrl(baseUrl, itemId, apiKey) {
-  if (!itemId) {
+function getArtworkTargetItemId(item) {
+  if (!item) {
     return null;
   }
 
-  const url = new URL(`/Items/${itemId}/Images/Primary`, baseUrl);
+  if (item.Type === "Episode") {
+    return item.SeriesId ?? item.ParentPrimaryImageItemId ?? item.Id ?? null;
+  }
+
+  if (item.Type === "Audio") {
+    return item.AlbumId ?? item.Id ?? null;
+  }
+
+  return item.Id ?? null;
+}
+
+function buildArtworkUrl(baseUrl, item, apiKey) {
+  const artworkTargetItemId = getArtworkTargetItemId(item);
+
+  if (!artworkTargetItemId) {
+    return null;
+  }
+
+  const url = new URL(`/Items/${artworkTargetItemId}/Images/Primary`, baseUrl);
   url.searchParams.set("maxWidth", "500");
   url.searchParams.set("quality", "90");
   url.searchParams.set("api_key", apiKey);
@@ -113,13 +131,15 @@ function getSessionScore(session, preferredUserName, preferredDeviceName) {
 }
 
 function pickBestSession(sessions, preferredUserName, preferredDeviceName) {
-  return sessions
-    .filter((session) => Boolean(session.NowPlayingItem))
-    .sort(
-      (a, b) =>
-        getSessionScore(b, preferredUserName, preferredDeviceName) -
-        getSessionScore(a, preferredUserName, preferredDeviceName),
-    )[0] ?? null;
+  return (
+    sessions
+      .filter((session) => Boolean(session.NowPlayingItem))
+      .sort(
+        (a, b) =>
+          getSessionScore(b, preferredUserName, preferredDeviceName) -
+          getSessionScore(a, preferredUserName, preferredDeviceName),
+      )[0] ?? null
+  );
 }
 
 async function fetchJellyfinNowPlaying() {
@@ -184,7 +204,11 @@ async function fetchJellyfinNowPlaying() {
       title: item.Name ?? "Onbekende titel",
       subtitle: buildSubtitle(item),
       secondaryText: buildSecondaryText(item, bestSession),
-      artworkUrl: buildArtworkUrl(baseUrl, item.Id, apiKey),
+      productionYear: item.ProductionYear ?? null,
+      genres: Array.isArray(item.Genres) ? item.Genres : [],
+      communityRating:
+        typeof item.CommunityRating === "number" ? item.CommunityRating : null,
+      artworkUrl: buildArtworkUrl(baseUrl, item, apiKey),
       progressMs: ticksToMs(bestSession.PlayState?.PositionTicks ?? null),
       durationMs: ticksToMs(item.RunTimeTicks ?? null),
       deviceName: bestSession.DeviceName ?? null,

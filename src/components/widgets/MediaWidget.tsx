@@ -17,6 +17,29 @@ function formatTime(ms: number | null) {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
+function formatRemainingTime(ms: number | null) {
+  if (ms === null) {
+    return null;
+  }
+
+  const totalMinutes = Math.max(0, Math.ceil(ms / 60000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours > 0) {
+    return `${hours}u ${minutes.toString().padStart(2, "0")}m`;
+  }
+
+  return `${minutes}m`;
+}
+
+function formatClockTime(date: Date) {
+  return new Intl.DateTimeFormat("nl-NL", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 function getLiveProgressMs(media: MediaState, nowMs: number) {
   if (media.progressMs === null) {
     return null;
@@ -76,6 +99,24 @@ export function MediaWidget({ media }: MediaWidgetProps) {
       : 0;
 
   const isVideo = media.kind === "movie" || media.kind === "episode";
+
+  const remainingMs =
+    isVideo && liveProgressMs !== null && media.durationMs !== null
+      ? Math.max(media.durationMs - liveProgressMs, 0)
+      : null;
+
+  const endTimeText =
+    remainingMs !== null && media.status === "playing"
+      ? formatClockTime(new Date(nowMs + remainingMs))
+      : null;
+
+  const videoMetadataBits = [
+    media.productionYear ? String(media.productionYear) : null,
+    media.genres.length > 0 ? media.genres.slice(0, 3).join(", ") : null,
+    media.communityRating !== null
+      ? `Rating ${media.communityRating.toFixed(1)}`
+      : null,
+  ].filter(Boolean);
 
   return (
     <section
@@ -184,6 +225,18 @@ export function MediaWidget({ media }: MediaWidgetProps) {
           </p>
         ) : null}
 
+        {isVideo && videoMetadataBits.length > 0 ? (
+          <p
+            style={{
+              margin: 0,
+              fontSize: 14,
+              opacity: 0.78,
+            }}
+          >
+            {videoMetadataBits.join(" · ")}
+          </p>
+        ) : null}
+
         <div
           style={{
             fontSize: 13,
@@ -231,6 +284,22 @@ export function MediaWidget({ media }: MediaWidgetProps) {
             >
               {progressText}
             </p>
+            {isVideo && (remainingMs !== null || endTimeText) ? (
+              <div
+                style={{
+                  display: "flex",
+                  gap: 12,
+                  flexWrap: "wrap",
+                  fontSize: 12,
+                  opacity: 0.78,
+                }}
+              >
+                {remainingMs !== null ? (
+                  <span>Resterend: {formatRemainingTime(remainingMs)}</span>
+                ) : null}
+                {endTimeText ? <span>Eindtijd: {endTimeText}</span> : null}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

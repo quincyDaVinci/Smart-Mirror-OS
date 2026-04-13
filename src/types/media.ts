@@ -1,11 +1,6 @@
 export type MediaSource = "jellyfin" | "spotify";
 export type MediaStatus = "idle" | "playing" | "paused" | "error";
-export type MediaKind =
-  | "movie"
-  | "episode"
-  | "track"
-  | "podcast"
-  | "unknown";
+export type MediaKind = "movie" | "episode" | "track" | "podcast" | "unknown";
 
 export type ProviderStatus = {
   enabled: boolean;
@@ -21,6 +16,9 @@ export type MediaState = {
   title: string;
   subtitle: string;
   secondaryText: string;
+  productionYear: number | null;
+  genres: string[];
+  communityRating: number | null;
   artworkUrl: string | null;
   progressMs: number | null;
   durationMs: number | null;
@@ -40,6 +38,9 @@ export const defaultMediaState: MediaState = {
   title: "Geen media actief",
   subtitle: "Er wordt nu niets afgespeeld",
   secondaryText: "",
+  productionYear: null,
+  genres: [],
+  communityRating: null,
   artworkUrl: null,
   progressMs: null,
   durationMs: null,
