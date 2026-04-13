@@ -1,3 +1,4 @@
+import { useEffect, useMemo, useState } from "react";
 import type { MediaState } from "../../types/media";
 
 type MediaWidgetProps = {
@@ -16,10 +17,57 @@ function formatTime(ms: number | null) {
   return `${minutes}:${seconds.toString().padStart(2, "0")}`;
 }
 
+function getLiveProgressMs(media: MediaState, nowMs: number) {
+  if (media.progressMs === null) {
+    return null;
+  }
+
+  if (media.status !== "playing" || media.lastUpdatedAt === null) {
+    return media.progressMs;
+  }
+
+  const elapsedMs = Math.max(0, nowMs - media.lastUpdatedAt);
+  const nextProgressMs = media.progressMs + elapsedMs;
+
+  if (media.durationMs !== null) {
+    return Math.min(nextProgressMs, media.durationMs);
+  }
+
+  return nextProgressMs;
+}
+
 export function MediaWidget({ media }: MediaWidgetProps) {
+  const [nowMs, setNowMs] = useState(Date.now());
+
+  useEffect(() => {
+    if (media.status !== "playing" || media.progressMs === null) {
+      return;
+    }
+
+    setNowMs(Date.now());
+
+    const intervalId = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 250);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [
+    media.status,
+    media.progressMs,
+    media.lastUpdatedAt,
+    media.title,
+    media.source,
+  ]);
+
+  const liveProgressMs = useMemo(() => {
+    return getLiveProgressMs(media, nowMs);
+  }, [media, nowMs]);
+
   const progressText =
-    media.progressMs !== null && media.durationMs !== null
-      ? `${formatTime(media.progressMs)} / ${formatTime(media.durationMs)}`
+    liveProgressMs !== null && media.durationMs !== null
+      ? `${formatTime(liveProgressMs)} / ${formatTime(media.durationMs)}`
       : null;
 
   return (

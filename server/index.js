@@ -11,6 +11,7 @@ const STATE_FILE = path.join(__dirname, "state.json");
 const express = require("express");
 const http = require("http");
 const { WebSocketServer } = require("ws");
+const { fetchJellyfinNowPlaying } = require("./providers/jellyfinNowPlaying");
 
 const app = express();
 const server = http.createServer(app);
@@ -132,6 +133,59 @@ function saveState(nextState) {
 }
 
 const state = loadState();
+
+function hasMediaChanged(currentMedia, nextMedia) {
+  return JSON.stringify(currentMedia) !== JSON.stringify(nextMedia);
+}
+
+function updateRuntimeMedia(nextMedia) {
+  if (!hasMediaChanged(state.media, nextMedia)) {
+    return;
+  }
+
+  state.media = nextMedia;
+  broadcastState();
+}
+
+async function pollJellyfinNowPlaying() {
+  try {
+    const { media, providerStatus } = await fetchJellyfinNowPlaying();
+
+    const nextMedia = media
+      ? {
+          ...state.media,
+          ...media,
+          sourceState: {
+            ...state.media.sourceState,
+            jellyfin: providerStatus,
+          },
+        }
+      : {
+          ...defaultState.media,
+          sourceState: {
+            ...state.media.sourceState,
+            jellyfin: providerStatus,
+          },
+        };
+
+    updateRuntimeMedia(nextMedia);
+  } catch (error) {
+    console.error("failed to poll jellyfin now playing", error);
+
+    updateRuntimeMedia({
+      ...defaultState.media,
+      sourceState: {
+        ...state.media.sourceState,
+        jellyfin: {
+          enabled: true,
+          status: "error",
+          message: "Jellyfin polling mislukt.",
+          lastCheckedAt: Date.now(),
+        },
+      },
+    });
+  }
+}
 
 async function checkForDeploymentUpdate() {
   state.deployment = {
@@ -280,6 +334,9 @@ function updateDisplayState(reason = "system") {
     updatedAt: Date.now(),
   };
 }
+
+pollJellyfinNowPlaying();
+setInterval(pollJellyfinNowPlaying, 2000);
 
 setInterval(() => {
   if (state.presence.mode !== "active") {
