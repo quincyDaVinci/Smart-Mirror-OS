@@ -47,6 +47,34 @@ const defaultState = {
     lastDeployedAt: null,
     message: null,
   },
+  media: {
+    status: "idle",
+    source: null,
+    kind: "unknown",
+    title: "Geen media actief",
+    subtitle: "Er wordt nu niets afgespeeld",
+    secondaryText: "",
+    artworkUrl: null,
+    progressMs: null,
+    durationMs: null,
+    deviceName: null,
+    userName: null,
+    lastUpdatedAt: null,
+    sourceState: {
+      jellyfin: {
+        enabled: true,
+        status: "idle",
+        message: null,
+        lastCheckedAt: null,
+      },
+      spotify: {
+        enabled: true,
+        status: "idle",
+        message: null,
+        lastCheckedAt: null,
+      },
+    },
+  },
 };
 
 function normalizeSettings(input = {}) {

@@ -5,6 +5,7 @@ import type { PresenceState } from "../types/presence";
 import type { DisplayState } from "../types/display";
 import { getWebSocketUrl } from "../utils/getWebSocketUrl";
 import type { DeploymentState } from "../types/deployment";
+import type { MediaState } from "../types/media";
 
 type MirrorState = {
   layout: LayoutItem[];
@@ -12,6 +13,7 @@ type MirrorState = {
   presence: PresenceState;
   display: DisplayState;
   deployment: DeploymentState;
+  media: MediaState;
 };
 
 type ServerMessage =
@@ -99,6 +101,34 @@ export function useMirrorSocket() {
     lastCheckedAt: null,
     lastDeployedAt: null,
     message: null,
+  });
+  const [media, setMedia] = useState<MediaState>({
+    status: "idle",
+    source: null,
+    kind: "unknown",
+    title: "Geen media actief",
+    subtitle: "Er wordt nu niets afgespeeld",
+    secondaryText: "",
+    artworkUrl: null,
+    progressMs: null,
+    durationMs: null,
+    deviceName: null,
+    userName: null,
+    lastUpdatedAt: null,
+    sourceState: {
+      jellyfin: {
+        enabled: true,
+        status: "idle",
+        message: null,
+        lastCheckedAt: null,
+      },
+      spotify: {
+        enabled: true,
+        status: "idle",
+        message: null,
+        lastCheckedAt: null,
+      },
+    },
   });
 
   const [isConnected, setIsConnected] = useState(false);
@@ -206,6 +236,7 @@ export function useMirrorSocket() {
           setPresence(parsedMessage.payload.presence);
           setDisplay(parsedMessage.payload.display);
           setDeployment(parsedMessage.payload.deployment);
+          setMedia(parsedMessage.payload.media);
         } catch (error) {
           console.error("failed to parse ws message", error);
           setConnectionError("Kon serverbericht niet verwerken.");
@@ -311,5 +342,6 @@ export function useMirrorSocket() {
     simulateMotion,
     checkDeploymentUpdate,
     deployLatestVersion,
+    media,
   };
 }

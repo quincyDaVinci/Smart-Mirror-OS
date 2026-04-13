@@ -19,6 +19,7 @@ function App() {
     deployment,
     checkDeploymentUpdate,
     deployLatestVersion,
+    media,
   } = useMirrorSocket();
 
   if (!layout.length) {
@@ -47,6 +48,7 @@ function App() {
               settings={settings}
               presence={presence}
               display={display}
+              media={media}
             />
           }
         />

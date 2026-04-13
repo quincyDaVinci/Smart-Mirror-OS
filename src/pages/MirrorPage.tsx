@@ -7,12 +7,14 @@ import type { LayoutItem, WidgetId } from "../types/layout";
 import type { MirrorSettings } from "../types/settings";
 import type { PresenceState } from "../types/presence";
 import type { DisplayState } from "../types/display";
+import type { MediaState } from "../types/media";
 
 type MirrorPageProps = {
   layout: LayoutItem[];
   settings: MirrorSettings;
   presence: PresenceState;
   display: DisplayState;
+  media: MediaState;
 };
 
 export function MirrorPage({
@@ -20,6 +22,7 @@ export function MirrorPage({
   settings,
   presence,
   display,
+  media,
 }: MirrorPageProps) {
   function renderWidget(widgetId: WidgetId) {
     switch (widgetId) {
@@ -37,8 +40,7 @@ export function MirrorPage({
       case "media":
         return (
           <MediaWidget
-            title={dashboardData.media.title}
-            artist={dashboardData.media.artist}
+            media={media}
           />
         );
 
