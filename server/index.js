@@ -14,6 +14,8 @@ const { WebSocketServer } = require("ws");
 const { fetchJellyfinNowPlaying } = require("./providers/jellyfinNowPlaying");
 
 const app = express();
+app.use(express.json());
+
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
@@ -580,6 +582,53 @@ function reorderLayoutByIds(currentLayout, orderedIds) {
   return nextLayout;
 }
 
+function handleClientMessage(message) {
+  if (!message || typeof message !== "object") {
+    return false;
+  }
+
+  if (message.type === "widget:toggle") {
+    const { widgetId } = message.payload ?? {};
+
+    state.layout = state.layout.map((item) =>
+      item.id === widgetId ? { ...item, enabled: !item.enabled } : item,
+    );
+
+    persistAndBroadcast();
+    return true;
+  }
+
+  if (message.type === "layout:reorder") {
+    const { orderedIds } = message.payload ?? {};
+
+    state.layout = reorderLayoutByIds(state.layout, orderedIds ?? []);
+    persistAndBroadcast();
+    return true;
+  }
+
+  if (message.type === "settings:update") {
+    updateSettings(message.payload ?? {});
+    return true;
+  }
+
+  if (message.type === "presence:motion") {
+    markPresenceActive();
+    return true;
+  }
+
+  if (message.type === "deployment:check") {
+    void checkForDeploymentUpdate();
+    return true;
+  }
+
+  if (message.type === "deployment:deploy") {
+    void deployLatestVersion();
+    return true;
+  }
+
+  return false;
+}
+
 console.log("[boot] registering websocket handlers");
 
 wss.on("connection", (ws, req) => {
@@ -620,44 +669,15 @@ wss.on("connection", (ws, req) => {
   ws.on("message", (rawMessage) => {
     try {
       const message = JSON.parse(rawMessage.toString());
+      const handled = handleClientMessage(message);
 
-      if (message.type === "widget:toggle") {
-        const { widgetId } = message.payload;
-
-        state.layout = state.layout.map((item) =>
-          item.id === widgetId ? { ...item, enabled: !item.enabled } : item,
+      if (!handled) {
+        appendLog(
+          "warn",
+          "ws",
+          "Onbekend clientbericht",
+          rawMessage.toString(),
         );
-
-        persistAndBroadcast();
-        return;
-      }
-
-      if (message.type === "layout:reorder") {
-        const { orderedIds } = message.payload;
-
-        state.layout = reorderLayoutByIds(state.layout, orderedIds);
-        persistAndBroadcast();
-        return;
-      }
-
-      if (message.type === "settings:update") {
-        updateSettings(message.payload);
-        return;
-      }
-
-      if (message.type === "presence:motion") {
-        markPresenceActive();
-        return;
-      }
-
-      if (message.type === "deployment:check") {
-        checkForDeploymentUpdate();
-        return;
-      }
-
-      if (message.type === "deployment:deploy") {
-        deployLatestVersion();
-        return;
       }
     } catch (error) {
       console.error("invalid ws message", error);
@@ -692,6 +712,25 @@ wss.on("connection", (ws, req) => {
 console.log("[boot] registering health route");
 
 app.get("/health", (_req, res) => {
+  res.json({ ok: true });
+});
+
+console.log("[boot] registering state route");
+
+app.get("/state", (_req, res) => {
+  res.json(state);
+});
+
+console.log("[boot] registering action route");
+
+app.post("/action", (req, res) => {
+  const handled = handleClientMessage(req.body);
+
+  if (!handled) {
+    res.status(400).json({ ok: false, error: "Unknown action" });
+    return;
+  }
+
   res.json({ ok: true });
 });
 

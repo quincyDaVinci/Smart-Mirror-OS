@@ -30,6 +30,12 @@ type ConnectionStatus =
 
 const WS_URL = getWebSocketUrl();
 
+function getApiBaseUrl() {
+  const url = new URL(WS_URL);
+  url.protocol = url.protocol === "wss:" ? "https:" : "http:";
+  return url.origin;
+}
+
 const RECONNECT_BASE_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 10000;
 const CONNECT_TIMEOUT_MS = 5000;
@@ -142,6 +148,16 @@ export function useMirrorSocket() {
   const [logs, setLogs] = useState<DebugLogEntry[]>([]);
   const [clientLogs, setClientLogs] = useState<DebugLogEntry[]>([]);
 
+  function applyState(nextState: MirrorState) {
+    setLayout(nextState.layout);
+    setSettings(nextState.settings);
+    setPresence(nextState.presence);
+    setDisplay(nextState.display);
+    setDeployment(nextState.deployment);
+    setMedia(nextState.media);
+    setLogs(nextState.logs ?? []);
+  }
+
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("connecting");
@@ -166,6 +182,34 @@ export function useMirrorSocket() {
         ...previousLogs,
       ].slice(0, 100),
     );
+  }
+
+  async function fetchStateSnapshot(reason: string) {
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/state`, {
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const nextState: unknown = await response.json();
+
+      if (!isMirrorState(nextState)) {
+        throw new Error("Snapshot heeft ongeldig formaat");
+      }
+
+      applyState(nextState);
+      appendClientLog("info", "http", "State snapshot opgehaald", reason);
+    } catch (error) {
+      appendClientLog(
+        "error",
+        "http",
+        "State snapshot ophalen mislukt",
+        `${reason} · ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   useEffect(() => {
@@ -319,13 +363,7 @@ export function useMirrorSocket() {
             return;
           }
 
-          setLayout(parsedMessage.payload.layout);
-          setSettings(parsedMessage.payload.settings);
-          setPresence(parsedMessage.payload.presence);
-          setDisplay(parsedMessage.payload.display);
-          setDeployment(parsedMessage.payload.deployment);
-          setMedia(parsedMessage.payload.media);
-          setLogs(parsedMessage.payload.logs ?? []);
+          applyState(parsedMessage.payload);
         } catch (error) {
           console.error("failed to parse ws message", error);
           setConnectionError("Kon serverbericht niet verwerken.");
@@ -339,6 +377,7 @@ export function useMirrorSocket() {
       });
     }
 
+    void fetchStateSnapshot("initial load");
     connectSocket();
 
     return () => {
@@ -350,6 +389,46 @@ export function useMirrorSocket() {
         socketRef.current.close();
         socketRef.current = null;
       }
+    };
+  }, []);
+
+  useEffect(() => {
+    function handlePageShow() {
+      appendClientLog(
+        "info",
+        "page",
+        "pageshow",
+        `visibility=${document.visibilityState}`,
+      );
+      void fetchStateSnapshot("pageshow");
+    }
+
+    function handleVisibilityChange() {
+      appendClientLog(
+        "info",
+        "page",
+        "visibilitychange",
+        `visibility=${document.visibilityState}`,
+      );
+
+      if (document.visibilityState === "visible") {
+        void fetchStateSnapshot("visibilitychange:visible");
+      }
+    }
+
+    function handleOnline() {
+      appendClientLog("info", "page", "online", String(navigator.onLine));
+      void fetchStateSnapshot("online");
+    }
+
+    window.addEventListener("pageshow", handlePageShow);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("online", handleOnline);
+
+    return () => {
+      window.removeEventListener("pageshow", handlePageShow);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("online", handleOnline);
     };
   }, []);
 
@@ -373,53 +452,86 @@ export function useMirrorSocket() {
     }
   }, [deployment.lastDeployedAt]);
 
-  function sendMessage(message: unknown) {
+  async function sendAction(message: unknown) {
     const socket = socketRef.current;
 
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      setConnectionError("Actie niet verstuurd: er is geen live verbinding.");
-      appendClientLog("warn", "ws", "Actie geblokkeerd: geen live verbinding");
+    if (socket && socket.readyState === WebSocket.OPEN) {
+      socket.send(JSON.stringify(message));
       return;
     }
 
-    socket.send(JSON.stringify(message));
+    appendClientLog(
+      "warn",
+      "http",
+      "WebSocket niet open, HTTP fallback gebruikt",
+      JSON.stringify(message),
+    );
+
+    try {
+      const response = await fetch(`${getApiBaseUrl()}/action`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(message),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      await fetchStateSnapshot("after http action fallback");
+      setConnectionError(
+        "Live verbinding tijdelijk weg. HTTP fallback gebruikt.",
+      );
+    } catch (error) {
+      setConnectionError(
+        "Actie mislukt: geen live verbinding en HTTP fallback faalde.",
+      );
+      appendClientLog(
+        "error",
+        "http",
+        "HTTP action fallback mislukt",
+        error instanceof Error ? error.message : String(error),
+      );
+    }
   }
 
   function toggleWidget(widgetId: WidgetId) {
-    sendMessage({
+    void sendAction({
       type: "widget:toggle",
       payload: { widgetId },
     });
   }
 
   function reorderLayout(orderedIds: WidgetId[]) {
-    sendMessage({
+    void sendAction({
       type: "layout:reorder",
       payload: { orderedIds },
     });
   }
 
   function updateSettings(nextSettings: Partial<MirrorSettings>) {
-    sendMessage({
+    void sendAction({
       type: "settings:update",
       payload: nextSettings,
     });
   }
 
   function simulateMotion() {
-    sendMessage({
+    void sendAction({
       type: "presence:motion",
     });
   }
 
   function checkDeploymentUpdate() {
-    sendMessage({
+    void sendAction({
       type: "deployment:check",
     });
   }
 
   function deployLatestVersion() {
-    sendMessage({
+    void sendAction({
       type: "deployment:deploy",
     });
   }
