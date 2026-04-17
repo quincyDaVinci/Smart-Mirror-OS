@@ -24,21 +24,6 @@ function App() {
     clientLogs,
   } = useMirrorSocket();
 
-  if (!layout.length) {
-    return (
-      <main
-        style={{
-          minHeight: "100vh",
-          padding: 24,
-          background: "black",
-          color: "white",
-        }}
-      >
-        Verbinden...
-      </main>
-    );
-  }
-
   return (
     <BrowserRouter>
       <Routes>
