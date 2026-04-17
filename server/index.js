@@ -64,7 +64,9 @@ const defaultState = {
   deployment: {
     status: "idle",
     currentCommit: null,
+    currentCommitMessage: null,
     remoteCommit: null,
+    remoteCommitMessage: null,
     hasUpdate: false,
     lastCheckedAt: null,
     lastDeployedAt: null,
@@ -101,6 +103,7 @@ const defaultState = {
       },
     },
   },
+  logs: [],
 };
 
 function normalizeSettings(input = {}) {
@@ -151,13 +154,37 @@ function loadState() {
 
 function saveState(nextState) {
   try {
-    fs.writeFileSync(STATE_FILE, JSON.stringify(nextState, null, 2), "utf-8");
+    const { logs, ...persistableState } = nextState;
+
+    fs.writeFileSync(
+      STATE_FILE,
+      JSON.stringify(persistableState, null, 2),
+      "utf-8",
+    );
   } catch (error) {
     console.error("failed to save state", error);
   }
 }
 
 const state = loadState();
+
+state.logs = [];
+
+const MAX_LOG_ENTRIES = 200;
+
+function appendLog(level, source, message, meta = null) {
+  state.logs = [
+    {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      timestamp: Date.now(),
+      level,
+      source,
+      message,
+      meta,
+    },
+    ...(state.logs ?? []),
+  ].slice(0, MAX_LOG_ENTRIES);
+}
 
 function hasMediaChanged(currentMedia, nextMedia) {
   return JSON.stringify(currentMedia) !== JSON.stringify(nextMedia);
@@ -218,35 +245,69 @@ async function checkForDeploymentUpdate() {
     status: "checking",
     message: "Controleren op updates...",
   };
+
+  appendLog("info", "deployment", "Update-check gestart");
   broadcastState();
 
   try {
-    const { stdout: localStdout } = await execAsync("git rev-parse HEAD", {
+    await execAsync("git fetch origin main --quiet", {
       cwd: __dirname + "/..",
     });
 
-    const { stdout: remoteStdout } = await execAsync(
-      "git ls-remote origin refs/heads/main",
+    const { stdout: currentCommitStdout } = await execAsync(
+      "git rev-parse HEAD",
       {
         cwd: __dirname + "/..",
       },
     );
 
-    const currentCommit = localStdout.trim();
-    const remoteCommit = remoteStdout.trim().split(/\s+/)[0] ?? null;
+    const { stdout: currentCommitMessageStdout } = await execAsync(
+      "git log -1 --pretty=%s HEAD",
+      {
+        cwd: __dirname + "/..",
+      },
+    );
+
+    const { stdout: remoteCommitStdout } = await execAsync(
+      "git rev-parse origin/main",
+      {
+        cwd: __dirname + "/..",
+      },
+    );
+
+    const { stdout: remoteCommitMessageStdout } = await execAsync(
+      "git log -1 --pretty=%s origin/main",
+      {
+        cwd: __dirname + "/..",
+      },
+    );
+
+    const currentCommit = currentCommitStdout.trim();
+    const currentCommitMessage = currentCommitMessageStdout.trim();
+    const remoteCommit = remoteCommitStdout.trim() || null;
+    const remoteCommitMessage = remoteCommitMessageStdout.trim() || null;
     const hasUpdate = Boolean(remoteCommit) && currentCommit !== remoteCommit;
 
     state.deployment = {
       ...state.deployment,
       status: hasUpdate ? "update-available" : "up-to-date",
       currentCommit,
+      currentCommitMessage,
       remoteCommit,
+      remoteCommitMessage,
       hasUpdate,
       lastCheckedAt: Date.now(),
       message: hasUpdate
         ? "Nieuwe update beschikbaar."
         : "Je zit al op de nieuwste versie.",
     };
+
+    appendLog(
+      "info",
+      "deployment",
+      hasUpdate ? "Nieuwe update gevonden" : "Geen update gevonden",
+      `local=${currentCommit.slice(0, 7)} · remote=${remoteCommit?.slice(0, 7) ?? "unknown"}`,
+    );
 
     persistAndBroadcast();
   } catch (error) {
@@ -256,6 +317,13 @@ async function checkForDeploymentUpdate() {
       lastCheckedAt: Date.now(),
       message: "Controleren op updates mislukt.",
     };
+
+    appendLog(
+      "error",
+      "deployment",
+      "Update-check mislukt",
+      error instanceof Error ? error.message : String(error),
+    );
 
     console.error("failed to check deployment update", error);
     persistAndBroadcast();
@@ -272,12 +340,17 @@ async function deployLatestVersion() {
     status: "deploying",
     message: "Update wordt uitgerold...",
   };
+
+  appendLog("info", "deployment", "Deploy gestart");
   broadcastState();
 
   try {
-    await execAsync("git fetch origin && git reset --hard origin/main", {
-      cwd: __dirname + "/..",
-    });
+    await execAsync(
+      "git fetch origin main --quiet && git reset --hard origin/main",
+      {
+        cwd: __dirname + "/..",
+      },
+    );
 
     await execAsync("npm ci", {
       cwd: __dirname + "/..",
@@ -298,17 +371,34 @@ async function deployLatestVersion() {
       },
     );
 
+    const { stdout: deployedCommitMessageStdout } = await execAsync(
+      "git log -1 --pretty=%s HEAD",
+      {
+        cwd: __dirname + "/..",
+      },
+    );
+
     const deployedCommit = deployedCommitStdout.trim();
+    const deployedCommitMessage = deployedCommitMessageStdout.trim();
 
     state.deployment = {
       ...state.deployment,
       status: "success",
       currentCommit: deployedCommit,
+      currentCommitMessage: deployedCommitMessage,
       remoteCommit: deployedCommit,
+      remoteCommitMessage: deployedCommitMessage,
       hasUpdate: false,
       lastDeployedAt: Date.now(),
       message: "Deploy gelukt. Services worden herstart.",
     };
+
+    appendLog(
+      "info",
+      "deployment",
+      "Deploy gelukt",
+      `${deployedCommit.slice(0, 7)} · ${deployedCommitMessage}`,
+    );
 
     persistAndBroadcast();
 
@@ -321,6 +411,13 @@ async function deployLatestVersion() {
       status: "error",
       message: "Deploy mislukt. Check server logs.",
     };
+
+    appendLog(
+      "error",
+      "deployment",
+      "Deploy mislukt",
+      error instanceof Error ? error.message : String(error),
+    );
 
     console.error("failed to deploy latest version", error);
     persistAndBroadcast();
@@ -339,18 +436,22 @@ function markPresenceActive() {
   };
 
   updateDisplayState("motion");
+  appendLog("info", "presence", "Beweging gedetecteerd");
   persistAndBroadcast();
 }
 
 function updateDisplayState(reason = "system") {
+  const previousMode = state.display.mode;
+  const previousReason = state.display.reason;
+
   let nextMode = "on";
 
-  if (state.presence.mode === "active") {
+  if (!state.settings.autoSleepEnabled) {
     nextMode = "on";
-  } else if (state.settings.autoSleepEnabled) {
-    nextMode = "sleep";
+  } else if (state.presence.mode === "active") {
+    nextMode = "on";
   } else {
-    nextMode = "dimmed";
+    nextMode = "sleep";
   }
 
   state.display = {
@@ -358,6 +459,15 @@ function updateDisplayState(reason = "system") {
     reason,
     updatedAt: Date.now(),
   };
+
+  if (previousMode !== nextMode || previousReason !== reason) {
+    appendLog(
+      "info",
+      "display",
+      "Display state gewijzigd",
+      `mode=${nextMode} · reason=${reason} · autoSleep=${state.settings.autoSleepEnabled} · presence=${state.presence.mode}`,
+    );
+  }
 }
 
 pollJellyfinNowPlaying();
@@ -369,6 +479,10 @@ setInterval(() => {
   }
 
   if (!state.presence.lastMotionAt) {
+    return;
+  }
+
+  if (!state.settings.autoSleepEnabled) {
     return;
   }
 
@@ -405,6 +519,12 @@ function updateSettings(partialSettings = {}) {
     ...partialSettings,
   });
 
+  appendLog(
+    "info",
+    "settings",
+    "Instellingen bijgewerkt",
+    JSON.stringify(partialSettings),
+  );
   updateDisplayState("settings:update");
   persistAndBroadcast();
 }
@@ -423,6 +543,7 @@ function reorderLayoutByIds(currentLayout, orderedIds) {
 
 wss.on("connection", (ws) => {
   console.log("client connected");
+  appendLog("info", "ws", "Client verbonden");
 
   ws.isAlive = true;
   ws.on("pong", markWebSocketAlive);
@@ -478,11 +599,13 @@ wss.on("connection", (ws) => {
       }
     } catch (error) {
       console.error("invalid ws message", error);
+      appendLog("error", "ws", "Ongeldig ws bericht ontvangen");
     }
   });
 
   ws.on("close", () => {
     console.log("client disconnected");
+    appendLog("warn", "ws", "Client verbinding verbroken");
   });
 });
 

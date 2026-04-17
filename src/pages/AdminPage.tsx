@@ -5,6 +5,7 @@ import type { MirrorSettings } from "../types/settings";
 import type { PresenceState } from "../types/presence";
 import type { DisplayState } from "../types/display";
 import type { DeploymentState } from "../types/deployment";
+import type { DebugLogEntry } from "../types/log";
 
 type AdminPageProps = {
   layout: LayoutItem[];
@@ -23,6 +24,8 @@ type AdminPageProps = {
     | "disconnected";
   connectionError: string | null;
   deployment: DeploymentState;
+  logs: DebugLogEntry[];
+  clientLogs: DebugLogEntry[];
   onCheckDeploymentUpdate: () => void;
   onDeployLatestVersion: () => void;
 };
@@ -44,6 +47,10 @@ function getConnectionStatusLabel(
   }
 }
 
+function formatLogTime(timestamp: number) {
+  return new Date(timestamp).toLocaleTimeString("nl-NL");
+}
+
 export function AdminPage({
   layout,
   settings,
@@ -57,6 +64,8 @@ export function AdminPage({
   connectionStatus,
   connectionError,
   deployment,
+  logs,
+  clientLogs,
   onCheckDeploymentUpdate,
   onDeployLatestVersion,
 }: AdminPageProps) {
@@ -181,7 +190,15 @@ export function AdminPage({
         <p>Status: {deployment.status}</p>
         <p>Huidige commit: {deployment.currentCommit ?? "onbekend"}</p>
         <p>
+          Huidige commit message:{" "}
+          {deployment.currentCommitMessage ?? "onbekend"}
+        </p>
+        <p>
           Remote commit: {deployment.remoteCommit ?? "nog niet gecontroleerd"}
+        </p>
+        <p>
+          Remote commit message:{" "}
+          {deployment.remoteCommitMessage ?? "nog niet gecontroleerd"}
         </p>
         <p>Update beschikbaar: {deployment.hasUpdate ? "ja" : "nee"}</p>
         <p>{deploymentMessage}</p>
@@ -211,6 +228,68 @@ export function AdminPage({
           >
             Deploy update
           </button>
+        </div>
+      </section>
+
+      <section className="admin-card">
+        <h2>Server logs</h2>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {logs.length === 0 ? (
+            <p>Nog geen serverlogs.</p>
+          ) : (
+            logs.map((log) => (
+              <div
+                key={log.id}
+                style={{
+                  fontFamily: "monospace",
+                  fontSize: "0.85rem",
+                  paddingBottom: "10px",
+                  borderBottom: "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                <div>
+                  [{formatLogTime(log.timestamp)}] {log.level.toUpperCase()} ·{" "}
+                  {log.source}
+                </div>
+                <div>{log.message}</div>
+                {log.meta ? (
+                  <div style={{ opacity: 0.7 }}>{log.meta}</div>
+                ) : null}
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
+      <section className="admin-card">
+        <h2>Browser / socket logs</h2>
+
+        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+          {clientLogs.length === 0 ? (
+            <p>Nog geen browserlogs.</p>
+          ) : (
+            clientLogs.map((log) => (
+              <div
+                key={log.id}
+                style={{
+                  fontFamily: "monospace",
+                  fontSize: "0.85rem",
+                  paddingBottom: "10px",
+                  borderBottom: "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                <div>
+                  [{formatLogTime(log.timestamp)}] {log.level.toUpperCase()} ·{" "}
+                  {log.source}
+                </div>
+                <div>{log.message}</div>
+                {log.meta ? (
+                  <div style={{ opacity: 0.7 }}>{log.meta}</div>
+                ) : null}
+              </div>
+            ))
+          )}
         </div>
       </section>
     </main>

@@ -20,6 +20,8 @@ function App() {
     checkDeploymentUpdate,
     deployLatestVersion,
     media,
+    logs,
+    clientLogs,
   } = useMirrorSocket();
 
   if (!layout.length) {
@@ -70,6 +72,8 @@ function App() {
               isConnected={isConnected}
               connectionStatus={connectionStatus}
               connectionError={connectionError}
+              logs={logs}
+              clientLogs={clientLogs}
             />
           }
         />

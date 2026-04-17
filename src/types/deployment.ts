@@ -10,7 +10,9 @@ export type DeploymentStatus =
 export type DeploymentState = {
   status: DeploymentStatus;
   currentCommit: string | null;
+  currentCommitMessage: string | null;
   remoteCommit: string | null;
+  remoteCommitMessage: string | null;
   hasUpdate: boolean;
   lastCheckedAt: number | null;
   lastDeployedAt: number | null;

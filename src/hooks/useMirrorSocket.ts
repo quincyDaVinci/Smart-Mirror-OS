@@ -6,6 +6,7 @@ import type { DisplayState } from "../types/display";
 import { getWebSocketUrl } from "../utils/getWebSocketUrl";
 import type { DeploymentState } from "../types/deployment";
 import type { MediaState } from "../types/media";
+import type { DebugLogEntry } from "../types/log";
 
 type MirrorState = {
   layout: LayoutItem[];
@@ -14,6 +15,7 @@ type MirrorState = {
   display: DisplayState;
   deployment: DeploymentState;
   media: MediaState;
+  logs: DebugLogEntry[];
 };
 
 type ServerMessage =
@@ -98,7 +100,9 @@ export function useMirrorSocket() {
   const [deployment, setDeployment] = useState<DeploymentState>({
     status: "idle",
     currentCommit: null,
+    currentCommitMessage: null,
     remoteCommit: null,
+    remoteCommitMessage: null,
     hasUpdate: false,
     lastCheckedAt: null,
     lastDeployedAt: null,
@@ -135,11 +139,34 @@ export function useMirrorSocket() {
       },
     },
   });
+  const [logs, setLogs] = useState<DebugLogEntry[]>([]);
+  const [clientLogs, setClientLogs] = useState<DebugLogEntry[]>([]);
 
   const [isConnected, setIsConnected] = useState(false);
   const [connectionStatus, setConnectionStatus] =
     useState<ConnectionStatus>("connecting");
   const [connectionError, setConnectionError] = useState<string | null>(null);
+
+  function appendClientLog(
+    level: "info" | "warn" | "error",
+    source: string,
+    message: string,
+    meta: string | null = null,
+  ) {
+    setClientLogs((previousLogs) =>
+      [
+        {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          timestamp: Date.now(),
+          level,
+          source,
+          message,
+          meta,
+        },
+        ...previousLogs,
+      ].slice(0, 100),
+    );
+  }
 
   useEffect(() => {
     isUnmountedRef.current = false;
@@ -174,6 +201,12 @@ export function useMirrorSocket() {
       setConnectionStatus("reconnecting");
       setConnectionError(
         `Verbinding verloren. Nieuwe poging over ${Math.ceil(delayMs / 1000)}s.`,
+      );
+      appendClientLog(
+        "warn",
+        "ws",
+        "Reconnect ingepland",
+        `delay=${delayMs}ms`,
       );
 
       reconnectTimeoutRef.current = window.setTimeout(() => {
@@ -225,6 +258,7 @@ export function useMirrorSocket() {
         setIsConnected(true);
         setConnectionStatus("connected");
         setConnectionError(null);
+        appendClientLog("info", "ws", "Verbonden met server", WS_URL);
       });
 
       socket.addEventListener("close", () => {
@@ -234,6 +268,7 @@ export function useMirrorSocket() {
 
         clearConnectTimeout();
         setIsConnected(false);
+        appendClientLog("warn", "ws", "Socket gesloten");
 
         if (isUnmountedRef.current) {
           return;
@@ -249,6 +284,7 @@ export function useMirrorSocket() {
 
         clearConnectTimeout();
         setConnectionError("Er ging iets mis met de WebSocket-verbinding.");
+        appendClientLog("error", "ws", "WebSocket error ontvangen");
 
         if (
           socket.readyState === WebSocket.OPEN ||
@@ -268,6 +304,7 @@ export function useMirrorSocket() {
 
           if (!isServerMessage(parsedMessage)) {
             setConnectionError("Ongeldig serverbericht ontvangen.");
+            appendClientLog("error", "ws", "Ongeldig serverbericht ontvangen");
             return;
           }
 
@@ -277,9 +314,16 @@ export function useMirrorSocket() {
           setDisplay(parsedMessage.payload.display);
           setDeployment(parsedMessage.payload.deployment);
           setMedia(parsedMessage.payload.media);
+          setLogs(parsedMessage.payload.logs ?? []);
         } catch (error) {
           console.error("failed to parse ws message", error);
           setConnectionError("Kon serverbericht niet verwerken.");
+          appendClientLog(
+            "error",
+            "ws",
+            "Kon serverbericht niet verwerken",
+            error instanceof Error ? error.message : String(error),
+          );
         }
       });
     }
@@ -323,6 +367,7 @@ export function useMirrorSocket() {
 
     if (!socket || socket.readyState !== WebSocket.OPEN) {
       setConnectionError("Actie niet verstuurd: er is geen live verbinding.");
+      appendClientLog("warn", "ws", "Actie geblokkeerd: geen live verbinding");
       return;
     }
 
@@ -384,5 +429,7 @@ export function useMirrorSocket() {
     checkDeploymentUpdate,
     deployLatestVersion,
     media,
+    logs,
+    clientLogs,
   };
 }
