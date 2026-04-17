@@ -17,6 +17,16 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
+process.on("uncaughtException", (error) => {
+  console.error("[fatal] uncaughtException", error);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[fatal] unhandledRejection", reason);
+});
+
+console.log("[boot] backend process starting");
+
 const HEARTBEAT_INTERVAL_MS = 25000;
 
 function markWebSocketAlive() {
@@ -167,6 +177,7 @@ function saveState(nextState) {
 }
 
 const state = loadState();
+console.log("[boot] state loaded");
 
 state.logs = [];
 
@@ -490,8 +501,16 @@ function updateDisplayState(reason = "system") {
   }
 }
 
-pollJellyfinNowPlaying();
-setInterval(pollJellyfinNowPlaying, 2000);
+function startBackgroundJobs() {
+  console.log("[boot] starting jellyfin polling");
+  void pollJellyfinNowPlaying();
+
+  setInterval(() => {
+    void pollJellyfinNowPlaying();
+  }, 2000);
+}
+
+console.log("[boot] registering presence timeout interval");
 
 setInterval(() => {
   if (state.presence.mode !== "active") {
@@ -561,6 +580,8 @@ function reorderLayoutByIds(currentLayout, orderedIds) {
   return nextLayout;
 }
 
+console.log("[boot] registering websocket handlers");
+
 wss.on("connection", (ws, req) => {
   const clientId = nextWsClientId++;
   const clientIp = getClientAddress(req);
@@ -574,7 +595,6 @@ wss.on("connection", (ws, req) => {
     "Client verbonden",
     `id=${clientId} · ip=${clientIp} · ua=${clientUserAgent}`,
   );
-  appendLog("info", "ws", "Client verbonden");
 
   ws.isAlive = true;
   ws.on("pong", markWebSocketAlive);
@@ -584,7 +604,9 @@ wss.on("connection", (ws, req) => {
       "error",
       "ws",
       "Client socket error",
-      `id=${clientId} · ${error instanceof Error ? error.message : String(error)}`,
+      `id=${clientId} · ${
+        error instanceof Error ? error.message : String(error)
+      }`,
     );
   });
 
@@ -639,7 +661,12 @@ wss.on("connection", (ws, req) => {
       }
     } catch (error) {
       console.error("invalid ws message", error);
-      appendLog("error", "ws", "Ongeldig ws bericht ontvangen");
+      appendLog(
+        "error",
+        "ws",
+        "Ongeldig clientbericht ontvangen",
+        error instanceof Error ? error.message : String(error),
+      );
     }
   });
 
@@ -660,14 +687,27 @@ wss.on("connection", (ws, req) => {
       `client disconnected #${clientId} code=${code} reason=${reason}`,
     );
   });
+});
 
-  app.get("/health", (_req, res) => {
-    res.json({ ok: true });
-  });
+console.log("[boot] registering health route");
 
-  const PORT = 8787;
+app.get("/health", (_req, res) => {
+  res.json({ ok: true });
+});
 
-  server.listen(PORT, "0.0.0.0", () => {
-    console.log(`server running on port ${PORT}`);
-  });
+const PORT = 8787;
+
+server.on("error", (error) => {
+  console.error("[fatal] http server error", error);
+});
+
+wss.on("error", (error) => {
+  console.error("[fatal] websocket server error", error);
+});
+
+console.log(`[boot] about to listen on port ${PORT}`);
+
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`[boot] server running on port ${PORT}`);
+  startBackgroundJobs();
 });
