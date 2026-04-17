@@ -170,7 +170,27 @@ const state = loadState();
 
 state.logs = [];
 
-const MAX_LOG_ENTRIES = 200;
+const MAX_LOG_ENTRIES = 100;
+
+let nextWsClientId = 1;
+
+function getClientAddress(req) {
+  const forwardedFor = req.headers["x-forwarded-for"];
+
+  if (typeof forwardedFor === "string" && forwardedFor.length > 0) {
+    return forwardedFor.split(",")[0].trim();
+  }
+
+  return req.socket.remoteAddress ?? "unknown";
+}
+
+function getClientUserAgent(req) {
+  const userAgent = req.headers["user-agent"];
+
+  return typeof userAgent === "string" && userAgent.length > 0
+    ? userAgent
+    : "unknown";
+}
 
 function appendLog(level, source, message, meta = null) {
   state.logs = [
@@ -541,12 +561,32 @@ function reorderLayoutByIds(currentLayout, orderedIds) {
   return nextLayout;
 }
 
-wss.on("connection", (ws) => {
-  console.log("client connected");
+wss.on("connection", (ws, req) => {
+  const clientId = nextWsClientId++;
+  const clientIp = getClientAddress(req);
+  const clientUserAgent = getClientUserAgent(req);
+
+  console.log(`client connected #${clientId} ${clientIp}`);
+
+  appendLog(
+    "info",
+    "ws",
+    "Client verbonden",
+    `id=${clientId} · ip=${clientIp} · ua=${clientUserAgent}`,
+  );
   appendLog("info", "ws", "Client verbonden");
 
   ws.isAlive = true;
   ws.on("pong", markWebSocketAlive);
+
+  ws.on("error", (error) => {
+    appendLog(
+      "error",
+      "ws",
+      "Client socket error",
+      `id=${clientId} · ${error instanceof Error ? error.message : String(error)}`,
+    );
+  });
 
   ws.send(
     JSON.stringify({
@@ -603,18 +643,31 @@ wss.on("connection", (ws) => {
     }
   });
 
-  ws.on("close", () => {
-    console.log("client disconnected");
-    appendLog("warn", "ws", "Client verbinding verbroken");
+  ws.on("close", (code, reasonBuffer) => {
+    const reason =
+      reasonBuffer && reasonBuffer.length > 0
+        ? reasonBuffer.toString()
+        : "no reason";
+
+    appendLog(
+      "warn",
+      "ws",
+      "Client verbinding verbroken",
+      `id=${clientId} · ip=${clientIp} · code=${code} · reason=${reason}`,
+    );
+
+    console.log(
+      `client disconnected #${clientId} code=${code} reason=${reason}`,
+    );
   });
-});
 
-app.get("/health", (_req, res) => {
-  res.json({ ok: true });
-});
+  app.get("/health", (_req, res) => {
+    res.json({ ok: true });
+  });
 
-const PORT = 8787;
+  const PORT = 8787;
 
-server.listen(PORT, "0.0.0.0", () => {
-  console.log(`server running on port ${PORT}`);
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`server running on port ${PORT}`);
+  });
 });

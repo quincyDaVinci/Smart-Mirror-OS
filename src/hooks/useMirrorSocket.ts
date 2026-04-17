@@ -261,14 +261,20 @@ export function useMirrorSocket() {
         appendClientLog("info", "ws", "Verbonden met server", WS_URL);
       });
 
-      socket.addEventListener("close", () => {
+      socket.addEventListener("close", (event) => {
         if (socket !== socketRef.current) {
           return;
         }
 
         clearConnectTimeout();
         setIsConnected(false);
-        appendClientLog("warn", "ws", "Socket gesloten");
+
+        appendClientLog(
+          event.wasClean ? "warn" : "error",
+          "ws",
+          "Socket gesloten",
+          `code=${event.code} · clean=${event.wasClean} · reason=${event.reason || "none"} · online=${navigator.onLine} · visibility=${document.visibilityState}`,
+        );
 
         if (isUnmountedRef.current) {
           return;
@@ -284,7 +290,12 @@ export function useMirrorSocket() {
 
         clearConnectTimeout();
         setConnectionError("Er ging iets mis met de WebSocket-verbinding.");
-        appendClientLog("error", "ws", "WebSocket error ontvangen");
+        appendClientLog(
+          "error",
+          "ws",
+          "WebSocket error ontvangen",
+          `online=${navigator.onLine} · visibility=${document.visibilityState}`,
+        );
 
         if (
           socket.readyState === WebSocket.OPEN ||
