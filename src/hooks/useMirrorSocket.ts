@@ -30,6 +30,7 @@ const WS_URL = getWebSocketUrl();
 
 const RECONNECT_BASE_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 10000;
+const CONNECT_TIMEOUT_MS = 5000;
 
 function getReconnectDelayMs(attempt: number) {
   return Math.min(
@@ -73,6 +74,7 @@ function isServerMessage(value: unknown): value is ServerMessage {
 export function useMirrorSocket() {
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
+  const connectTimeoutRef = useRef<number | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const isUnmountedRef = useRef(false);
   const lastHandledDeployAtRef = useRef<number | null>(null);
@@ -149,12 +151,20 @@ export function useMirrorSocket() {
       }
     }
 
+    function clearConnectTimeout() {
+      if (connectTimeoutRef.current !== null) {
+        window.clearTimeout(connectTimeoutRef.current);
+        connectTimeoutRef.current = null;
+      }
+    }
+
     function scheduleReconnect() {
       if (isUnmountedRef.current) {
         return;
       }
 
       clearReconnectTimeout();
+      clearConnectTimeout();
 
       const nextAttempt = reconnectAttemptsRef.current + 1;
       reconnectAttemptsRef.current = nextAttempt;
@@ -173,6 +183,17 @@ export function useMirrorSocket() {
 
     function connectSocket() {
       clearReconnectTimeout();
+      clearConnectTimeout();
+
+      const previousSocket = socketRef.current;
+
+      if (
+        previousSocket &&
+        (previousSocket.readyState === WebSocket.OPEN ||
+          previousSocket.readyState === WebSocket.CONNECTING)
+      ) {
+        previousSocket.close();
+      }
 
       setConnectionStatus(
         reconnectAttemptsRef.current > 0 ? "reconnecting" : "connecting",
@@ -181,11 +202,25 @@ export function useMirrorSocket() {
       const socket = new WebSocket(WS_URL);
       socketRef.current = socket;
 
+      connectTimeoutRef.current = window.setTimeout(() => {
+        if (socket !== socketRef.current) {
+          return;
+        }
+
+        if (socket.readyState === WebSocket.CONNECTING) {
+          setConnectionError(
+            "Server reageert te traag. Nieuwe verbindingspoging...",
+          );
+          socket.close();
+        }
+      }, CONNECT_TIMEOUT_MS);
+
       socket.addEventListener("open", () => {
         if (socket !== socketRef.current) {
           return;
         }
 
+        clearConnectTimeout();
         reconnectAttemptsRef.current = 0;
         setIsConnected(true);
         setConnectionStatus("connected");
@@ -197,6 +232,7 @@ export function useMirrorSocket() {
           return;
         }
 
+        clearConnectTimeout();
         setIsConnected(false);
 
         if (isUnmountedRef.current) {
@@ -211,6 +247,7 @@ export function useMirrorSocket() {
           return;
         }
 
+        clearConnectTimeout();
         setConnectionError("Er ging iets mis met de WebSocket-verbinding.");
 
         if (
@@ -252,6 +289,7 @@ export function useMirrorSocket() {
     return () => {
       isUnmountedRef.current = true;
       clearReconnectTimeout();
+      clearConnectTimeout();
 
       if (socketRef.current) {
         socketRef.current.close();

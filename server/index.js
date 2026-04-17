@@ -17,6 +17,28 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
+const HEARTBEAT_INTERVAL_MS = 25000;
+
+function markWebSocketAlive() {
+  this.isAlive = true;
+}
+
+const heartbeatInterval = setInterval(() => {
+  wss.clients.forEach((client) => {
+    if (client.isAlive === false) {
+      client.terminate();
+      return;
+    }
+
+    client.isAlive = false;
+    client.ping();
+  });
+}, HEARTBEAT_INTERVAL_MS);
+
+wss.on("close", () => {
+  clearInterval(heartbeatInterval);
+});
+
 const defaultState = {
   layout: [
     { id: "clock", enabled: true },
@@ -401,6 +423,9 @@ function reorderLayoutByIds(currentLayout, orderedIds) {
 
 wss.on("connection", (ws) => {
   console.log("client connected");
+
+  ws.isAlive = true;
+  ws.on("pong", markWebSocketAlive);
 
   ws.send(
     JSON.stringify({
