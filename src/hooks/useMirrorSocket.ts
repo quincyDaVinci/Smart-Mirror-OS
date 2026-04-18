@@ -215,6 +215,8 @@ export function useMirrorSocket() {
       applyState(nextState);
 
       if (!options?.silentSuccess) {
+        applyState(nextState);
+        setConnectionError(null);
         appendClientLog("info", "http", "State snapshot opgehaald", reason);
       }
     } catch (error) {
@@ -520,6 +522,7 @@ export function useMirrorSocket() {
     const socket = socketRef.current;
 
     if (socket && socket.readyState === WebSocket.OPEN) {
+      setConnectionError(null);
       socket.send(JSON.stringify(message));
       return;
     }
@@ -545,8 +548,12 @@ export function useMirrorSocket() {
       }
 
       await fetchStateSnapshot("after http action fallback");
-      setConnectionError(
-        "Live verbinding tijdelijk weg. HTTP fallback gebruikt.",
+      setConnectionError(null);
+      appendClientLog(
+        "info",
+        "http",
+        "HTTP fallback actie gelukt",
+        JSON.stringify(message),
       );
     } catch (error) {
       setConnectionError(

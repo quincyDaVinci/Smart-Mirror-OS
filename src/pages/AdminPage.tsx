@@ -73,9 +73,14 @@ export function AdminPage({
     (deployment.status === "deploying" || deployment.status === "success") &&
     connectionStatus !== "connected";
 
+  const hasRecoveredAfterDeploy =
+    deployment.status === "success" && connectionStatus === "connected";
+
   const deploymentMessage = isExpectedReconnect
     ? "Services herstarten. De pagina verbindt zo opnieuw."
-    : (deployment.message ?? "Nog geen update-check uitgevoerd.");
+    : hasRecoveredAfterDeploy
+      ? "Deploy afgerond. Verbinding hersteld."
+      : (deployment.message ?? "Nog geen update-check uitgevoerd.");
 
   return (
     <main className="admin-page">
@@ -90,7 +95,9 @@ export function AdminPage({
         Status: <strong>{getConnectionStatusLabel(connectionStatus)}</strong>
       </p>
 
-      {connectionError && !isExpectedReconnect ? (
+      {connectionError &&
+      !isExpectedReconnect &&
+      connectionStatus !== "connected" ? (
         <p
           className="admin-status"
           style={{ color: "#ffb3b3", marginTop: "-8px" }}
