@@ -39,6 +39,7 @@ function getApiBaseUrl() {
 const RECONNECT_BASE_DELAY_MS = 1000;
 const RECONNECT_MAX_DELAY_MS = 10000;
 const CONNECT_TIMEOUT_MS = 5000;
+const MIRROR_POLL_INTERVAL_MS = 4000;
 
 function getReconnectDelayMs(attempt: number) {
   return Math.min(
@@ -83,6 +84,7 @@ export function useMirrorSocket() {
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
   const connectTimeoutRef = useRef<number | null>(null);
+  const mirrorPollIntervalRef = useRef<number | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const isUnmountedRef = useRef(false);
   const lastHandledDeployAtRef = useRef<number | null>(null);
@@ -184,7 +186,17 @@ export function useMirrorSocket() {
     );
   }
 
-  async function fetchStateSnapshot(reason: string) {
+  function clearMirrorPollInterval() {
+    if (mirrorPollIntervalRef.current !== null) {
+      window.clearInterval(mirrorPollIntervalRef.current);
+      mirrorPollIntervalRef.current = null;
+    }
+  }
+
+  async function fetchStateSnapshot(
+    reason: string,
+    options?: { silentSuccess?: boolean },
+  ) {
     try {
       const response = await fetch(`${getApiBaseUrl()}/state`, {
         cache: "no-store",
@@ -201,7 +213,10 @@ export function useMirrorSocket() {
       }
 
       applyState(nextState);
-      appendClientLog("info", "http", "State snapshot opgehaald", reason);
+
+      if (!options?.silentSuccess) {
+        appendClientLog("info", "http", "State snapshot opgehaald", reason);
+      }
     } catch (error) {
       appendClientLog(
         "error",
@@ -384,6 +399,7 @@ export function useMirrorSocket() {
       isUnmountedRef.current = true;
       clearReconnectTimeout();
       clearConnectTimeout();
+      clearMirrorPollInterval();
 
       if (socketRef.current) {
         socketRef.current.close();
@@ -431,6 +447,54 @@ export function useMirrorSocket() {
       window.removeEventListener("online", handleOnline);
     };
   }, []);
+
+  useEffect(() => {
+    if (window.location.pathname !== "/") {
+      clearMirrorPollInterval();
+      return;
+    }
+
+    if (isConnected) {
+      const wasPolling = mirrorPollIntervalRef.current !== null;
+      clearMirrorPollInterval();
+
+      if (wasPolling) {
+        appendClientLog(
+          "info",
+          "http",
+          "Mirror polling fallback gestopt",
+          "WebSocket opnieuw verbonden",
+        );
+      }
+
+      return;
+    }
+
+    if (mirrorPollIntervalRef.current !== null) {
+      return;
+    }
+
+    appendClientLog(
+      "warn",
+      "http",
+      "Mirror polling fallback gestart",
+      `interval=${MIRROR_POLL_INTERVAL_MS}ms · status=${connectionStatus}`,
+    );
+
+    void fetchStateSnapshot("mirror polling:start", {
+      silentSuccess: true,
+    });
+
+    mirrorPollIntervalRef.current = window.setInterval(() => {
+      void fetchStateSnapshot("mirror polling:interval", {
+        silentSuccess: true,
+      });
+    }, MIRROR_POLL_INTERVAL_MS);
+
+    return () => {
+      clearMirrorPollInterval();
+    };
+  }, [isConnected, connectionStatus]);
 
   useEffect(() => {
     if (window.location.pathname !== "/") {
