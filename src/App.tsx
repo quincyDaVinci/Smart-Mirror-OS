@@ -22,6 +22,7 @@ function App() {
     media,
     logs,
     clientLogs,
+    lastHttpSuccessAt,
   } = useMirrorSocket();
 
   return (
@@ -59,6 +60,7 @@ function App() {
               connectionError={connectionError}
               logs={logs}
               clientLogs={clientLogs}
+              lastHttpSuccessAt={lastHttpSuccessAt}
             />
           }
         />

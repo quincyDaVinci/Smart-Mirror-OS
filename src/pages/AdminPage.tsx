@@ -28,6 +28,7 @@ type AdminPageProps = {
   clientLogs: DebugLogEntry[];
   onCheckDeploymentUpdate: () => void;
   onDeployLatestVersion: () => void;
+  lastHttpSuccessAt: number | null;
 };
 
 function getConnectionStatusLabel(
@@ -68,6 +69,7 @@ export function AdminPage({
   clientLogs,
   onCheckDeploymentUpdate,
   onDeployLatestVersion,
+  lastHttpSuccessAt,
 }: AdminPageProps) {
   const isExpectedReconnect =
     (deployment.status === "deploying" || deployment.status === "success") &&
@@ -92,6 +94,14 @@ export function AdminPage({
       </div>
 
       <p className="admin-status">
+        {!isConnected && lastHttpSuccessAt ? (
+          <p
+            className="admin-status"
+            style={{ marginTop: "-8px", color: "#cfcfcf" }}
+          >
+            Transport: HTTP fallback actief
+          </p>
+        ) : null}
         Status: <strong>{getConnectionStatusLabel(connectionStatus)}</strong>
       </p>
 

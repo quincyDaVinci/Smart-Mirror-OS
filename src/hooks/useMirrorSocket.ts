@@ -85,6 +85,7 @@ export function useMirrorSocket() {
   const reconnectTimeoutRef = useRef<number | null>(null);
   const connectTimeoutRef = useRef<number | null>(null);
   const mirrorPollIntervalRef = useRef<number | null>(null);
+  const reconnectNowRef = useRef<(() => void) | null>(null);
   const reconnectAttemptsRef = useRef(0);
   const isUnmountedRef = useRef(false);
   const lastHandledDeployAtRef = useRef<number | null>(null);
@@ -149,6 +150,9 @@ export function useMirrorSocket() {
   });
   const [logs, setLogs] = useState<DebugLogEntry[]>([]);
   const [clientLogs, setClientLogs] = useState<DebugLogEntry[]>([]);
+  const [lastHttpSuccessAt, setLastHttpSuccessAt] = useState<number | null>(
+    null,
+  );
 
   function applyState(nextState: MirrorState) {
     setLayout(nextState.layout);
@@ -158,6 +162,7 @@ export function useMirrorSocket() {
     setDeployment(nextState.deployment);
     setMedia(nextState.media);
     setLogs(nextState.logs ?? []);
+    setLastHttpSuccessAt(Date.now());
   }
 
   const [isConnected, setIsConnected] = useState(false);
@@ -195,7 +200,7 @@ export function useMirrorSocket() {
 
   async function fetchStateSnapshot(
     reason: string,
-    options?: { silentSuccess?: boolean },
+    options?: { silentSuccess?: boolean; triggerReconnect?: boolean },
   ) {
     try {
       const response = await fetch(`${getApiBaseUrl()}/state`, {
@@ -213,11 +218,25 @@ export function useMirrorSocket() {
       }
 
       applyState(nextState);
+      setConnectionError(null);
 
       if (!options?.silentSuccess) {
-        applyState(nextState);
-        setConnectionError(null);
         appendClientLog("info", "http", "State snapshot opgehaald", reason);
+      }
+
+      if (
+        options?.triggerReconnect &&
+        !isConnected &&
+        document.visibilityState === "visible" &&
+        navigator.onLine
+      ) {
+        appendClientLog(
+          "info",
+          "ws",
+          "Directe reconnect getriggerd na HTTP succes",
+          reason,
+        );
+        reconnectNowRef.current?.();
       }
     } catch (error) {
       appendClientLog(
@@ -394,11 +413,23 @@ export function useMirrorSocket() {
       });
     }
 
-    void fetchStateSnapshot("initial load");
+    reconnectNowRef.current = () => {
+      if (isUnmountedRef.current) {
+        return;
+      }
+
+      clearReconnectTimeout();
+      clearConnectTimeout();
+      reconnectAttemptsRef.current = 0;
+      connectSocket();
+    };
+
+    void fetchStateSnapshot("initial load", { triggerReconnect: true });
     connectSocket();
 
     return () => {
       isUnmountedRef.current = true;
+      reconnectNowRef.current = null;
       clearReconnectTimeout();
       clearConnectTimeout();
       clearMirrorPollInterval();
@@ -418,7 +449,7 @@ export function useMirrorSocket() {
         "pageshow",
         `visibility=${document.visibilityState}`,
       );
-      void fetchStateSnapshot("pageshow");
+      void fetchStateSnapshot("pageshow", { triggerReconnect: true });
     }
 
     function handleVisibilityChange() {
@@ -430,13 +461,15 @@ export function useMirrorSocket() {
       );
 
       if (document.visibilityState === "visible") {
-        void fetchStateSnapshot("visibilitychange:visible");
+        void fetchStateSnapshot("visibilitychange:visible", {
+          triggerReconnect: true,
+        });
       }
     }
 
     function handleOnline() {
       appendClientLog("info", "page", "online", String(navigator.onLine));
-      void fetchStateSnapshot("online");
+      void fetchStateSnapshot("online", { triggerReconnect: true });
     }
 
     window.addEventListener("pageshow", handlePageShow);
@@ -625,5 +658,6 @@ export function useMirrorSocket() {
     media,
     logs,
     clientLogs,
+    lastHttpSuccessAt,
   };
 }
