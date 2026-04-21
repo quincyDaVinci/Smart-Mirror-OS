@@ -18,9 +18,10 @@ const {
   resetSpotifyAccessTokenCache,
 } = require("./providers/spotifyNowPlaying");
 const {
+  saveJellyfinSecrets,
   getSpotifySecrets,
   saveSpotifySecrets,
-  getRedactedSpotifySecrets,
+  getRedactedProviderSecrets,
 } = require("./secretsStore");
 
 const app = express();
@@ -835,10 +836,90 @@ wss.on("connection", (ws, req) => {
     );
   });
 });
-app.get("/auth/spotify/status", (_req, res) => {
+
+app.get("/config/providers/status", (_req, res) => {
   res.json({
     ok: true,
-    spotify: getRedactedSpotifySecrets(),
+    providers: getRedactedProviderSecrets(),
+  });
+});
+
+app.post("/config/providers/secrets", async (req, res) => {
+  if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
+    res.status(400).json({ ok: false, error: "Ongeldige request body." });
+    return;
+  }
+
+  const jellyfinInput = req.body.jellyfin;
+  const spotifyInput = req.body.spotify;
+
+  if (jellyfinInput === undefined && spotifyInput === undefined) {
+    res.status(400).json({
+      ok: false,
+      error: "Geen jellyfin of spotify configuratie ontvangen.",
+    });
+    return;
+  }
+
+  if (
+    jellyfinInput !== undefined &&
+    (typeof jellyfinInput !== "object" ||
+      jellyfinInput === null ||
+      Array.isArray(jellyfinInput))
+  ) {
+    res.status(400).json({
+      ok: false,
+      error: "Jellyfin configuratie heeft ongeldig formaat.",
+    });
+    return;
+  }
+
+  if (
+    spotifyInput !== undefined &&
+    (typeof spotifyInput !== "object" ||
+      spotifyInput === null ||
+      Array.isArray(spotifyInput))
+  ) {
+    res.status(400).json({
+      ok: false,
+      error: "Spotify configuratie heeft ongeldig formaat.",
+    });
+    return;
+  }
+
+  if (jellyfinInput) {
+    saveJellyfinSecrets(jellyfinInput);
+  }
+
+  if (spotifyInput) {
+    saveSpotifySecrets(spotifyInput);
+    resetSpotifyAccessTokenCache();
+  }
+
+  appendLog(
+    "info",
+    "config",
+    "Provider secrets bijgewerkt",
+    JSON.stringify({
+      jellyfinKeys: jellyfinInput ? Object.keys(jellyfinInput) : [],
+      spotifyKeys: spotifyInput ? Object.keys(spotifyInput) : [],
+    }),
+  );
+
+  await pollNowPlayingProviders();
+
+  res.json({
+    ok: true,
+    providers: getRedactedProviderSecrets(),
+  });
+});
+
+app.get("/auth/spotify/status", (_req, res) => {
+  const providers = getRedactedProviderSecrets();
+
+  res.json({
+    ok: true,
+    spotify: providers.spotify,
   });
 });
 

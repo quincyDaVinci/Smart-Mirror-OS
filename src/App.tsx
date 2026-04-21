@@ -23,6 +23,10 @@ function App() {
     logs,
     clientLogs,
     lastHttpSuccessAt,
+    providerConfigStatus,
+    refreshProviderConfigStatus,
+    saveProviderSecrets,
+    apiBaseUrl,
   } = useMirrorSocket();
 
   return (
@@ -61,6 +65,10 @@ function App() {
               logs={logs}
               clientLogs={clientLogs}
               lastHttpSuccessAt={lastHttpSuccessAt}
+              providerConfigStatus={providerConfigStatus}
+              onRefreshProviderConfigStatus={refreshProviderConfigStatus}
+              onSaveProviderSecrets={saveProviderSecrets}
+              apiBaseUrl={apiBaseUrl}
             />
           }
         />

@@ -1,4 +1,5 @@
 const CHECKED_IDLE_MESSAGE = "Geen actieve Jellyfin sessie.";
+const { getJellyfinSecrets } = require("../secretsStore");
 
 function ticksToMs(ticks) {
   return typeof ticks === "number" ? Math.floor(ticks / 10000) : null;
@@ -143,10 +144,13 @@ function pickBestSession(sessions, preferredUserName, preferredDeviceName) {
 }
 
 async function fetchJellyfinNowPlaying() {
-  const baseUrl = process.env.JELLYFIN_BASE_URL;
-  const apiKey = process.env.JELLYFIN_API_KEY;
-  const preferredUserName = process.env.JELLYFIN_USER_NAME ?? "";
-  const preferredDeviceName = process.env.JELLYFIN_DEVICE_NAME ?? "";
+  const jellyfinSecrets = getJellyfinSecrets();
+
+  const baseUrl = jellyfinSecrets.baseUrl;
+  const apiKey = jellyfinSecrets.apiKey;
+  const preferredUserName = jellyfinSecrets.userName ?? "";
+  const preferredDeviceName = jellyfinSecrets.deviceName ?? "";
+  
   const checkedAt = Date.now();
 
   if (!baseUrl || !apiKey) {

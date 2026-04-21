@@ -7,6 +7,11 @@ import { getWebSocketUrl } from "../utils/getWebSocketUrl";
 import type { DeploymentState } from "../types/deployment";
 import type { MediaState } from "../types/media";
 import type { DebugLogEntry } from "../types/log";
+import type {
+  ProviderConfigStatus,
+  ProviderSecretsInput,
+} from "../types/providerConfig";
+import { defaultProviderConfigStatus } from "../types/providerConfig";
 
 type MirrorState = {
   layout: LayoutItem[];
@@ -79,7 +84,25 @@ function isServerMessage(value: unknown): value is ServerMessage {
   );
 }
 
-// Centrale live state voor mirror en admin via WebSocket
+function isProviderConfigStatus(value: unknown): value is ProviderConfigStatus {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as ProviderConfigStatus;
+
+  return (
+    typeof candidate.jellyfin?.hasBaseUrl === "boolean" &&
+    typeof candidate.jellyfin?.hasApiKey === "boolean" &&
+    typeof candidate.jellyfin?.hasUserName === "boolean" &&
+    typeof candidate.jellyfin?.hasDeviceName === "boolean" &&
+    typeof candidate.spotify?.hasClientId === "boolean" &&
+    typeof candidate.spotify?.hasClientSecret === "boolean" &&
+    typeof candidate.spotify?.hasRefreshToken === "boolean" &&
+    typeof candidate.spotify?.hasRedirectUri === "boolean"
+  );
+}
+
 export function useMirrorSocket() {
   const socketRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number | null>(null);
@@ -153,6 +176,8 @@ export function useMirrorSocket() {
   const [lastHttpSuccessAt, setLastHttpSuccessAt] = useState<number | null>(
     null,
   );
+  const [providerConfigStatus, setProviderConfigStatus] =
+    useState<ProviderConfigStatus>(defaultProviderConfigStatus);
 
   function applyState(nextState: MirrorState) {
     setLayout(nextState.layout);
@@ -442,6 +467,17 @@ export function useMirrorSocket() {
   }, []);
 
   useEffect(() => {
+    void refreshProviderConfigStatus().catch((error) => {
+      appendClientLog(
+        "error",
+        "config",
+        "Provider status ophalen mislukt",
+        error instanceof Error ? error.message : String(error),
+      );
+    });
+  }, []);
+
+  useEffect(() => {
     function handlePageShow() {
       appendClientLog(
         "info",
@@ -551,6 +587,75 @@ export function useMirrorSocket() {
     }
   }, [deployment.lastDeployedAt]);
 
+  async function refreshProviderConfigStatus() {
+    const response = await fetch(`${getApiBaseUrl()}/config/providers/status`, {
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const payload: unknown = await response.json();
+
+    if (
+      !payload ||
+      typeof payload !== "object" ||
+      !isProviderConfigStatus((payload as { providers?: unknown }).providers)
+    ) {
+      throw new Error("Provider status antwoord heeft ongeldig formaat.");
+    }
+
+    setProviderConfigStatus(
+      (payload as { providers: ProviderConfigStatus }).providers,
+    );
+  }
+
+  async function saveProviderSecrets(nextSecrets: ProviderSecretsInput) {
+    const response = await fetch(
+      `${getApiBaseUrl()}/config/providers/secrets`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(nextSecrets),
+      },
+    );
+
+    const payload: unknown = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        typeof payload === "object" &&
+          payload !== null &&
+          "error" in payload &&
+          typeof (payload as { error?: unknown }).error === "string"
+          ? (payload as { error: string }).error
+          : `HTTP ${response.status}`,
+      );
+    }
+
+    if (
+      !payload ||
+      typeof payload !== "object" ||
+      !isProviderConfigStatus((payload as { providers?: unknown }).providers)
+    ) {
+      throw new Error("Provider secrets antwoord heeft ongeldig formaat.");
+    }
+
+    setProviderConfigStatus(
+      (payload as { providers: ProviderConfigStatus }).providers,
+    );
+
+    appendClientLog("info", "config", "Provider secrets opgeslagen via admin");
+
+    await fetchStateSnapshot("after provider config save", {
+      silentSuccess: true,
+      triggerReconnect: true,
+    });
+  }
+
   async function sendAction(message: unknown) {
     const socket = socketRef.current;
 
@@ -659,5 +764,9 @@ export function useMirrorSocket() {
     logs,
     clientLogs,
     lastHttpSuccessAt,
+    providerConfigStatus,
+    refreshProviderConfigStatus,
+    saveProviderSecrets,
+    apiBaseUrl: getApiBaseUrl(),
   };
 }

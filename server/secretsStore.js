@@ -25,6 +25,49 @@ function writeSecretsFile(nextSecrets) {
   }
 }
 
+function pickNonEmptyStringValues(input = {}) {
+  return Object.fromEntries(
+    Object.entries(input)
+      .filter(([, value]) => typeof value === "string" && value.trim().length > 0)
+      .map(([key, value]) => [key, value.trim()]),
+  );
+}
+
+function saveSection(sectionName, partialSection) {
+  const currentSecrets = readSecretsFile();
+  const currentSection = currentSecrets[sectionName] ?? {};
+
+  const nextSection = {
+    ...currentSection,
+    ...pickNonEmptyStringValues(partialSection),
+  };
+
+  const nextSecrets = {
+    ...currentSecrets,
+    [sectionName]: nextSection,
+  };
+
+  writeSecretsFile(nextSecrets);
+
+  return nextSection;
+}
+
+function getJellyfinSecrets() {
+  const fileSecrets = readSecretsFile();
+  const jellyfin = fileSecrets.jellyfin ?? {};
+
+  return {
+    baseUrl: jellyfin.baseUrl ?? process.env.JELLYFIN_BASE_URL ?? null,
+    apiKey: jellyfin.apiKey ?? process.env.JELLYFIN_API_KEY ?? null,
+    userName: jellyfin.userName ?? process.env.JELLYFIN_USER_NAME ?? null,
+    deviceName: jellyfin.deviceName ?? process.env.JELLYFIN_DEVICE_NAME ?? null,
+  };
+}
+
+function saveJellyfinSecrets(partialJellyfinSecrets) {
+  return saveSection("jellyfin", partialJellyfinSecrets);
+}
+
 function getSpotifySecrets() {
   const fileSecrets = readSecretsFile();
   const spotify = fileSecrets.spotify ?? {};
@@ -41,42 +84,34 @@ function getSpotifySecrets() {
 }
 
 function saveSpotifySecrets(partialSpotifySecrets) {
-  const currentSecrets = readSecretsFile();
-  const currentSpotify = currentSecrets.spotify ?? {};
-
-  const nextSpotify = {
-    ...currentSpotify,
-    ...Object.fromEntries(
-      Object.entries(partialSpotifySecrets).filter(
-        ([, value]) => typeof value === "string" && value.length > 0,
-      ),
-    ),
-  };
-
-  const nextSecrets = {
-    ...currentSecrets,
-    spotify: nextSpotify,
-  };
-
-  writeSecretsFile(nextSecrets);
-
-  return nextSecrets.spotify;
+  return saveSection("spotify", partialSpotifySecrets);
 }
 
-function getRedactedSpotifySecrets() {
+function getRedactedProviderSecrets() {
+  const jellyfin = getJellyfinSecrets();
   const spotify = getSpotifySecrets();
 
   return {
-    hasClientId: Boolean(spotify.clientId),
-    hasClientSecret: Boolean(spotify.clientSecret),
-    hasRefreshToken: Boolean(spotify.refreshToken),
-    redirectUri: spotify.redirectUri,
+    jellyfin: {
+      hasBaseUrl: Boolean(jellyfin.baseUrl),
+      hasApiKey: Boolean(jellyfin.apiKey),
+      hasUserName: Boolean(jellyfin.userName),
+      hasDeviceName: Boolean(jellyfin.deviceName),
+    },
+    spotify: {
+      hasClientId: Boolean(spotify.clientId),
+      hasClientSecret: Boolean(spotify.clientSecret),
+      hasRefreshToken: Boolean(spotify.refreshToken),
+      hasRedirectUri: Boolean(spotify.redirectUri),
+    },
   };
 }
 
 module.exports = {
   SECRETS_FILE,
+  getJellyfinSecrets,
+  saveJellyfinSecrets,
   getSpotifySecrets,
   saveSpotifySecrets,
-  getRedactedSpotifySecrets,
+  getRedactedProviderSecrets,
 };

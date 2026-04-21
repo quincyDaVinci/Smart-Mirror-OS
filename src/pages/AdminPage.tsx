@@ -6,6 +6,11 @@ import type { PresenceState } from "../types/presence";
 import type { DisplayState } from "../types/display";
 import type { DeploymentState } from "../types/deployment";
 import type { DebugLogEntry } from "../types/log";
+import { ProviderSecretsPanel } from "../components/admin/ProviderSecretsPanel";
+import type {
+  ProviderConfigStatus,
+  ProviderSecretsInput,
+} from "../types/providerConfig";
 
 type AdminPageProps = {
   layout: LayoutItem[];
@@ -29,6 +34,10 @@ type AdminPageProps = {
   onCheckDeploymentUpdate: () => void;
   onDeployLatestVersion: () => void;
   lastHttpSuccessAt: number | null;
+  providerConfigStatus: ProviderConfigStatus;
+  onRefreshProviderConfigStatus: () => Promise<void>;
+  onSaveProviderSecrets: (nextSecrets: ProviderSecretsInput) => Promise<void>;
+  apiBaseUrl: string;
 };
 
 function getConnectionStatusLabel(
@@ -70,6 +79,10 @@ export function AdminPage({
   onCheckDeploymentUpdate,
   onDeployLatestVersion,
   lastHttpSuccessAt,
+  providerConfigStatus,
+  onRefreshProviderConfigStatus,
+  onSaveProviderSecrets,
+  apiBaseUrl,
 }: AdminPageProps) {
   const isExpectedReconnect =
     (deployment.status === "deploying" || deployment.status === "success") &&
@@ -247,6 +260,13 @@ export function AdminPage({
           </button>
         </div>
       </section>
+
+      <ProviderSecretsPanel
+        configStatus={providerConfigStatus}
+        apiBaseUrl={apiBaseUrl}
+        onRefreshStatus={onRefreshProviderConfigStatus}
+        onSaveSecrets={onSaveProviderSecrets}
+      />
 
       <section className="admin-card">
         <h2>Server logs</h2>
