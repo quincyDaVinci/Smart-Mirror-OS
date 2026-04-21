@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { ClockWidget } from "../components/widgets/ClockWidget";
 import { WeatherWidget } from "../components/widgets/WeatherWidget";
 import { MediaWidget } from "../components/widgets/MediaWidget";
@@ -24,6 +25,12 @@ export function MirrorPage({
   display,
   media,
 }: MirrorPageProps) {
+  const mirrorStyle = {
+    "--mirror-padding": `${settings.layoutPaddingPx}px`,
+    "--mirror-gap": `${settings.widgetGapPx}px`,
+    "--mirror-scale": `${settings.zoomPercent / 100}`,
+  } as CSSProperties;
+
   function renderWidget(widgetId: WidgetId) {
     switch (widgetId) {
       case "clock":
@@ -38,11 +45,7 @@ export function MirrorPage({
         );
 
       case "media":
-        return (
-          <MediaWidget
-            media={media}
-          />
-        );
+        return <MediaWidget media={media} />;
 
       case "calendar":
         return (
@@ -59,17 +62,23 @@ export function MirrorPage({
 
   return (
     <main
-      className={`mirror-page mirror-page--${presence.mode} mirror-page--display-${display.mode}`}
+      className={`mirror-page mirror-page--mode-${settings.mirrorMode} mirror-page--${presence.mode} mirror-page--display-${display.mode}`}
+      style={mirrorStyle}
     >
-      <div className="mirror-status">
-        Presence: {presence.mode} · Display: {display.mode} · Reason:{" "}
-        {display.reason}
+      {settings.showStatusBar ? (
+        <div className="mirror-status">
+          Presence: {presence.mode} · Display: {display.mode} · Reason:{" "}
+          {display.reason}
+        </div>
+      ) : null}
+
+      <div className="mirror-page-content">
+        {layout
+          .filter((item) => item.enabled)
+          .map((item) => (
+            <div key={item.id}>{renderWidget(item.id)}</div>
+          ))}
       </div>
-      {layout
-        .filter((item) => item.enabled)
-        .map((item) => (
-          <div key={item.id}>{renderWidget(item.id)}</div>
-        ))}
     </main>
   );
 }

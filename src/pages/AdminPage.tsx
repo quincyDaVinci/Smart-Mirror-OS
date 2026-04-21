@@ -159,6 +159,27 @@ export function AdminPage({
         </label>
 
         <label style={{ display: "block", marginBottom: "1rem" }}>
+          Schermrotatie
+          <select
+            value={settings.mirrorMode}
+            onChange={(event) => {
+              onUpdateSettings({
+                mirrorMode: event.target.value as MirrorSettings["mirrorMode"],
+              });
+            }}
+            style={{
+              display: "block",
+              marginTop: "0.5rem",
+              width: "100%",
+            }}
+          >
+            <option value="normal">Landscape / normaal</option>
+            <option value="portrait-left">Portrait linksom</option>
+            <option value="portrait-right">Portrait rechtsom</option>
+          </select>
+        </label>
+
+        <label style={{ display: "block", marginBottom: "1rem" }}>
           <input
             type="checkbox"
             checked={settings.autoSleepEnabled}
@@ -181,6 +202,105 @@ export function AdminPage({
             onChange={(event) => {
               onUpdateSettings({
                 sleepTimeoutSeconds: Number(event.target.value),
+              });
+            }}
+            style={{
+              display: "block",
+              marginTop: "0.5rem",
+              width: "100%",
+            }}
+          />
+        </label>
+      </section>
+
+            <section className="admin-card">
+        <h2>Display settings</h2>
+
+        <label style={{ display: "block", marginBottom: "1rem" }}>
+          Rotatie
+          <select
+            value={settings.mirrorMode}
+            onChange={(event) => {
+              onUpdateSettings({
+                mirrorMode: event.target.value as MirrorSettings["mirrorMode"],
+              });
+            }}
+            style={{
+              display: "block",
+              marginTop: "0.5rem",
+              width: "100%",
+            }}
+          >
+            <option value="normal">Landscape / normaal</option>
+            <option value="portrait-left">Portrait linksom</option>
+            <option value="portrait-right">Portrait rechtsom</option>
+          </select>
+        </label>
+
+        <label style={{ display: "block", marginBottom: "1rem" }}>
+          <input
+            type="checkbox"
+            checked={settings.showStatusBar}
+            onChange={(event) => {
+              onUpdateSettings({ showStatusBar: event.target.checked });
+            }}
+          />{" "}
+          Toon statusbar bovenaan
+        </label>
+
+        <label style={{ display: "block", marginBottom: "1rem" }}>
+          Zoom ({settings.zoomPercent}%)
+          <input
+            type="range"
+            min={50}
+            max={150}
+            step={5}
+            value={settings.zoomPercent}
+            onChange={(event) => {
+              onUpdateSettings({
+                zoomPercent: Number(event.target.value),
+              });
+            }}
+            style={{
+              display: "block",
+              marginTop: "0.5rem",
+              width: "100%",
+            }}
+          />
+        </label>
+
+        <label style={{ display: "block", marginBottom: "1rem" }}>
+          Padding ({settings.layoutPaddingPx}px)
+          <input
+            type="range"
+            min={0}
+            max={96}
+            step={4}
+            value={settings.layoutPaddingPx}
+            onChange={(event) => {
+              onUpdateSettings({
+                layoutPaddingPx: Number(event.target.value),
+              });
+            }}
+            style={{
+              display: "block",
+              marginTop: "0.5rem",
+              width: "100%",
+            }}
+          />
+        </label>
+
+        <label style={{ display: "block" }}>
+          Widget spacing ({settings.widgetGapPx}px)
+          <input
+            type="range"
+            min={0}
+            max={64}
+            step={2}
+            value={settings.widgetGapPx}
+            onChange={(event) => {
+              onUpdateSettings({
+                widgetGapPx: Number(event.target.value),
               });
             }}
             style={{

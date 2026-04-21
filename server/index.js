@@ -201,6 +201,10 @@ const defaultState = {
     mirrorMode: "normal",
     autoSleepEnabled: false,
     sleepTimeoutSeconds: 180,
+    showStatusBar: true,
+    layoutPaddingPx: 32,
+    widgetGapPx: 16,
+    zoomPercent: 100,
   },
   presence: {
     mode: "idle",
@@ -256,16 +260,73 @@ const defaultState = {
   logs: [],
 };
 
+function clampNumber(value, min, max, fallback) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+
+  return Math.min(max, Math.max(min, Math.round(parsed)));
+}
+
 function normalizeSettings(input = {}) {
-  const { idleTimeoutSeconds, sleepTimeoutSeconds, ...restSettings } = input;
+  const {
+    idleTimeoutSeconds,
+    sleepTimeoutSeconds,
+    showSeconds,
+    mirrorMode,
+    autoSleepEnabled,
+    showStatusBar,
+    layoutPaddingPx,
+    widgetGapPx,
+    zoomPercent,
+  } = input;
 
   return {
     ...defaultState.settings,
-    ...restSettings,
-    sleepTimeoutSeconds:
-      sleepTimeoutSeconds ??
-      idleTimeoutSeconds ??
+    showSeconds:
+      typeof showSeconds === "boolean"
+        ? showSeconds
+        : defaultState.settings.showSeconds,
+    mirrorMode:
+      mirrorMode === "portrait-left" ||
+      mirrorMode === "portrait-right" ||
+      mirrorMode === "normal"
+        ? mirrorMode
+        : defaultState.settings.mirrorMode,
+    autoSleepEnabled:
+      typeof autoSleepEnabled === "boolean"
+        ? autoSleepEnabled
+        : defaultState.settings.autoSleepEnabled,
+    sleepTimeoutSeconds: clampNumber(
+      sleepTimeoutSeconds ?? idleTimeoutSeconds,
+      10,
+      3600,
       defaultState.settings.sleepTimeoutSeconds,
+    ),
+    showStatusBar:
+      typeof showStatusBar === "boolean"
+        ? showStatusBar
+        : defaultState.settings.showStatusBar,
+    layoutPaddingPx: clampNumber(
+      layoutPaddingPx,
+      0,
+      96,
+      defaultState.settings.layoutPaddingPx,
+    ),
+    widgetGapPx: clampNumber(
+      widgetGapPx,
+      0,
+      64,
+      defaultState.settings.widgetGapPx,
+    ),
+    zoomPercent: clampNumber(
+      zoomPercent,
+      50,
+      150,
+      defaultState.settings.zoomPercent,
+    ),
   };
 }
 

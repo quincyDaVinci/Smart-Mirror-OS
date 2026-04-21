@@ -119,6 +119,10 @@ export function useMirrorSocket() {
     mirrorMode: "normal",
     autoSleepEnabled: false,
     sleepTimeoutSeconds: 180,
+    showStatusBar: true,
+    layoutPaddingPx: 32,
+    widgetGapPx: 16,
+    zoomPercent: 100,
   });
   const [presence, setPresence] = useState<PresenceState>({
     mode: "idle",

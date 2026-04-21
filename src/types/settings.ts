@@ -1,10 +1,14 @@
-export type MirrorMode = string;
+export type MirrorMode = "normal" | "portrait-left" | "portrait-right";
 
 export type MirrorSettings = {
   showSeconds: boolean;
   mirrorMode: MirrorMode;
   autoSleepEnabled: boolean;
   sleepTimeoutSeconds: number;
+  showStatusBar: boolean;
+  layoutPaddingPx: number;
+  widgetGapPx: number;
+  zoomPercent: number;
 };
 
 export const defaultMirrorSettings: MirrorSettings = {
@@ -12,4 +16,8 @@ export const defaultMirrorSettings: MirrorSettings = {
   mirrorMode: "normal",
   autoSleepEnabled: false,
   sleepTimeoutSeconds: 180,
+  showStatusBar: true,
+  layoutPaddingPx: 32,
+  widgetGapPx: 16,
+  zoomPercent: 100,
 };

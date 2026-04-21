@@ -22,27 +22,71 @@ body {
 }
 
 .mirror-page {
+  --mirror-top: 0;
+  --mirror-left: 0;
+  --mirror-width: 100vw;
+  --mirror-height: 100vh;
+  --mirror-rotation: rotate(0deg);
+  --mirror-padding: 32px;
+  --mirror-gap: 16px;
+  --mirror-scale: 1;
+
   position: fixed;
-  top: 100vh;
-  left: 0;
-  width: 100vh;
-  min-height: 100vw;
-  padding: 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  top: var(--mirror-top);
+  left: var(--mirror-left);
+  width: var(--mirror-width);
+  height: var(--mirror-height);
   overflow: hidden;
   background: black;
   transform-origin: top left;
-  transform: rotate(-90deg);
+  transform: var(--mirror-rotation);
+}
+
+.mirror-page--mode-normal {
+  --mirror-top: 0;
+  --mirror-left: 0;
+  --mirror-width: 100vw;
+  --mirror-height: 100vh;
+  --mirror-rotation: rotate(0deg);
+}
+
+.mirror-page--mode-portrait-left {
+  --mirror-top: 100vh;
+  --mirror-left: 0;
+  --mirror-width: 100vh;
+  --mirror-height: 100vw;
+  --mirror-rotation: rotate(-90deg);
+}
+
+.mirror-page--mode-portrait-right {
+  --mirror-top: 0;
+  --mirror-left: 100vw;
+  --mirror-width: 100vh;
+  --mirror-height: 100vw;
+  --mirror-rotation: rotate(90deg);
+}
+
+.mirror-page-content {
+  width: calc(100% / var(--mirror-scale));
+  min-height: calc(100% / var(--mirror-scale));
+  padding: var(--mirror-padding);
+  display: flex;
+  flex-direction: column;
+  gap: var(--mirror-gap);
+  transform-origin: top left;
+  transform: scale(var(--mirror-scale));
 }
 
 .mirror-page--active {
-  transition: opacity 0.3s ease, filter 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    filter 0.3s ease;
 }
 
 .mirror-page--idle {
-  transition: opacity 0.3s ease, filter 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    filter 0.3s ease;
 }
 
 .mirror-page--display-on {
@@ -66,6 +110,10 @@ body {
   margin-bottom: 1rem;
   text-transform: uppercase;
   letter-spacing: 0.08em;
+}
+
+.mirror-status + .mirror-page-content {
+  padding-top: 0;
 }
 
 .widget {
@@ -122,8 +170,6 @@ body {
   font-size: 1rem;
   color: #c9c9c9;
 }
-
-
 
 .admin-page {
   min-height: 100vh;
@@ -206,9 +252,6 @@ body {
   opacity: 0.4;
   cursor: not-allowed;
 }
-
-
-
 
 .admin-status {
   margin: 0 0 16px;
