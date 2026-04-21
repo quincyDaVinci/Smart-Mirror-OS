@@ -11,13 +11,7 @@ type ProviderSecretsPanelProps = {
   onSaveSecrets: (nextSecrets: ProviderSecretsInput) => Promise<void>;
 };
 
-function StatusLine({
-  label,
-  active,
-}: {
-  label: string;
-  active: boolean;
-}) {
+function StatusLine({ label, active }: { label: string; active: boolean }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
       <span>{label}</span>
@@ -41,6 +35,7 @@ export function ProviderSecretsPanel({
 
   const [spotifyClientId, setSpotifyClientId] = useState("");
   const [spotifyClientSecret, setSpotifyClientSecret] = useState("");
+  const [spotifyRedirectUri, setSpotifyRedirectUri] = useState("");
 
   const [isSavingJellyfin, setIsSavingJellyfin] = useState(false);
   const [isSavingSpotify, setIsSavingSpotify] = useState(false);
@@ -48,7 +43,8 @@ export function ProviderSecretsPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const spotifyRedirectUri = `${apiBaseUrl}/auth/spotify/callback`;
+  const effectiveSpotifyRedirectUri =
+    spotifyRedirectUri.trim() || "http://127.0.0.1:8787/auth/spotify/callback";
   const canStartSpotifyLink =
     configStatus.spotify.hasClientId && configStatus.spotify.hasClientSecret;
 
@@ -114,12 +110,13 @@ export function ProviderSecretsPanel({
         spotify: {
           clientId: spotifyClientId,
           clientSecret: spotifyClientSecret,
-          redirectUri: spotifyRedirectUri,
+          redirectUri: effectiveSpotifyRedirectUri,
         },
       });
 
       setSpotifyClientId("");
       setSpotifyClientSecret("");
+      setSpotifyRedirectUri("");
       setMessage("Spotify app-config opgeslagen. Je kunt nu koppelen.");
     } catch (saveError) {
       setError(
@@ -151,9 +148,9 @@ export function ProviderSecretsPanel({
       </div>
 
       <p style={{ opacity: 0.78 }}>
-        Je kunt hier waarden toevoegen of overschrijven. Bestaande secrets worden
-        nooit teruggestuurd naar de browser. Laat een veld leeg om de huidige
-        opgeslagen waarde te behouden.
+        Je kunt hier waarden toevoegen of overschrijven. Bestaande secrets
+        worden nooit teruggestuurd naar de browser. Laat een veld leeg om de
+        huidige opgeslagen waarde te behouden.
       </p>
 
       {message ? <p style={{ color: "#b8ffb8" }}>{message}</p> : null}
@@ -264,7 +261,9 @@ export function ProviderSecretsPanel({
             <h3 style={{ margin: 0 }}>Spotify</h3>
 
             <a
-              href={canStartSpotifyLink ? `${apiBaseUrl}/auth/spotify/login` : "#"}
+              href={
+                canStartSpotifyLink ? `${apiBaseUrl}/auth/spotify/login` : "#"
+              }
               target={canStartSpotifyLink ? "_blank" : undefined}
               rel={canStartSpotifyLink ? "noreferrer" : undefined}
               className="admin-link"
@@ -331,19 +330,32 @@ export function ProviderSecretsPanel({
               <input
                 type="text"
                 value={spotifyRedirectUri}
-                readOnly
+                onChange={(event) => setSpotifyRedirectUri(event.target.value)}
+                placeholder="http://127.0.0.1:8787/auth/spotify/callback"
                 style={{
                   display: "block",
                   width: "100%",
                   marginTop: 6,
-                  opacity: 0.72,
-                  cursor: "not-allowed",
                 }}
               />
+              <p style={{ margin: "6px 0 0", opacity: 0.72, fontSize: 14 }}>
+                Gebruik{" "}
+                <strong>http://127.0.0.1:8787/auth/spotify/callback</strong> als
+                je de koppeling uitvoert op dezelfde machine als de backend.
+                Gebruik voor remote koppelen alleen een{" "}
+                <strong>https://</strong> callback URL.
+              </p>
             </label>
           </div>
 
-          <div style={{ marginTop: 16, display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <div
+            style={{
+              marginTop: 16,
+              display: "flex",
+              gap: 12,
+              flexWrap: "wrap",
+            }}
+          >
             <button type="submit" disabled={isSavingSpotify}>
               {isSavingSpotify ? "Opslaan..." : "Sla Spotify app-config op"}
             </button>
