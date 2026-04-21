@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const crypto = require("crypto");
 
 const { exec } = require("child_process");
 const util = require("util");
@@ -12,6 +13,15 @@ const express = require("express");
 const http = require("http");
 const { WebSocketServer } = require("ws");
 const { fetchJellyfinNowPlaying } = require("./providers/jellyfinNowPlaying");
+const {
+  fetchSpotifyNowPlaying,
+  resetSpotifyAccessTokenCache,
+} = require("./providers/spotifyNowPlaying");
+const {
+  getSpotifySecrets,
+  saveSpotifySecrets,
+  getRedactedSpotifySecrets,
+} = require("./secretsStore");
 
 const app = express();
 app.use(express.json());
@@ -30,6 +40,84 @@ process.on("unhandledRejection", (reason) => {
 console.log("[boot] backend process starting");
 
 const HEARTBEAT_INTERVAL_MS = 25000;
+
+const SPOTIFY_AUTHORIZE_URL = "https://accounts.spotify.com/authorize";
+const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
+const SPOTIFY_SCOPES = [
+  "user-read-currently-playing",
+  "user-read-playback-state",
+];
+const SPOTIFY_STATE_TTL_MS = 10 * 60 * 1000;
+
+const pendingSpotifyStates = new Map();
+
+function cleanupPendingSpotifyStates() {
+  const now = Date.now();
+
+  for (const [stateKey, expiresAt] of pendingSpotifyStates.entries()) {
+    if (expiresAt <= now) {
+      pendingSpotifyStates.delete(stateKey);
+    }
+  }
+}
+
+function getBasicAuthorizationHeader(clientId, clientSecret) {
+  const raw = `${clientId}:${clientSecret}`;
+  return `Basic ${Buffer.from(raw).toString("base64")}`;
+}
+
+function buildSpotifyAuthorizeUrl() {
+  const spotifySecrets = getSpotifySecrets();
+  const state = crypto.randomBytes(16).toString("hex");
+
+  cleanupPendingSpotifyStates();
+  pendingSpotifyStates.set(state, Date.now() + SPOTIFY_STATE_TTL_MS);
+
+  const url = new URL(SPOTIFY_AUTHORIZE_URL);
+  url.searchParams.set("client_id", spotifySecrets.clientId);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("redirect_uri", spotifySecrets.redirectUri);
+  url.searchParams.set("scope", SPOTIFY_SCOPES.join(" "));
+  url.searchParams.set("state", state);
+  url.searchParams.set("show_dialog", "true");
+
+  return url.toString();
+}
+
+async function exchangeSpotifyAuthorizationCode(code) {
+  const spotifySecrets = getSpotifySecrets();
+
+  const response = await fetch(SPOTIFY_TOKEN_URL, {
+    method: "POST",
+    headers: {
+      Authorization: getBasicAuthorizationHeader(
+        spotifySecrets.clientId,
+        spotifySecrets.clientSecret,
+      ),
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      grant_type: "authorization_code",
+      code,
+      redirect_uri: spotifySecrets.redirectUri,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `Spotify code exchange gaf status ${response.status} · ${errorText}`,
+    );
+  }
+
+  const payload = await response.json();
+
+  if (!payload.refresh_token) {
+    throw new Error("Spotify gaf geen refresh_token terug");
+  }
+
+  return payload;
+}
 
 function markWebSocketAlive() {
   this.isAlive = true;
@@ -232,44 +320,83 @@ function updateRuntimeMedia(nextMedia) {
   broadcastState();
 }
 
-async function pollJellyfinNowPlaying() {
+function buildResolvedMedia({
+  jellyfinMedia,
+  jellyfinStatus,
+  spotifyMedia,
+  spotifyStatus,
+}) {
+  const sourceState = {
+    ...defaultState.media.sourceState,
+    jellyfin: jellyfinStatus,
+    spotify: spotifyStatus,
+  };
+
+  if (jellyfinMedia) {
+    return {
+      ...defaultState.media,
+      ...jellyfinMedia,
+      sourceState,
+    };
+  }
+
+  if (spotifyMedia) {
+    return {
+      ...defaultState.media,
+      ...spotifyMedia,
+      sourceState,
+    };
+  }
+
+  return {
+    ...defaultState.media,
+    sourceState,
+  };
+}
+
+function buildProviderErrorStatus(message) {
+  return {
+    enabled: true,
+    status: "error",
+    message,
+    lastCheckedAt: Date.now(),
+  };
+}
+
+async function pollNowPlayingProviders() {
+  let jellyfinResult;
+  let spotifyResult;
+
   try {
-    const { media, providerStatus } = await fetchJellyfinNowPlaying();
-
-    const nextMedia = media
-      ? {
-          ...state.media,
-          ...media,
-          sourceState: {
-            ...state.media.sourceState,
-            jellyfin: providerStatus,
-          },
-        }
-      : {
-          ...defaultState.media,
-          sourceState: {
-            ...state.media.sourceState,
-            jellyfin: providerStatus,
-          },
-        };
-
-    updateRuntimeMedia(nextMedia);
+    jellyfinResult = await fetchJellyfinNowPlaying();
   } catch (error) {
     console.error("failed to poll jellyfin now playing", error);
 
-    updateRuntimeMedia({
-      ...defaultState.media,
-      sourceState: {
-        ...state.media.sourceState,
-        jellyfin: {
-          enabled: true,
-          status: "error",
-          message: "Jellyfin polling mislukt.",
-          lastCheckedAt: Date.now(),
-        },
-      },
-    });
+    jellyfinResult = {
+      media: null,
+      providerStatus: buildProviderErrorStatus("Jellyfin polling mislukt."),
+    };
   }
+
+  try {
+    spotifyResult = await fetchSpotifyNowPlaying();
+  } catch (error) {
+    console.error("failed to poll spotify now playing", error);
+
+    spotifyResult = {
+      media: null,
+      providerStatus: buildProviderErrorStatus("Spotify polling mislukt."),
+    };
+  }
+
+  const nextMedia = buildResolvedMedia({
+    jellyfinMedia: jellyfinResult.media,
+    jellyfinStatus: jellyfinResult.providerStatus,
+    spotifyMedia: spotifyResult.media,
+    spotifyStatus: spotifyResult.providerStatus,
+  });
+
+  updateRuntimeMedia(nextMedia);
 }
 
 async function checkForDeploymentUpdate() {
@@ -504,11 +631,11 @@ function updateDisplayState(reason = "system") {
 }
 
 function startBackgroundJobs() {
-  console.log("[boot] starting jellyfin polling");
-  void pollJellyfinNowPlaying();
+  console.log("[boot] starting now playing polling");
+  void pollNowPlayingProviders();
 
   setInterval(() => {
-    void pollJellyfinNowPlaying();
+    void pollNowPlayingProviders();
   }, 2000);
 }
 
@@ -707,6 +834,132 @@ wss.on("connection", (ws, req) => {
       `client disconnected #${clientId} code=${code} reason=${reason}`,
     );
   });
+});
+app.get("/auth/spotify/status", (_req, res) => {
+  res.json({
+    ok: true,
+    spotify: getRedactedSpotifySecrets(),
+  });
+});
+
+app.get("/auth/spotify/login", (_req, res) => {
+  const spotifySecrets = getSpotifySecrets();
+
+  if (!spotifySecrets.clientId || !spotifySecrets.clientSecret) {
+    res
+      .status(400)
+      .send(
+        "Spotify client ID of client secret ontbreekt. Zet eerst SPOTIFY_CLIENT_ID en SPOTIFY_CLIENT_SECRET.",
+      );
+    return;
+  }
+
+  res.redirect(buildSpotifyAuthorizeUrl());
+});
+
+app.get("/auth/spotify/callback", async (req, res) => {
+  const code = typeof req.query.code === "string" ? req.query.code : null;
+  const state = typeof req.query.state === "string" ? req.query.state : null;
+  const error = typeof req.query.error === "string" ? req.query.error : null;
+
+  if (error) {
+    res.status(400).send(`Spotify authorisatie geweigerd of mislukt: ${error}`);
+    return;
+  }
+
+  cleanupPendingSpotifyStates();
+
+  if (!state || !pendingSpotifyStates.has(state)) {
+    res.status(400).send("Spotify state mismatch of verlopen login-poging.");
+    return;
+  }
+
+  pendingSpotifyStates.delete(state);
+
+  if (!code) {
+    res.status(400).send("Spotify callback bevat geen code.");
+    return;
+  }
+
+  try {
+    const spotifySecrets = getSpotifySecrets();
+    const tokenPayload = await exchangeSpotifyAuthorizationCode(code);
+
+    saveSpotifySecrets({
+      clientId: spotifySecrets.clientId,
+      clientSecret: spotifySecrets.clientSecret,
+      refreshToken: tokenPayload.refresh_token,
+      redirectUri: spotifySecrets.redirectUri,
+    });
+
+    resetSpotifyAccessTokenCache();
+
+    appendLog(
+      "info",
+      "spotify",
+      "Spotify refresh token opgeslagen",
+      spotifySecrets.redirectUri,
+    );
+
+    await pollNowPlayingProviders();
+
+    res.send(`
+      <!doctype html>
+      <html lang="nl">
+        <head>
+          <meta charset="utf-8" />
+          <title>Spotify gekoppeld</title>
+          <style>
+            body {
+              margin: 0;
+              padding: 40px;
+              background: #0b0b0b;
+              color: white;
+              font-family: Arial, sans-serif;
+            }
+            .card {
+              max-width: 720px;
+              padding: 24px;
+              border-radius: 20px;
+              background: rgba(255,255,255,0.04);
+              border: 1px solid rgba(255,255,255,0.08);
+            }
+            code {
+              display: inline-block;
+              margin-top: 8px;
+              padding: 6px 10px;
+              border-radius: 10px;
+              background: rgba(255,255,255,0.08);
+            }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>Spotify is gekoppeld</h1>
+            <p>De refresh token is server-side opgeslagen in <code>server/secrets.local.json</code>.</p>
+            <p>Je kunt dit venster sluiten en teruggaan naar je mirror/admin.</p>
+          </div>
+        </body>
+      </html>
+    `);
+  } catch (callbackError) {
+    appendLog(
+      "error",
+      "spotify",
+      "Spotify callback mislukt",
+      callbackError instanceof Error
+        ? callbackError.message
+        : String(callbackError),
+    );
+
+    res
+      .status(500)
+      .send(
+        callbackError instanceof Error
+          ? callbackError.message
+          : "Spotify callback mislukt.",
+      );
+  }
 });
 
 console.log("[boot] registering health route");
