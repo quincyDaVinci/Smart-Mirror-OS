@@ -11,6 +11,7 @@ import type {
   ProviderConfigStatus,
   ProviderSecretsInput,
 } from "../types/providerConfig";
+import { AccordionSection } from "../components/admin/AccordionSection";
 
 type AdminPageProps = {
   layout: LayoutItem[];
@@ -138,317 +139,323 @@ export function AdminPage({
         </p>
       ) : null}
 
-      <LayoutControls
-        layout={layout}
-        onToggleWidget={onToggleWidget}
-        onReorderWidgets={onReorderWidgets}
-      />
-
-      <section className="admin-card">
-        <h2>Mirror instellingen</h2>
-
-        <label style={{ display: "block", marginBottom: "1rem" }}>
-          <input
-            type="checkbox"
-            checked={settings.showSeconds}
-            onChange={(event) => {
-              onUpdateSettings({ showSeconds: event.target.checked });
-            }}
-          />{" "}
-          Toon seconden in klok
-        </label>
-
-        <label style={{ display: "block", marginBottom: "1rem" }}>
-          Schermrotatie
-          <select
-            value={settings.mirrorMode}
-            onChange={(event) => {
-              onUpdateSettings({
-                mirrorMode: event.target.value as MirrorSettings["mirrorMode"],
-              });
-            }}
-            style={{
-              display: "block",
-              marginTop: "0.5rem",
-              width: "100%",
-            }}
-          >
-            <option value="normal">Landscape / normaal</option>
-            <option value="portrait-left">Portrait linksom</option>
-            <option value="portrait-right">Portrait rechtsom</option>
-          </select>
-        </label>
-
-        <label style={{ display: "block", marginBottom: "1rem" }}>
-          <input
-            type="checkbox"
-            checked={settings.autoSleepEnabled}
-            onChange={(event) => {
-              onUpdateSettings({
-                autoSleepEnabled: event.target.checked,
-              });
-            }}
-          />{" "}
-          Auto sleep inschakelen
-        </label>
-
-        <label style={{ display: "block" }}>
-          Sleep timeout (seconden)
-          <input
-            type="number"
-            min={10}
-            step={10}
-            value={settings.sleepTimeoutSeconds}
-            onChange={(event) => {
-              onUpdateSettings({
-                sleepTimeoutSeconds: Number(event.target.value),
-              });
-            }}
-            style={{
-              display: "block",
-              marginTop: "0.5rem",
-              width: "100%",
-            }}
-          />
-        </label>
-      </section>
-
-            <section className="admin-card">
-        <h2>Display settings</h2>
-
-        <label style={{ display: "block", marginBottom: "1rem" }}>
-          Rotatie
-          <select
-            value={settings.mirrorMode}
-            onChange={(event) => {
-              onUpdateSettings({
-                mirrorMode: event.target.value as MirrorSettings["mirrorMode"],
-              });
-            }}
-            style={{
-              display: "block",
-              marginTop: "0.5rem",
-              width: "100%",
-            }}
-          >
-            <option value="normal">Landscape / normaal</option>
-            <option value="portrait-left">Portrait linksom</option>
-            <option value="portrait-right">Portrait rechtsom</option>
-          </select>
-        </label>
-
-        <label style={{ display: "block", marginBottom: "1rem" }}>
-          <input
-            type="checkbox"
-            checked={settings.showStatusBar}
-            onChange={(event) => {
-              onUpdateSettings({ showStatusBar: event.target.checked });
-            }}
-          />{" "}
-          Toon statusbar bovenaan
-        </label>
-
-        <label style={{ display: "block", marginBottom: "1rem" }}>
-          Zoom ({settings.zoomPercent}%)
-          <input
-            type="range"
-            min={50}
-            max={150}
-            step={5}
-            value={settings.zoomPercent}
-            onChange={(event) => {
-              onUpdateSettings({
-                zoomPercent: Number(event.target.value),
-              });
-            }}
-            style={{
-              display: "block",
-              marginTop: "0.5rem",
-              width: "100%",
-            }}
-          />
-        </label>
-
-        <label style={{ display: "block", marginBottom: "1rem" }}>
-          Padding ({settings.layoutPaddingPx}px)
-          <input
-            type="range"
-            min={0}
-            max={96}
-            step={4}
-            value={settings.layoutPaddingPx}
-            onChange={(event) => {
-              onUpdateSettings({
-                layoutPaddingPx: Number(event.target.value),
-              });
-            }}
-            style={{
-              display: "block",
-              marginTop: "0.5rem",
-              width: "100%",
-            }}
-          />
-        </label>
-
-        <label style={{ display: "block" }}>
-          Widget spacing ({settings.widgetGapPx}px)
-          <input
-            type="range"
-            min={0}
-            max={64}
-            step={2}
-            value={settings.widgetGapPx}
-            onChange={(event) => {
-              onUpdateSettings({
-                widgetGapPx: Number(event.target.value),
-              });
-            }}
-            style={{
-              display: "block",
-              marginTop: "0.5rem",
-              width: "100%",
-            }}
-          />
-        </label>
-      </section>
-
-      <section className="admin-card">
-        <h2>Presence debug</h2>
-
-        <p>Presence mode: {presence.mode}</p>
-        <p>Display mode: {display.mode}</p>
-        <p>Display reason: {display.reason}</p>
-        <p>
-          Laatste beweging:{" "}
-          {presence.lastMotionAt
-            ? new Date(presence.lastMotionAt).toLocaleTimeString("nl-NL")
-            : "nog geen beweging"}
-        </p>
-
-        <button
-          type="button"
-          onClick={onSimulateMotion}
-          disabled={!isConnected}
+      <div className="admin-sections">
+        <AccordionSection
+          title="Widgets"
+          subtitle="Widgets aanzetten, uitzetten en herschikken"
+          defaultOpen
         >
-          Simuleer beweging
-        </button>
-      </section>
+          <LayoutControls
+            layout={layout}
+            onToggleWidget={onToggleWidget}
+            onReorderWidgets={onReorderWidgets}
+            renderInAccordion
+          />
+        </AccordionSection>
 
-      <section className="admin-card">
-        <h2>Deployment</h2>
+        <AccordionSection
+          title="Mirror instellingen"
+          subtitle="Klok en sleep gedrag"
+          defaultOpen
+        >
+          <label style={{ display: "block", marginBottom: "1rem" }}>
+            <input
+              type="checkbox"
+              checked={settings.showSeconds}
+              onChange={(event) => {
+                onUpdateSettings({ showSeconds: event.target.checked });
+              }}
+            />{" "}
+            Toon seconden in klok
+          </label>
 
-        <p>Status: {deployment.status}</p>
-        <p>Huidige commit: {deployment.currentCommit ?? "onbekend"}</p>
-        <p>
-          Huidige commit message:{" "}
-          {deployment.currentCommitMessage ?? "onbekend"}
-        </p>
-        <p>
-          Remote commit: {deployment.remoteCommit ?? "nog niet gecontroleerd"}
-        </p>
-        <p>
-          Remote commit message:{" "}
-          {deployment.remoteCommitMessage ?? "nog niet gecontroleerd"}
-        </p>
-        <p>Update beschikbaar: {deployment.hasUpdate ? "ja" : "nee"}</p>
-        <p>{deploymentMessage}</p>
+          <label style={{ display: "block", marginBottom: "1rem" }}>
+            <input
+              type="checkbox"
+              checked={settings.autoSleepEnabled}
+              onChange={(event) => {
+                onUpdateSettings({
+                  autoSleepEnabled: event.target.checked,
+                });
+              }}
+            />{" "}
+            Auto sleep inschakelen
+          </label>
 
-        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          <label style={{ display: "block" }}>
+            Sleep timeout (seconden)
+            <input
+              type="number"
+              min={10}
+              step={10}
+              value={settings.sleepTimeoutSeconds}
+              onChange={(event) => {
+                onUpdateSettings({
+                  sleepTimeoutSeconds: Number(event.target.value),
+                });
+              }}
+              style={{
+                display: "block",
+                marginTop: "0.5rem",
+                width: "100%",
+              }}
+            />
+          </label>
+        </AccordionSection>
+
+        <AccordionSection
+          title="Display settings"
+          subtitle="Rotatie, zoom, padding en spacing"
+          defaultOpen
+        >
+          <label style={{ display: "block", marginBottom: "1rem" }}>
+            Rotatie
+            <select
+              value={settings.mirrorMode}
+              onChange={(event) => {
+                onUpdateSettings({
+                  mirrorMode: event.target
+                    .value as MirrorSettings["mirrorMode"],
+                });
+              }}
+              style={{
+                display: "block",
+                marginTop: "0.5rem",
+                width: "100%",
+              }}
+            >
+              <option value="normal">Landscape / normaal</option>
+              <option value="portrait-left">Portrait linksom</option>
+              <option value="portrait-right">Portrait rechtsom</option>
+            </select>
+          </label>
+
+          <label style={{ display: "block", marginBottom: "1rem" }}>
+            <input
+              type="checkbox"
+              checked={settings.showStatusBar}
+              onChange={(event) => {
+                onUpdateSettings({ showStatusBar: event.target.checked });
+              }}
+            />{" "}
+            Toon statusbar bovenaan
+          </label>
+
+          <label style={{ display: "block", marginBottom: "1rem" }}>
+            Zoom ({settings.zoomPercent}%)
+            <input
+              type="range"
+              min={50}
+              max={150}
+              step={5}
+              value={settings.zoomPercent}
+              onChange={(event) => {
+                onUpdateSettings({
+                  zoomPercent: Number(event.target.value),
+                });
+              }}
+              style={{
+                display: "block",
+                marginTop: "0.5rem",
+                width: "100%",
+              }}
+            />
+          </label>
+
+          <label style={{ display: "block", marginBottom: "1rem" }}>
+            Padding ({settings.layoutPaddingPx}px)
+            <input
+              type="range"
+              min={0}
+              max={96}
+              step={4}
+              value={settings.layoutPaddingPx}
+              onChange={(event) => {
+                onUpdateSettings({
+                  layoutPaddingPx: Number(event.target.value),
+                });
+              }}
+              style={{
+                display: "block",
+                marginTop: "0.5rem",
+                width: "100%",
+              }}
+            />
+          </label>
+
+          <label style={{ display: "block" }}>
+            Widget spacing ({settings.widgetGapPx}px)
+            <input
+              type="range"
+              min={0}
+              max={64}
+              step={2}
+              value={settings.widgetGapPx}
+              onChange={(event) => {
+                onUpdateSettings({
+                  widgetGapPx: Number(event.target.value),
+                });
+              }}
+              style={{
+                display: "block",
+                marginTop: "0.5rem",
+                width: "100%",
+              }}
+            />
+          </label>
+        </AccordionSection>
+
+        <AccordionSection
+          title="Presence debug"
+          subtitle="Live presence en display state"
+        >
+          <p>Presence mode: {presence.mode}</p>
+          <p>Display mode: {display.mode}</p>
+          <p>Display reason: {display.reason}</p>
+          <p>
+            Laatste beweging:{" "}
+            {presence.lastMotionAt
+              ? new Date(presence.lastMotionAt).toLocaleTimeString("nl-NL")
+              : "nog geen beweging"}
+          </p>
+
           <button
             type="button"
-            onClick={onCheckDeploymentUpdate}
-            disabled={
-              !isConnected ||
-              deployment.status === "checking" ||
-              deployment.status === "deploying"
-            }
+            onClick={onSimulateMotion}
+            disabled={!isConnected}
           >
-            Check for updates
+            Simuleer beweging
           </button>
+        </AccordionSection>
 
-          <button
-            type="button"
-            onClick={onDeployLatestVersion}
-            disabled={
-              !isConnected ||
-              !deployment.hasUpdate ||
-              deployment.status === "checking" ||
-              deployment.status === "deploying"
-            }
+        <AccordionSection
+          title="Deployment"
+          subtitle="Update check en live uitrollen"
+        >
+          <p>Status: {deployment.status}</p>
+          <p>Huidige commit: {deployment.currentCommit ?? "onbekend"}</p>
+          <p>
+            Huidige commit message:{" "}
+            {deployment.currentCommitMessage ?? "onbekend"}
+          </p>
+          <p>
+            Remote commit: {deployment.remoteCommit ?? "nog niet gecontroleerd"}
+          </p>
+          <p>
+            Remote commit message:{" "}
+            {deployment.remoteCommitMessage ?? "nog niet gecontroleerd"}
+          </p>
+          <p>Update beschikbaar: {deployment.hasUpdate ? "ja" : "nee"}</p>
+          <p>{deploymentMessage}</p>
+
+          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              onClick={onCheckDeploymentUpdate}
+              disabled={
+                !isConnected ||
+                deployment.status === "checking" ||
+                deployment.status === "deploying"
+              }
+            >
+              Check for updates
+            </button>
+
+            <button
+              type="button"
+              onClick={onDeployLatestVersion}
+              disabled={
+                !isConnected ||
+                !deployment.hasUpdate ||
+                deployment.status === "checking" ||
+                deployment.status === "deploying"
+              }
+            >
+              Deploy update
+            </button>
+          </div>
+        </AccordionSection>
+
+        <AccordionSection
+          title="Provider secrets"
+          subtitle="Jellyfin en Spotify configuratie"
+        >
+          <ProviderSecretsPanel
+            configStatus={providerConfigStatus}
+            apiBaseUrl={apiBaseUrl}
+            onRefreshStatus={onRefreshProviderConfigStatus}
+            onSaveSecrets={onSaveProviderSecrets}
+          />
+        </AccordionSection>
+
+        <AccordionSection
+          title="Server logs"
+          subtitle="Backend events en errors"
+        >
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "10px" }}
           >
-            Deploy update
-          </button>
-        </div>
-      </section>
-
-      <ProviderSecretsPanel
-        configStatus={providerConfigStatus}
-        apiBaseUrl={apiBaseUrl}
-        onRefreshStatus={onRefreshProviderConfigStatus}
-        onSaveSecrets={onSaveProviderSecrets}
-      />
-
-      <section className="admin-card">
-        <h2>Server logs</h2>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          {logs.length === 0 ? (
-            <p>Nog geen serverlogs.</p>
-          ) : (
-            logs.map((log) => (
-              <div
-                key={log.id}
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: "0.85rem",
-                  paddingBottom: "10px",
-                  borderBottom: "1px solid rgba(255,255,255,0.08)",
-                }}
-              >
-                <div>
-                  [{formatLogTime(log.timestamp)}] {log.level.toUpperCase()} ·{" "}
-                  {log.source}
+            {logs.length === 0 ? (
+              <p>Nog geen serverlogs.</p>
+            ) : (
+              logs.map((log) => (
+                <div
+                  key={log.id}
+                  style={{
+                    fontFamily: "monospace",
+                    fontSize: "0.85rem",
+                    paddingBottom: "10px",
+                    borderBottom: "1px solid rgba(255,255,255,0.08)",
+                  }}
+                >
+                  <div>
+                    [{formatLogTime(log.timestamp)}] {log.level.toUpperCase()} ·{" "}
+                    {log.source}
+                  </div>
+                  <div>{log.message}</div>
+                  {log.meta ? (
+                    <div style={{ opacity: 0.7 }}>{log.meta}</div>
+                  ) : null}
                 </div>
-                <div>{log.message}</div>
-                {log.meta ? (
-                  <div style={{ opacity: 0.7 }}>{log.meta}</div>
-                ) : null}
-              </div>
-            ))
-          )}
-        </div>
-      </section>
+              ))
+            )}
+          </div>
+        </AccordionSection>
 
-      <section className="admin-card">
-        <h2>Browser / socket logs</h2>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          {clientLogs.length === 0 ? (
-            <p>Nog geen browserlogs.</p>
-          ) : (
-            clientLogs.map((log) => (
-              <div
-                key={log.id}
-                style={{
-                  fontFamily: "monospace",
-                  fontSize: "0.85rem",
-                  paddingBottom: "10px",
-                  borderBottom: "1px solid rgba(255,255,255,0.08)",
-                }}
-              >
-                <div>
-                  [{formatLogTime(log.timestamp)}] {log.level.toUpperCase()} ·{" "}
-                  {log.source}
+        <AccordionSection
+          title="Browser / socket logs"
+          subtitle="Frontend reconnect en fallback gedrag"
+        >
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: "10px" }}
+          >
+            {clientLogs.length === 0 ? (
+              <p>Nog geen browserlogs.</p>
+            ) : (
+              clientLogs.map((log) => (
+                <div
+                  key={log.id}
+                  style={{
+                    fontFamily: "monospace",
+                    fontSize: "0.85rem",
+                    paddingBottom: "10px",
+                    borderBottom: "1px solid rgba(255,255,255,0.08)",
+                  }}
+                >
+                  <div>
+                    [{formatLogTime(log.timestamp)}] {log.level.toUpperCase()} ·{" "}
+                    {log.source}
+                  </div>
+                  <div>{log.message}</div>
+                  {log.meta ? (
+                    <div style={{ opacity: 0.7 }}>{log.meta}</div>
+                  ) : null}
                 </div>
-                <div>{log.message}</div>
-                {log.meta ? (
-                  <div style={{ opacity: 0.7 }}>{log.meta}</div>
-                ) : null}
-              </div>
-            ))
-          )}
-        </div>
-      </section>
+              ))
+            )}
+          </div>
+        </AccordionSection>
+      </div>
     </main>
   );
 }

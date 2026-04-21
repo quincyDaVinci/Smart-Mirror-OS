@@ -130,7 +130,7 @@ export function ProviderSecretsPanel({
   }
 
   return (
-    <section className="admin-card" style={{ maxWidth: 760 }}>
+    <>
       <div
         style={{
           display: "flex",
@@ -368,6 +368,6 @@ export function ProviderSecretsPanel({
           </div>
         </form>
       </div>
-    </section>
+    </>
   );
 }

@@ -8,12 +8,14 @@ type LayoutControlsProps = {
   layout: LayoutItem[];
   onToggleWidget: (widgetId: WidgetId) => void;
   onReorderWidgets: (orderedIds: WidgetId[]) => void;
+  renderInAccordion?: boolean;
 };
 
 export function LayoutControls({
   layout,
   onToggleWidget,
   onReorderWidgets,
+  renderInAccordion = false,
 }: LayoutControlsProps) {
   const [orderedIds, setOrderedIds] = useState<WidgetId[]>(
     layout.map((item) => item.id),
@@ -29,6 +31,35 @@ export function LayoutControls({
         .map((id) => layout.find((item) => item.id === id))
         .filter((item): item is LayoutItem => Boolean(item)),
     [orderedIds, layout],
+  );
+
+  const content = (
+    <>
+      {!renderInAccordion ? (
+        <h2 className="admin-card-title">Widgets</h2>
+      ) : null}
+
+      <div className="admin-list">
+        {orderedItems.map((item, index) => (
+          <SortableLayoutItem key={item.id} id={item.id} index={index}>
+            <div className="admin-row">
+              <div className="admin-row-left">
+                <span className="admin-row-label">{item.id}</span>
+
+                <label className="admin-toggle">
+                  <span>Actief</span>
+                  <input
+                    type="checkbox"
+                    checked={item.enabled}
+                    onChange={() => onToggleWidget(item.id)}
+                  />
+                </label>
+              </div>
+            </div>
+          </SortableLayoutItem>
+        ))}
+      </div>
+    </>
   );
 
   return (
@@ -60,30 +91,11 @@ export function LayoutControls({
         });
       }}
     >
-      <section className="admin-card">
-        <h2 className="admin-card-title">Widgets</h2>
-
-        <div className="admin-list">
-          {orderedItems.map((item, index) => (
-            <SortableLayoutItem key={item.id} id={item.id} index={index}>
-              <div className="admin-row">
-                <div className="admin-row-left">
-                  <span className="admin-row-label">{item.id}</span>
-
-                  <label className="admin-toggle">
-                    <span>Actief</span>
-                    <input
-                      type="checkbox"
-                      checked={item.enabled}
-                      onChange={() => onToggleWidget(item.id)}
-                    />
-                  </label>
-                </div>
-              </div>
-            </SortableLayoutItem>
-          ))}
-        </div>
-      </section>
+      {renderInAccordion ? (
+        content
+      ) : (
+        <section className="admin-card">{content}</section>
+      )}
     </DragDropProvider>
   );
 }
