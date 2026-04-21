@@ -27,6 +27,55 @@ const {
 const app = express();
 app.use(express.json());
 
+const ALLOWED_ORIGINS = [
+  process.env.ADMIN_ALLOWED_ORIGIN,
+  "http://localhost:4173",
+  "http://127.0.0.1:4173",
+].filter(Boolean);
+
+function isAllowedOrigin(origin) {
+  if (!origin) {
+    return false;
+  }
+
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    return true;
+  }
+
+  try {
+    const url = new URL(origin);
+    const hostname = url.hostname;
+
+    return (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname.startsWith("192.168.") ||
+      hostname.startsWith("10.") ||
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
+    );
+  } catch {
+    return false;
+  }
+}
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+
+  if (typeof origin === "string" && isAllowedOrigin(origin)) {
+    res.header("Access-Control-Allow-Origin", origin);
+    res.header("Vary", "Origin");
+    res.header("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    res.header("Access-Control-Allow-Headers", "Content-Type");
+  }
+
+  if (req.method === "OPTIONS") {
+    res.sendStatus(204);
+    return;
+  }
+
+  next();
+});
+
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
 
