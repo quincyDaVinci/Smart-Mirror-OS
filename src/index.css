@@ -1160,8 +1160,6 @@ button:disabled {
   top: max(36px, var(--mirror-padding));
   left: max(36px, var(--mirror-padding));
   width: min(28vw, 280px);
-  padding: 18px 18px 16px;
-  border-radius: 18px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -1230,7 +1228,7 @@ button:disabled {
 
 .mirror-compact-weather__forecast-row {
   display: grid;
-  grid-template-columns: 52px 22px 1fr 34px 34px;
+  grid-template-columns: 52px 22px 25% 34px;
   align-items: center;
   column-gap: 8px;
   font-size: 0.92rem;
