@@ -10,6 +10,21 @@ let cachedAccessToken = null;
 let cachedAccessTokenExpiresAt = 0;
 let spotifyRateLimitedUntil = 0;
 
+const DEBUG_SPOTIFY = false;
+
+function logSpotifyDebug(message, meta = null) {
+  if (!DEBUG_SPOTIFY) {
+    return;
+  }
+
+  if (meta === null) {
+    console.log(`[spotify-debug] ${message}`);
+    return;
+  }
+
+  console.log(`[spotify-debug] ${message}`, meta);
+}
+
 function parseRetryAfterToMs(retryAfterHeader) {
   if (
     typeof retryAfterHeader !== "string" ||
@@ -54,6 +69,12 @@ async function refreshSpotifyAccessToken({
   clientSecret,
   refreshToken,
 }) {
+  logSpotifyDebug("refreshSpotifyAccessToken:start", {
+    hasClientId: Boolean(clientId),
+    hasClientSecret: Boolean(clientSecret),
+    hasRefreshToken: Boolean(refreshToken),
+  });
+
   const response = await fetch(SPOTIFY_TOKEN_URL, {
     method: "POST",
     headers: {
@@ -66,6 +87,11 @@ async function refreshSpotifyAccessToken({
     }),
   });
 
+  logSpotifyDebug("refreshSpotifyAccessToken:response", {
+    status: response.status,
+    ok: response.ok,
+  });
+
   if (!response.ok) {
     let errorDetails = null;
 
@@ -74,6 +100,11 @@ async function refreshSpotifyAccessToken({
     } catch {
       errorDetails = null;
     }
+
+    logSpotifyDebug("refreshSpotifyAccessToken:failed", {
+      status: response.status,
+      errorDetails,
+    });
 
     throw new Error(
       `Spotify token refresh gaf status ${response.status}${
@@ -91,6 +122,10 @@ async function refreshSpotifyAccessToken({
   cachedAccessToken = payload.access_token;
   cachedAccessTokenExpiresAt =
     Date.now() + Math.max((payload.expires_in ?? 3600) - 60, 60) * 1000;
+
+  logSpotifyDebug("refreshSpotifyAccessToken:success", {
+    expiresIn: payload.expires_in ?? 3600,
+  });
 
   return cachedAccessToken;
 }
@@ -229,11 +264,26 @@ async function fetchSpotifyNowPlaying() {
 
   const spotifySecrets = getSpotifySecrets();
 
+  logSpotifyDebug("fetchSpotifyNowPlaying:start", {
+    checkedAt,
+    hasClientId: Boolean(spotifySecrets.clientId),
+    hasClientSecret: Boolean(spotifySecrets.clientSecret),
+    hasRefreshToken: Boolean(spotifySecrets.refreshToken),
+    redirectUri: spotifySecrets.redirectUri,
+    spotifyRateLimitedUntil,
+  });
+
   if (
     !spotifySecrets.clientId ||
     !spotifySecrets.clientSecret ||
     !spotifySecrets.refreshToken
   ) {
+    logSpotifyDebug("fetchSpotifyNowPlaying:missing-secrets", {
+      hasClientId: Boolean(spotifySecrets.clientId),
+      hasClientSecret: Boolean(spotifySecrets.clientSecret),
+      hasRefreshToken: Boolean(spotifySecrets.refreshToken),
+    });
+
     return {
       media: null,
       providerStatus: {
@@ -246,6 +296,10 @@ async function fetchSpotifyNowPlaying() {
   }
 
   if (spotifyRateLimitedUntil > checkedAt) {
+    logSpotifyDebug("fetchSpotifyNowPlaying:rate-limited-short-circuit", {
+      msRemaining: spotifyRateLimitedUntil - checkedAt,
+    });
+
     return {
       media: null,
       providerStatus: {
@@ -262,6 +316,8 @@ async function fetchSpotifyNowPlaying() {
   const accessToken = await getSpotifyAccessToken();
 
   if (!accessToken) {
+    logSpotifyDebug("fetchSpotifyNowPlaying:no-access-token");
+
     return {
       media: null,
       providerStatus: {
@@ -280,7 +336,14 @@ async function fetchSpotifyNowPlaying() {
     },
   });
 
+  logSpotifyDebug("fetchSpotifyNowPlaying:currently-playing-response", {
+    status: response.status,
+    ok: response.ok,
+  });
+
   if (response.status === 204) {
+    logSpotifyDebug("fetchSpotifyNowPlaying:no-active-session-204");
+
     return {
       media: null,
       providerStatus: {
@@ -293,8 +356,8 @@ async function fetchSpotifyNowPlaying() {
   }
 
   if (response.status === 401) {
-    cachedAccessToken = null;
-    cachedAccessTokenExpiresAt = 0;
+    logSpotifyDebug("fetchSpotifyNowPlaying:unauthorized-401");
+    resetSpotifyAccessTokenCache();
 
     return {
       media: null,
@@ -311,15 +374,17 @@ async function fetchSpotifyNowPlaying() {
     const retryAfterMs = parseRetryAfterToMs(
       response.headers.get("retry-after"),
     );
-    const effectiveRetryAfterMs = Math.max(retryAfterMs ?? 30000, 15000);
+    const boundedRetryAfterMs = Math.min(
+      Math.max(retryAfterMs ?? 30000, 15000),
+      5 * 60 * 1000,
+    );
 
-    spotifyRateLimitedUntil = checkedAt + effectiveRetryAfterMs;
+    spotifyRateLimitedUntil = checkedAt + boundedRetryAfterMs;
 
     logSpotifyDebug("fetchSpotifyNowPlaying:rate-limited-429", {
       retryAfterHeader: response.headers.get("retry-after"),
       retryAfterMs,
-      effectiveRetryAfterMs,
-      retryUntilIso: new Date(spotifyRateLimitedUntil).toISOString(),
+      boundedRetryAfterMs,
     });
 
     return {
@@ -327,7 +392,7 @@ async function fetchSpotifyNowPlaying() {
       providerStatus: {
         enabled: true,
         status: "ok",
-        message: formatRateLimitWaitMessage(effectiveRetryAfterMs),
+        message: formatRateLimitWaitMessage(boundedRetryAfterMs),
         lastCheckedAt: checkedAt,
       },
     };
@@ -342,6 +407,15 @@ async function fetchSpotifyNowPlaying() {
   const payload = await response.json();
   const item = payload.item;
   const currentlyPlayingType = payload.currently_playing_type ?? "unknown";
+
+  logSpotifyDebug("fetchSpotifyNowPlaying:payload", {
+    isPlaying: payload.is_playing,
+    currentlyPlayingType,
+    hasItem: Boolean(item),
+    itemId: item?.id ?? null,
+    itemName: item?.name ?? null,
+    deviceName: payload.device?.name ?? null,
+  });
 
   const isLiked =
     currentlyPlayingType === "track" && typeof item?.id === "string"

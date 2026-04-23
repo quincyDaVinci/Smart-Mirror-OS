@@ -95,6 +95,7 @@ process.on("unhandledRejection", (reason) => {
 console.log("[boot] backend process starting");
 
 const HEARTBEAT_INTERVAL_MS = 25000;
+const NOW_PLAYING_POLL_INTERVAL_MS = 10000;
 
 const SPOTIFY_AUTHORIZE_URL = "https://accounts.spotify.com/authorize";
 const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
@@ -1104,6 +1105,33 @@ async function pollNowPlayingProviders() {
   updateRuntimeMedia(nextMedia);
 }
 
+let nowPlayingPollInFlight = false;
+
+async function runNowPlayingPollTick(trigger = "interval") {
+  if (nowPlayingPollInFlight) {
+    console.log(
+      "[poll] now playing poll skipped, previous tick still running",
+      {
+        trigger,
+      },
+    );
+    return;
+  }
+
+  nowPlayingPollInFlight = true;
+
+  try {
+    await pollNowPlayingProviders();
+  } catch (error) {
+    console.error("[poll] now playing tick failed", {
+      trigger,
+      error,
+    });
+  } finally {
+    nowPlayingPollInFlight = false;
+  }
+}
+
 async function checkForDeploymentUpdate() {
   state.deployment = {
     ...state.deployment,
@@ -1337,12 +1365,15 @@ function updateDisplayState(reason = "system") {
 }
 
 function startBackgroundJobs() {
-  console.log("[boot] starting now playing polling");
-  void pollNowPlayingProviders();
+  console.log("[boot] starting now playing polling", {
+    intervalMs: NOW_PLAYING_POLL_INTERVAL_MS,
+  });
+
+  void runNowPlayingPollTick("boot");
 
   setInterval(() => {
-    void pollNowPlayingProviders();
-  }, 2000);
+    void runNowPlayingPollTick("interval");
+  }, NOW_PLAYING_POLL_INTERVAL_MS);
 }
 
 console.log("[boot] registering presence timeout interval");
@@ -1711,7 +1742,9 @@ app.post("/config/providers/secrets", async (req, res) => {
 
     if (
       addEntry !== undefined &&
-      (typeof addEntry !== "object" || addEntry === null || Array.isArray(addEntry))
+      (typeof addEntry !== "object" ||
+        addEntry === null ||
+        Array.isArray(addEntry))
     ) {
       res.status(400).json({
         ok: false,
