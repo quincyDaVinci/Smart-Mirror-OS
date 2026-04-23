@@ -189,13 +189,56 @@ wss.on("close", () => {
   clearInterval(heartbeatInterval);
 });
 
+const WIDGET_IDS = ["clock", "weather", "media", "calendar"];
+
+const WIDGET_EDGE_POSITIONS = [
+  "top-left",
+  "top-right",
+  "left-middle",
+  "right-middle",
+  "bottom-left",
+  "bottom-center",
+  "bottom-right",
+];
+
+const WIDGET_DEFAULT_EDGE_POSITIONS = {
+  clock: "top-left",
+  weather: "top-left",
+  media: "bottom-right",
+  calendar: "bottom-left",
+};
+
+const FOCUS_SOURCES = ["manual", "media-auto"];
+const MEDIA_STATUSES = ["idle", "playing", "paused", "error"];
+const MEDIA_KINDS = ["movie", "episode", "track", "podcast", "unknown"];
+const MEDIA_SOURCES = ["jellyfin", "spotify"];
+
+function isWidgetId(value) {
+  return typeof value === "string" && WIDGET_IDS.includes(value);
+}
+
+function isWidgetEdgePosition(value) {
+  return typeof value === "string" && WIDGET_EDGE_POSITIONS.includes(value);
+}
+
+function getDefaultWidgetPosition(widgetId) {
+  if (!isWidgetId(widgetId)) {
+    return "bottom-right";
+  }
+
+  return WIDGET_DEFAULT_EDGE_POSITIONS[widgetId] ?? "bottom-right";
+}
+
+function getDefaultLayout() {
+  return WIDGET_IDS.map((id) => ({
+    id,
+    enabled: true,
+    position: getDefaultWidgetPosition(id),
+  }));
+}
+
 const defaultState = {
-  layout: [
-    { id: "clock", enabled: true },
-    { id: "weather", enabled: true },
-    { id: "media", enabled: true },
-    { id: "calendar", enabled: true },
-  ],
+  layout: getDefaultLayout(),
   settings: {
     showSeconds: true,
     mirrorMode: "normal",
@@ -205,6 +248,8 @@ const defaultState = {
     layoutPaddingPx: 32,
     widgetGapPx: 16,
     zoomPercent: 100,
+    focusIdleTimeoutSeconds: 45,
+    mediaFocusExitDelaySeconds: 10,
   },
   presence: {
     mode: "idle",
@@ -214,6 +259,11 @@ const defaultState = {
     mode: "dimmed",
     reason: "initial",
     updatedAt: Date.now(),
+    focusedWidgetId: null,
+    focusSource: null,
+    focusSetAt: null,
+    focusUntil: null,
+    mediaIdleSince: null,
   },
   deployment: {
     status: "idle",
@@ -242,6 +292,7 @@ const defaultState = {
     deviceName: null,
     userName: null,
     lastUpdatedAt: null,
+    lastPlayed: null,
     sourceState: {
       jellyfin: {
         enabled: true,
@@ -281,6 +332,8 @@ function normalizeSettings(input = {}) {
     layoutPaddingPx,
     widgetGapPx,
     zoomPercent,
+    focusIdleTimeoutSeconds,
+    mediaFocusExitDelaySeconds,
   } = input;
 
   return {
@@ -327,6 +380,301 @@ function normalizeSettings(input = {}) {
       150,
       defaultState.settings.zoomPercent,
     ),
+    focusIdleTimeoutSeconds: clampNumber(
+      focusIdleTimeoutSeconds,
+      10,
+      3600,
+      defaultState.settings.focusIdleTimeoutSeconds,
+    ),
+    mediaFocusExitDelaySeconds: clampNumber(
+      mediaFocusExitDelaySeconds,
+      3,
+      600,
+      defaultState.settings.mediaFocusExitDelaySeconds,
+    ),
+  };
+}
+
+function ensureUniqueLayoutPositions(layoutItems) {
+  const usedPositions = new Set();
+
+  return layoutItems.map((item) => {
+    if (item.id === "clock") {
+      return item;
+    }
+
+    if (!usedPositions.has(item.position)) {
+      usedPositions.add(item.position);
+      return item;
+    }
+
+    const firstUnused =
+      WIDGET_EDGE_POSITIONS.find((position) => !usedPositions.has(position)) ??
+      item.position;
+
+    usedPositions.add(firstUnused);
+
+    return {
+      ...item,
+      position: firstUnused,
+    };
+  });
+}
+
+function normalizeLayout(layoutInput = []) {
+  const normalizedById = new Map();
+
+  if (Array.isArray(layoutInput)) {
+    for (const candidate of layoutInput) {
+      if (!candidate || typeof candidate !== "object") {
+        continue;
+      }
+
+      const { id, enabled, position } = candidate;
+
+      if (!isWidgetId(id)) {
+        continue;
+      }
+
+      normalizedById.set(id, {
+        id,
+        enabled: typeof enabled === "boolean" ? enabled : true,
+        position: isWidgetEdgePosition(position)
+          ? position
+          : getDefaultWidgetPosition(id),
+      });
+    }
+  }
+
+  const normalizedLayout = WIDGET_IDS.map((widgetId) => {
+    const fallbackItem = defaultState.layout.find((item) => item.id === widgetId);
+
+    if (!fallbackItem) {
+      return {
+        id: widgetId,
+        enabled: true,
+        position: getDefaultWidgetPosition(widgetId),
+      };
+    }
+
+    return normalizedById.get(widgetId) ?? fallbackItem;
+  });
+
+  return ensureUniqueLayoutPositions(normalizedLayout);
+}
+
+function normalizeFocusSource(value) {
+  return typeof value === "string" && FOCUS_SOURCES.includes(value)
+    ? value
+    : null;
+}
+
+function normalizeDisplay(displayInput = {}) {
+  const nextDisplay = {
+    ...defaultState.display,
+    mode:
+      displayInput.mode === "on" ||
+      displayInput.mode === "dimmed" ||
+      displayInput.mode === "sleep"
+        ? displayInput.mode
+        : defaultState.display.mode,
+    reason:
+      typeof displayInput.reason === "string" && displayInput.reason.length > 0
+        ? displayInput.reason
+        : defaultState.display.reason,
+    updatedAt: Number.isFinite(Number(displayInput.updatedAt))
+      ? Number(displayInput.updatedAt)
+      : Date.now(),
+    focusedWidgetId: isWidgetId(displayInput.focusedWidgetId)
+      ? displayInput.focusedWidgetId
+      : null,
+    focusSource: normalizeFocusSource(displayInput.focusSource),
+    focusSetAt: Number.isFinite(Number(displayInput.focusSetAt))
+      ? Number(displayInput.focusSetAt)
+      : null,
+    focusUntil: Number.isFinite(Number(displayInput.focusUntil))
+      ? Number(displayInput.focusUntil)
+      : null,
+    mediaIdleSince: Number.isFinite(Number(displayInput.mediaIdleSince))
+      ? Number(displayInput.mediaIdleSince)
+      : null,
+  };
+
+  if (!nextDisplay.focusedWidgetId) {
+    nextDisplay.focusSource = null;
+    nextDisplay.focusSetAt = null;
+    nextDisplay.focusUntil = null;
+    nextDisplay.mediaIdleSince = null;
+  }
+
+  if (nextDisplay.focusSource === "media-auto") {
+    nextDisplay.focusedWidgetId = "media";
+  }
+
+  return nextDisplay;
+}
+
+function normalizeMediaSource(value) {
+  return typeof value === "string" && MEDIA_SOURCES.includes(value)
+    ? value
+    : null;
+}
+
+function normalizeMediaStatus(value) {
+  return typeof value === "string" && MEDIA_STATUSES.includes(value)
+    ? value
+    : defaultState.media.status;
+}
+
+function normalizeMediaKind(value) {
+  return typeof value === "string" && MEDIA_KINDS.includes(value)
+    ? value
+    : defaultState.media.kind;
+}
+
+function normalizeOptionalTimestamp(value) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function normalizeOptionalNumber(value) {
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function normalizeProviderRuntimeStatus(input = {}, fallback = {}) {
+  return {
+    enabled:
+      typeof input.enabled === "boolean"
+        ? input.enabled
+        : Boolean(fallback.enabled),
+    status:
+      input.status === "ok" || input.status === "error" || input.status === "idle"
+        ? input.status
+        : fallback.status ?? "idle",
+    message: typeof input.message === "string" ? input.message : null,
+    lastCheckedAt: normalizeOptionalTimestamp(input.lastCheckedAt),
+  };
+}
+
+function normalizeMediaSnapshot(snapshotInput = null) {
+  if (!snapshotInput || typeof snapshotInput !== "object") {
+    return null;
+  }
+
+  return {
+    source: normalizeMediaSource(snapshotInput.source),
+    kind: normalizeMediaKind(snapshotInput.kind),
+    title:
+      typeof snapshotInput.title === "string" && snapshotInput.title.length > 0
+        ? snapshotInput.title
+        : defaultState.media.title,
+    subtitle:
+      typeof snapshotInput.subtitle === "string"
+        ? snapshotInput.subtitle
+        : defaultState.media.subtitle,
+    secondaryText:
+      typeof snapshotInput.secondaryText === "string"
+        ? snapshotInput.secondaryText
+        : defaultState.media.secondaryText,
+    productionYear: Number.isFinite(Number(snapshotInput.productionYear))
+      ? Number(snapshotInput.productionYear)
+      : null,
+    genres: Array.isArray(snapshotInput.genres)
+      ? snapshotInput.genres.filter((genre) => typeof genre === "string")
+      : [],
+    communityRating: normalizeOptionalNumber(snapshotInput.communityRating),
+    artworkUrl:
+      typeof snapshotInput.artworkUrl === "string" &&
+      snapshotInput.artworkUrl.length > 0
+        ? snapshotInput.artworkUrl
+        : null,
+    durationMs: normalizeOptionalNumber(snapshotInput.durationMs),
+    deviceName:
+      typeof snapshotInput.deviceName === "string" &&
+      snapshotInput.deviceName.length > 0
+        ? snapshotInput.deviceName
+        : null,
+    userName:
+      typeof snapshotInput.userName === "string" &&
+      snapshotInput.userName.length > 0
+        ? snapshotInput.userName
+        : null,
+    capturedAt: normalizeOptionalTimestamp(snapshotInput.capturedAt) ?? Date.now(),
+  };
+}
+
+function normalizeMediaState(mediaInput = {}) {
+  const jellyfinInput =
+    mediaInput.sourceState && typeof mediaInput.sourceState === "object"
+      ? mediaInput.sourceState.jellyfin
+      : undefined;
+
+  const spotifyInput =
+    mediaInput.sourceState && typeof mediaInput.sourceState === "object"
+      ? mediaInput.sourceState.spotify
+      : undefined;
+
+  return {
+    ...defaultState.media,
+    status: normalizeMediaStatus(mediaInput.status),
+    source: normalizeMediaSource(mediaInput.source),
+    kind: normalizeMediaKind(mediaInput.kind),
+    title:
+      typeof mediaInput.title === "string" && mediaInput.title.length > 0
+        ? mediaInput.title
+        : defaultState.media.title,
+    subtitle:
+      typeof mediaInput.subtitle === "string"
+        ? mediaInput.subtitle
+        : defaultState.media.subtitle,
+    secondaryText:
+      typeof mediaInput.secondaryText === "string"
+        ? mediaInput.secondaryText
+        : defaultState.media.secondaryText,
+    productionYear: Number.isFinite(Number(mediaInput.productionYear))
+      ? Number(mediaInput.productionYear)
+      : null,
+    genres: Array.isArray(mediaInput.genres)
+      ? mediaInput.genres.filter((genre) => typeof genre === "string")
+      : [],
+    communityRating: normalizeOptionalNumber(mediaInput.communityRating),
+    artworkUrl:
+      typeof mediaInput.artworkUrl === "string" && mediaInput.artworkUrl.length > 0
+        ? mediaInput.artworkUrl
+        : null,
+    progressMs: normalizeOptionalNumber(mediaInput.progressMs),
+    durationMs: normalizeOptionalNumber(mediaInput.durationMs),
+    deviceName:
+      typeof mediaInput.deviceName === "string" && mediaInput.deviceName.length > 0
+        ? mediaInput.deviceName
+        : null,
+    userName:
+      typeof mediaInput.userName === "string" && mediaInput.userName.length > 0
+        ? mediaInput.userName
+        : null,
+    lastUpdatedAt: normalizeOptionalTimestamp(mediaInput.lastUpdatedAt),
+    lastPlayed: normalizeMediaSnapshot(mediaInput.lastPlayed),
+    sourceState: {
+      jellyfin: normalizeProviderRuntimeStatus(
+        jellyfinInput,
+        defaultState.media.sourceState.jellyfin,
+      ),
+      spotify: normalizeProviderRuntimeStatus(
+        spotifyInput,
+        defaultState.media.sourceState.spotify,
+      ),
+    },
   };
 }
 
@@ -343,19 +691,18 @@ function loadState() {
     return {
       ...baseState,
       ...parsedState,
+      layout: normalizeLayout(parsedState.layout ?? []),
       settings: normalizeSettings(parsedState.settings ?? {}),
       presence: {
         ...baseState.presence,
         ...parsedState.presence,
       },
-      display: {
-        ...baseState.display,
-        ...parsedState.display,
-      },
+      display: normalizeDisplay(parsedState.display ?? {}),
       deployment: {
         ...baseState.deployment,
         ...parsedState.deployment,
       },
+      media: normalizeMediaState(parsedState.media ?? {}),
     };
   } catch (error) {
     console.error("failed to load state, using default", error);
@@ -422,12 +769,225 @@ function hasMediaChanged(currentMedia, nextMedia) {
   return JSON.stringify(currentMedia) !== JSON.stringify(nextMedia);
 }
 
+function getFocusIdleTimeoutMs() {
+  return state.settings.focusIdleTimeoutSeconds * 1000;
+}
+
+function getMediaFocusExitDelayMs() {
+  return state.settings.mediaFocusExitDelaySeconds * 1000;
+}
+
+function createLastPlayedSnapshot(mediaState) {
+  return {
+    source: mediaState.source,
+    kind: mediaState.kind,
+    title: mediaState.title,
+    subtitle: mediaState.subtitle,
+    secondaryText: mediaState.secondaryText,
+    productionYear: mediaState.productionYear,
+    genres: [...(mediaState.genres ?? [])],
+    communityRating: mediaState.communityRating,
+    artworkUrl: mediaState.artworkUrl,
+    durationMs: mediaState.durationMs,
+    deviceName: mediaState.deviceName,
+    userName: mediaState.userName,
+    capturedAt: Date.now(),
+  };
+}
+
+function shouldRefreshLastPlayedSnapshot(previousSnapshot, nextMedia) {
+  if (!previousSnapshot) {
+    return true;
+  }
+
+  return (
+    previousSnapshot.source !== nextMedia.source ||
+    previousSnapshot.kind !== nextMedia.kind ||
+    previousSnapshot.title !== nextMedia.title ||
+    previousSnapshot.subtitle !== nextMedia.subtitle ||
+    previousSnapshot.secondaryText !== nextMedia.secondaryText ||
+    previousSnapshot.artworkUrl !== nextMedia.artworkUrl ||
+    previousSnapshot.durationMs !== nextMedia.durationMs
+  );
+}
+
+function isMediaPlayableSource(mediaState) {
+  return mediaState.source === "jellyfin" || mediaState.source === "spotify";
+}
+
+function setFocusedWidget(widgetId, focusSource = "manual", reason = "focus:set") {
+  if (!isWidgetId(widgetId)) {
+    return false;
+  }
+
+  const now = Date.now();
+  const normalizedSource = focusSource === "media-auto" ? "media-auto" : "manual";
+  const normalizedWidgetId = normalizedSource === "media-auto" ? "media" : widgetId;
+  const nextFocusUntil = now + getFocusIdleTimeoutMs();
+
+  const changed =
+    state.display.focusedWidgetId !== normalizedWidgetId ||
+    state.display.focusSource !== normalizedSource;
+
+  state.display = {
+    ...state.display,
+    focusedWidgetId: normalizedWidgetId,
+    focusSource: normalizedSource,
+    focusSetAt: now,
+    focusUntil: nextFocusUntil,
+    mediaIdleSince: null,
+    reason,
+    updatedAt: now,
+  };
+
+  if (changed) {
+    appendLog(
+      "info",
+      "focus",
+      "Focus widget gewijzigd",
+      `${normalizedSource}:${normalizedWidgetId}`,
+    );
+  }
+
+  return true;
+}
+
+function clearFocusedWidget(reason = "focus:clear") {
+  if (!state.display.focusedWidgetId && !state.display.focusSource) {
+    return false;
+  }
+
+  const previousWidgetId = state.display.focusedWidgetId;
+
+  state.display = {
+    ...state.display,
+    focusedWidgetId: null,
+    focusSource: null,
+    focusSetAt: null,
+    focusUntil: null,
+    mediaIdleSince: null,
+    reason,
+    updatedAt: Date.now(),
+  };
+
+  appendLog(
+    "info",
+    "focus",
+    "Focus widget gewist",
+    `${previousWidgetId ?? "none"} · reason=${reason}`,
+  );
+
+  return true;
+}
+
+function reconcileFocusState(trigger = "focus:tick") {
+  const now = Date.now();
+  const focusedWidgetId = state.display.focusedWidgetId;
+  const mediaIsPlaying =
+    state.media.status === "playing" && isMediaPlayableSource(state.media);
+
+  if (!focusedWidgetId) {
+    if (mediaIsPlaying) {
+      const didChange = setFocusedWidget("media", "media-auto", "focus:auto-media");
+
+      if (didChange) {
+        appendLog("info", "focus", "Media auto-focus actief", trigger);
+      }
+
+      return didChange;
+    }
+
+    return false;
+  }
+
+  if (state.display.focusSource === "manual") {
+    if (state.display.focusUntil !== null && now >= state.display.focusUntil) {
+      return clearFocusedWidget("focus:manual-timeout");
+    }
+
+    return false;
+  }
+
+  if (state.display.focusSource === "media-auto") {
+    if (state.media.status === "playing") {
+      if (state.display.mediaIdleSince !== null) {
+        state.display = {
+          ...state.display,
+          mediaIdleSince: null,
+          reason: "focus:media-resumed",
+          updatedAt: now,
+        };
+
+        return true;
+      }
+
+      return false;
+    }
+
+    if (state.media.status === "paused") {
+      return false;
+    }
+
+    if (state.display.mediaIdleSince === null) {
+      state.display = {
+        ...state.display,
+        mediaIdleSince: now,
+        reason: "focus:media-idle",
+        updatedAt: now,
+      };
+
+      return true;
+    }
+
+    const elapsedMs = now - state.display.mediaIdleSince;
+
+    if (elapsedMs >= getMediaFocusExitDelayMs()) {
+      return clearFocusedWidget("focus:media-idle-timeout");
+    }
+
+    return false;
+  }
+
+  if (state.display.focusUntil !== null && now >= state.display.focusUntil) {
+    return clearFocusedWidget("focus:timeout");
+  }
+
+  return false;
+}
+
 function updateRuntimeMedia(nextMedia) {
-  if (!hasMediaChanged(state.media, nextMedia)) {
+  const normalizedMedia = normalizeMediaState(nextMedia);
+  const previousLastPlayed = state.media.lastPlayed;
+
+  if (normalizedMedia.status === "playing" || normalizedMedia.status === "paused") {
+    normalizedMedia.lastPlayed = shouldRefreshLastPlayedSnapshot(
+      previousLastPlayed,
+      normalizedMedia,
+    )
+      ? createLastPlayedSnapshot(normalizedMedia)
+      : previousLastPlayed;
+  } else {
+    normalizedMedia.lastPlayed = previousLastPlayed;
+  }
+
+  const mediaChanged = hasMediaChanged(state.media, normalizedMedia);
+  const lastPlayedChanged =
+    JSON.stringify(previousLastPlayed) !== JSON.stringify(normalizedMedia.lastPlayed);
+
+  if (mediaChanged) {
+    state.media = normalizedMedia;
+  }
+
+  const focusChanged = reconcileFocusState("media:update");
+
+  if (!mediaChanged && !focusChanged) {
     return;
   }
 
-  state.media = nextMedia;
+  if (focusChanged || lastPlayedChanged) {
+    saveState(state);
+  }
+
   broadcastState();
 }
 
@@ -726,6 +1286,7 @@ function updateDisplayState(reason = "system") {
   }
 
   state.display = {
+    ...state.display,
     mode: nextMode,
     reason,
     updatedAt: Date.now(),
@@ -753,28 +1314,32 @@ function startBackgroundJobs() {
 console.log("[boot] registering presence timeout interval");
 
 setInterval(() => {
-  if (state.presence.mode !== "active") {
-    return;
+  let stateChanged = false;
+
+  if (
+    state.presence.mode === "active" &&
+    state.presence.lastMotionAt &&
+    state.settings.autoSleepEnabled
+  ) {
+    const timeoutMs = state.settings.sleepTimeoutSeconds * 1000;
+    const elapsedMs = Date.now() - state.presence.lastMotionAt;
+
+    if (elapsedMs >= timeoutMs) {
+      state.presence = {
+        ...state.presence,
+        mode: "idle",
+      };
+
+      updateDisplayState("timeout");
+      stateChanged = true;
+    }
   }
 
-  if (!state.presence.lastMotionAt) {
-    return;
+  if (reconcileFocusState("interval:tick")) {
+    stateChanged = true;
   }
 
-  if (!state.settings.autoSleepEnabled) {
-    return;
-  }
-
-  const timeoutMs = state.settings.sleepTimeoutSeconds * 1000;
-  const elapsedMs = Date.now() - state.presence.lastMotionAt;
-
-  if (elapsedMs >= timeoutMs) {
-    state.presence = {
-      ...state.presence,
-      mode: "idle",
-    };
-
-    updateDisplayState("timeout");
+  if (stateChanged) {
     persistAndBroadcast();
   }
 }, 1000);
@@ -805,6 +1370,16 @@ function updateSettings(partialSettings = {}) {
     JSON.stringify(partialSettings),
   );
   updateDisplayState("settings:update");
+
+  if (reconcileFocusState("settings:update")) {
+    appendLog(
+      "info",
+      "focus",
+      "Focus state aangepast na settings update",
+      null,
+    );
+  }
+
   persistAndBroadcast();
 }
 
@@ -820,6 +1395,54 @@ function reorderLayoutByIds(currentLayout, orderedIds) {
   return nextLayout;
 }
 
+function setLayoutItemPosition(widgetId, nextPosition) {
+  if (!isWidgetId(widgetId) || widgetId === "clock") {
+    return false;
+  }
+
+  if (!isWidgetEdgePosition(nextPosition)) {
+    return false;
+  }
+
+  const currentItem = state.layout.find((item) => item.id === widgetId);
+
+  if (!currentItem || currentItem.position === nextPosition) {
+    return false;
+  }
+
+  const nextLayout = state.layout.map((item) => ({ ...item }));
+  const selectedItem = nextLayout.find((item) => item.id === widgetId);
+
+  if (!selectedItem) {
+    return false;
+  }
+
+  const previousPosition = selectedItem.position;
+  const occupiedItem = nextLayout.find(
+    (item) =>
+      item.id !== widgetId &&
+      item.id !== "clock" &&
+      item.position === nextPosition,
+  );
+
+  selectedItem.position = nextPosition;
+
+  if (occupiedItem) {
+    occupiedItem.position = previousPosition;
+  }
+
+  state.layout = normalizeLayout(nextLayout);
+
+  appendLog(
+    "info",
+    "layout",
+    "Widgetpositie gewijzigd",
+    `${widgetId}: ${previousPosition} -> ${nextPosition}`,
+  );
+
+  return true;
+}
+
 function handleClientMessage(message) {
   if (!message || typeof message !== "object") {
     return false;
@@ -827,6 +1450,10 @@ function handleClientMessage(message) {
 
   if (message.type === "widget:toggle") {
     const { widgetId } = message.payload ?? {};
+
+    if (!isWidgetId(widgetId)) {
+      return false;
+    }
 
     state.layout = state.layout.map((item) =>
       item.id === widgetId ? { ...item, enabled: !item.enabled } : item,
@@ -844,12 +1471,46 @@ function handleClientMessage(message) {
     return true;
   }
 
+  if (message.type === "layout:position") {
+    const { widgetId, position } = message.payload ?? {};
+
+    if (!setLayoutItemPosition(widgetId, position)) {
+      return false;
+    }
+
+    persistAndBroadcast();
+    return true;
+  }
+
   if (message.type === "settings:update") {
     updateSettings(message.payload ?? {});
     return true;
   }
 
+  if (message.type === "display:focus") {
+    const { widgetId } = message.payload ?? {};
+
+    if (!isWidgetId(widgetId)) {
+      return false;
+    }
+
+    setFocusedWidget(widgetId, "manual", "focus:manual");
+    persistAndBroadcast();
+    return true;
+  }
+
+  if (message.type === "display:focus:clear") {
+    clearFocusedWidget("focus:manual-clear");
+    persistAndBroadcast();
+    return true;
+  }
+
   if (message.type === "presence:motion") {
+    markPresenceActive();
+    return true;
+  }
+
+  if (message.type === "presence:reset-idle") {
     markPresenceActive();
     return true;
   }

@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import type { LayoutItem, WidgetId } from "../types/layout";
+import type {
+  LayoutItem,
+  WidgetEdgePosition,
+  WidgetId,
+} from "../types/layout";
 import type { MirrorSettings } from "../types/settings";
 import type { PresenceState } from "../types/presence";
 import type { DisplayState } from "../types/display";
@@ -123,6 +127,8 @@ export function useMirrorSocket() {
     layoutPaddingPx: 32,
     widgetGapPx: 16,
     zoomPercent: 100,
+    focusIdleTimeoutSeconds: 45,
+    mediaFocusExitDelaySeconds: 10,
   });
   const [presence, setPresence] = useState<PresenceState>({
     mode: "idle",
@@ -132,6 +138,11 @@ export function useMirrorSocket() {
     mode: "dimmed",
     reason: "initial",
     updatedAt: Date.now(),
+    focusedWidgetId: null,
+    focusSource: null,
+    focusSetAt: null,
+    focusUntil: null,
+    mediaIdleSince: null,
   });
   const [deployment, setDeployment] = useState<DeploymentState>({
     status: "idle",
@@ -160,6 +171,7 @@ export function useMirrorSocket() {
     deviceName: null,
     userName: null,
     lastUpdatedAt: null,
+    lastPlayed: null,
     sourceState: {
       jellyfin: {
         enabled: true,
@@ -724,6 +736,16 @@ export function useMirrorSocket() {
     });
   }
 
+  function updateWidgetPosition(widgetId: WidgetId, position: WidgetEdgePosition) {
+    void sendAction({
+      type: "layout:position",
+      payload: {
+        widgetId,
+        position,
+      },
+    });
+  }
+
   function updateSettings(nextSettings: Partial<MirrorSettings>) {
     void sendAction({
       type: "settings:update",
@@ -731,9 +753,28 @@ export function useMirrorSocket() {
     });
   }
 
+  function focusWidget(widgetId: WidgetId) {
+    void sendAction({
+      type: "display:focus",
+      payload: { widgetId },
+    });
+  }
+
+  function clearWidgetFocus() {
+    void sendAction({
+      type: "display:focus:clear",
+    });
+  }
+
   function simulateMotion() {
     void sendAction({
       type: "presence:motion",
+    });
+  }
+
+  function resetIdleTimer() {
+    void sendAction({
+      type: "presence:reset-idle",
     });
   }
 
@@ -760,8 +801,12 @@ export function useMirrorSocket() {
     deployment,
     toggleWidget,
     reorderLayout,
+    updateWidgetPosition,
     updateSettings,
+    focusWidget,
+    clearWidgetFocus,
     simulateMotion,
+    resetIdleTimer,
     checkDeploymentUpdate,
     deployLatestVersion,
     media,

@@ -3,6 +3,8 @@ import type { MediaState } from "../../types/media";
 
 type MediaWidgetProps = {
   media: MediaState;
+  variant?: "edge" | "focus";
+  preferLastPlayed?: boolean;
 };
 
 type MetaChipProps = {
@@ -120,6 +122,96 @@ function TagIcon() {
   );
 }
 
+function DeviceIcon() {
+  return (
+    <IconBase>
+      <svg
+        viewBox="0 0 24 24"
+        width="14"
+        height="14"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <rect x="3" y="6" width="18" height="12" rx="2" />
+        <path d="M8 20h8" />
+      </svg>
+    </IconBase>
+  );
+}
+
+function UserIcon() {
+  return (
+    <IconBase>
+      <svg
+        viewBox="0 0 24 24"
+        width="14"
+        height="14"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <circle cx="12" cy="8" r="3.2" />
+        <path d="M5.5 19a6.5 6.5 0 0 1 13 0" />
+      </svg>
+    </IconBase>
+  );
+}
+
+function PlayIcon() {
+  return (
+    <IconBase>
+      <svg
+        viewBox="0 0 24 24"
+        width="14"
+        height="14"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <circle cx="12" cy="12" r="9" />
+        <path d="M10 8.5v7l5-3.5-5-3.5Z" fill="currentColor" stroke="none" />
+      </svg>
+    </IconBase>
+  );
+}
+
+function PauseIcon() {
+  return (
+    <IconBase>
+      <svg
+        viewBox="0 0 24 24"
+        width="14"
+        height="14"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <circle cx="12" cy="12" r="9" />
+        <path d="M10 8v8M14 8v8" />
+      </svg>
+    </IconBase>
+  );
+}
+
+function HistoryIcon() {
+  return (
+    <IconBase>
+      <svg
+        viewBox="0 0 24 24"
+        width="14"
+        height="14"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+      >
+        <path d="M3.5 12a8.5 8.5 0 1 0 2.5-6" />
+        <path d="M3.5 4.5v4h4" />
+      </svg>
+    </IconBase>
+  );
+}
+
 function formatTime(ms: number | null, forceHours = false) {
   if (ms === null || Number.isNaN(ms)) {
     return null;
@@ -189,15 +281,17 @@ function getLiveProgressMs(media: MediaState, nowMs: number) {
   return nextProgressMs;
 }
 
-export function MediaWidget({ media }: MediaWidgetProps) {
-  const [nowMs, setNowMs] = useState(Date.now());
+export function MediaWidget({
+  media,
+  variant = "edge",
+  preferLastPlayed = false,
+}: MediaWidgetProps) {
+  const [nowMs, setNowMs] = useState(0);
 
   useEffect(() => {
     if (media.status !== "playing" || media.progressMs === null) {
       return;
     }
-
-    setNowMs(Date.now());
 
     const intervalId = window.setInterval(() => {
       setNowMs(Date.now());
@@ -270,18 +364,52 @@ export function MediaWidget({ media }: MediaWidgetProps) {
   const remainingText =
     isVideo && remainingMs !== null ? formatRemainingTime(remainingMs) : null;
 
+  const isShowingLastPlayed =
+    preferLastPlayed &&
+    media.lastPlayed !== null &&
+    media.status !== "playing" &&
+    media.status !== "paused";
+
+  const contextLabel = isShowingLastPlayed
+    ? "Laatst afgespeeld"
+    : media.status === "playing"
+      ? "Nu actief"
+      : media.status === "paused"
+        ? "Gepauzeerd"
+        : "Media";
+
+  const contextIcon = isShowingLastPlayed ? (
+    <HistoryIcon />
+  ) : media.status === "playing" ? (
+    <PlayIcon />
+  ) : media.status === "paused" ? (
+    <PauseIcon />
+  ) : (
+    <TagIcon />
+  );
+
+  const artworkColumn = variant === "focus" ? "minmax(200px, 28vw) 1fr" : "96px 1fr";
+  const titleSize = variant === "focus" ? 44 : 24;
+  const subtitleSize = variant === "focus" ? 22 : 16;
+  const detailSize = variant === "focus" ? 17 : 14;
+  const artworkPadding = variant === "focus" ? (isVideo ? 12 : 8) : isVideo ? 8 : 4;
+  const progressHeight = variant === "focus" ? 8 : 6;
+
   return (
     <section
+      className={`widget media-widget media-widget--${variant}`}
       style={{
         display: "grid",
-        gridTemplateColumns: "96px 1fr",
-        gap: 16,
+        gridTemplateColumns: artworkColumn,
+        gap: variant === "focus" ? "24px" : "16px",
         alignItems: "stretch",
+        width: "100%",
+        minHeight: 0,
       }}
     >
       <div
         style={{
-          width: "96px",
+          width: "100%",
           aspectRatio: isVideo ? "2 / 3" : "1 / 1",
           borderRadius: 14,
           overflow: "hidden",
@@ -292,13 +420,14 @@ export function MediaWidget({ media }: MediaWidgetProps) {
           justifyContent: "center",
           flexShrink: 0,
         }}
+        className="media-widget-artwork"
       >
         {media.artworkUrl ? (
           <div
             style={{
               width: "100%",
               height: "100%",
-              padding: isVideo ? 8 : 4,
+              padding: artworkPadding,
               boxSizing: "border-box",
             }}
           >
@@ -324,7 +453,11 @@ export function MediaWidget({ media }: MediaWidgetProps) {
               lineHeight: 1.3,
             }}
           >
-            {isVideo ? "Geen poster" : "Geen cover"}
+            {isShowingLastPlayed
+              ? "Geen cover van laatste item"
+              : isVideo
+                ? "Geen poster"
+                : "Geen cover"}
           </div>
         )}
       </div>
@@ -334,9 +467,10 @@ export function MediaWidget({ media }: MediaWidgetProps) {
           minWidth: 0,
           display: "flex",
           flexDirection: "column",
-          gap: 8,
+          gap: variant === "focus" ? 14 : 8,
           justifyContent: "center",
         }}
+        className="media-widget-body"
       >
         <div
           style={{
@@ -344,21 +478,21 @@ export function MediaWidget({ media }: MediaWidgetProps) {
             alignItems: "center",
             gap: 8,
             flexWrap: "wrap",
-            fontSize: 12,
+            fontSize: variant === "focus" ? 13 : 12,
             opacity: 0.8,
             textTransform: "uppercase",
             letterSpacing: "0.08em",
           }}
         >
-          <span>Now Playing</span>
+          <MetaChip icon={contextIcon}>{contextLabel}</MetaChip>
           {media.source ? <span>{media.source}</span> : null}
-          <span>{media.kind}</span>
+          {media.kind !== "unknown" ? <span>{media.kind}</span> : null}
         </div>
 
         <h2
           style={{
             margin: 0,
-            fontSize: 24,
+            fontSize: titleSize,
             lineHeight: 1.1,
           }}
         >
@@ -368,7 +502,7 @@ export function MediaWidget({ media }: MediaWidgetProps) {
         <p
           style={{
             margin: 0,
-            fontSize: 16,
+            fontSize: subtitleSize,
             opacity: 0.9,
           }}
         >
@@ -379,7 +513,7 @@ export function MediaWidget({ media }: MediaWidgetProps) {
           <p
             style={{
               margin: 0,
-              fontSize: 14,
+              fontSize: detailSize,
               opacity: 0.7,
             }}
           >
@@ -391,7 +525,7 @@ export function MediaWidget({ media }: MediaWidgetProps) {
           <p
             style={{
               margin: 0,
-              fontSize: 14,
+              fontSize: detailSize,
               opacity: 0.78,
             }}
           >
@@ -421,16 +555,23 @@ export function MediaWidget({ media }: MediaWidgetProps) {
           </div>
         ) : null}
 
-        <div
-          style={{
-            fontSize: 13,
-            opacity: 0.75,
-          }}
-        >
-          <span>Status: {media.status}</span>
-          {media.deviceName ? <span> · Device: {media.deviceName}</span> : null}
-          {media.userName ? <span> · User: {media.userName}</span> : null}
-        </div>
+        {media.deviceName || media.userName ? (
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              flexWrap: "wrap",
+            }}
+          >
+            {media.deviceName ? (
+              <MetaChip icon={<DeviceIcon />}>{media.deviceName}</MetaChip>
+            ) : null}
+
+            {media.userName ? (
+              <MetaChip icon={<UserIcon />}>{media.userName}</MetaChip>
+            ) : null}
+          </div>
+        ) : null}
 
         {progressText ? (
           <div
@@ -442,7 +583,7 @@ export function MediaWidget({ media }: MediaWidgetProps) {
           >
             <div
               style={{
-                height: 6,
+                height: progressHeight,
                 width: "100%",
                 borderRadius: 999,
                 background: "rgba(255, 255, 255, 0.14)",
@@ -462,7 +603,7 @@ export function MediaWidget({ media }: MediaWidgetProps) {
             <p
               style={{
                 margin: 0,
-                fontSize: 13,
+                fontSize: variant === "focus" ? 15 : 13,
                 opacity: 0.8,
               }}
             >

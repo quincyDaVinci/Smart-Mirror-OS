@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { useMirrorSocket } from "./hooks/useMirrorSocket";
 import { MirrorPage } from "./pages/MirrorPage";
 import { AdminPage } from "./pages/AdminPage";
+import { RemoteControlPage } from "./pages/RemoteControlPage";
 
 function App() {
   const {
@@ -14,8 +15,12 @@ function App() {
     connectionError,
     toggleWidget,
     reorderLayout,
+    updateWidgetPosition,
     updateSettings,
+    focusWidget,
+    clearWidgetFocus,
     simulateMotion,
+    resetIdleTimer,
     deployment,
     checkDeploymentUpdate,
     deployLatestVersion,
@@ -54,6 +59,7 @@ function App() {
               display={display}
               onToggleWidget={toggleWidget}
               onReorderWidgets={reorderLayout}
+              onUpdateWidgetPosition={updateWidgetPosition}
               onUpdateSettings={updateSettings}
               onSimulateMotion={simulateMotion}
               deployment={deployment}
@@ -69,6 +75,23 @@ function App() {
               onRefreshProviderConfigStatus={refreshProviderConfigStatus}
               onSaveProviderSecrets={saveProviderSecrets}
               apiBaseUrl={apiBaseUrl}
+            />
+          }
+        />
+        <Route
+          path="/remote"
+          element={
+            <RemoteControlPage
+              layout={layout}
+              display={display}
+              presence={presence}
+              media={media}
+              isConnected={isConnected}
+              connectionStatus={connectionStatus}
+              connectionError={connectionError}
+              onFocusWidget={focusWidget}
+              onClearFocus={clearWidgetFocus}
+              onResetIdleTimer={resetIdleTimer}
             />
           }
         />

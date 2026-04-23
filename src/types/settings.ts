@@ -9,6 +9,8 @@ export type MirrorSettings = {
   layoutPaddingPx: number;
   widgetGapPx: number;
   zoomPercent: number;
+  focusIdleTimeoutSeconds: number;
+  mediaFocusExitDelaySeconds: number;
 };
 
 export const defaultMirrorSettings: MirrorSettings = {
@@ -20,4 +22,6 @@ export const defaultMirrorSettings: MirrorSettings = {
   layoutPaddingPx: 32,
   widgetGapPx: 16,
   zoomPercent: 100,
+  focusIdleTimeoutSeconds: 45,
+  mediaFocusExitDelaySeconds: 10,
 };

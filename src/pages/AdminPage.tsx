@@ -1,6 +1,10 @@
 import { Link } from "react-router-dom";
 import { LayoutControls } from "../components/admin/LayoutControls";
-import type { LayoutItem, WidgetId } from "../types/layout";
+import type {
+  LayoutItem,
+  WidgetEdgePosition,
+  WidgetId,
+} from "../types/layout";
 import type { MirrorSettings } from "../types/settings";
 import type { PresenceState } from "../types/presence";
 import type { DisplayState } from "../types/display";
@@ -20,6 +24,10 @@ type AdminPageProps = {
   display: DisplayState;
   onToggleWidget: (widgetId: WidgetId) => void;
   onReorderWidgets: (orderedIds: WidgetId[]) => void;
+  onUpdateWidgetPosition: (
+    widgetId: WidgetId,
+    position: WidgetEdgePosition,
+  ) => void;
   onUpdateSettings: (nextSettings: Partial<MirrorSettings>) => void;
   onSimulateMotion: () => void;
   isConnected: boolean;
@@ -69,6 +77,7 @@ export function AdminPage({
   display,
   onToggleWidget,
   onReorderWidgets,
+  onUpdateWidgetPosition,
   onUpdateSettings,
   onSimulateMotion,
   isConnected,
@@ -102,22 +111,25 @@ export function AdminPage({
     <main className="admin-page">
       <div className="admin-header">
         <h1 className="admin-title">Smart Mirror Admin</h1>
-        <Link to="/" className="admin-link">
-          Ga naar mirror
-        </Link>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Link to="/" className="admin-link">
+            Ga naar mirror
+          </Link>
+          <Link to="/remote" className="admin-link">
+            Open remote
+          </Link>
+        </div>
       </div>
 
       <p className="admin-status">
-        {!isConnected && lastHttpSuccessAt ? (
-          <p
-            className="admin-status"
-            style={{ marginTop: "-8px", color: "#cfcfcf" }}
-          >
-            Transport: HTTP fallback actief
-          </p>
-        ) : null}
         Status: <strong>{getConnectionStatusLabel(connectionStatus)}</strong>
       </p>
+
+      {!isConnected && lastHttpSuccessAt ? (
+        <p className="admin-status" style={{ marginTop: "-8px", color: "#cfcfcf" }}>
+          Transport: HTTP fallback actief
+        </p>
+      ) : null}
 
       {connectionError &&
       !isExpectedReconnect &&
@@ -149,6 +161,7 @@ export function AdminPage({
             layout={layout}
             onToggleWidget={onToggleWidget}
             onReorderWidgets={onReorderWidgets}
+            onUpdateWidgetPosition={onUpdateWidgetPosition}
             renderInAccordion
           />
         </AccordionSection>
@@ -201,6 +214,46 @@ export function AdminPage({
               }}
             />
           </label>
+
+          <label style={{ display: "block", marginTop: "1rem" }}>
+            Focus timeout (seconden)
+            <input
+              type="number"
+              min={10}
+              step={5}
+              value={settings.focusIdleTimeoutSeconds}
+              onChange={(event) => {
+                onUpdateSettings({
+                  focusIdleTimeoutSeconds: Number(event.target.value),
+                });
+              }}
+              style={{
+                display: "block",
+                marginTop: "0.5rem",
+                width: "100%",
+              }}
+            />
+          </label>
+
+          <label style={{ display: "block", marginTop: "1rem" }}>
+            Media focus exit delay (seconden)
+            <input
+              type="number"
+              min={3}
+              step={1}
+              value={settings.mediaFocusExitDelaySeconds}
+              onChange={(event) => {
+                onUpdateSettings({
+                  mediaFocusExitDelaySeconds: Number(event.target.value),
+                });
+              }}
+              style={{
+                display: "block",
+                marginTop: "0.5rem",
+                width: "100%",
+              }}
+            />
+          </label>
         </AccordionSection>
 
         <AccordionSection
@@ -228,17 +281,6 @@ export function AdminPage({
               <option value="portrait-left">Portrait linksom</option>
               <option value="portrait-right">Portrait rechtsom</option>
             </select>
-          </label>
-
-          <label style={{ display: "block", marginBottom: "1rem" }}>
-            <input
-              type="checkbox"
-              checked={settings.showStatusBar}
-              onChange={(event) => {
-                onUpdateSettings({ showStatusBar: event.target.checked });
-              }}
-            />{" "}
-            Toon statusbar bovenaan
           </label>
 
           <label style={{ display: "block", marginBottom: "1rem" }}>

@@ -9,6 +9,22 @@ export type ProviderStatus = {
   lastCheckedAt: number | null;
 };
 
+export type MediaSnapshot = {
+  source: MediaSource | null;
+  kind: MediaKind;
+  title: string;
+  subtitle: string;
+  secondaryText: string;
+  productionYear: number | null;
+  genres: string[];
+  communityRating: number | null;
+  artworkUrl: string | null;
+  durationMs: number | null;
+  deviceName: string | null;
+  userName: string | null;
+  capturedAt: number;
+};
+
 export type MediaState = {
   status: MediaStatus;
   source: MediaSource | null;
@@ -25,6 +41,7 @@ export type MediaState = {
   deviceName: string | null;
   userName: string | null;
   lastUpdatedAt: number | null;
+  lastPlayed: MediaSnapshot | null;
   sourceState: {
     jellyfin: ProviderStatus;
     spotify: ProviderStatus;
@@ -47,6 +64,7 @@ export const defaultMediaState: MediaState = {
   deviceName: null,
   userName: null,
   lastUpdatedAt: null,
+  lastPlayed: null,
   sourceState: {
     jellyfin: {
       enabled: true,

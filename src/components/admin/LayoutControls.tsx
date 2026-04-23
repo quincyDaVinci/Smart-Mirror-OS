@@ -1,13 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
 import { DragDropProvider } from "@dnd-kit/react";
 import { isSortable } from "@dnd-kit/react/sortable";
 import { SortableLayoutItem } from "./SortableLayoutItem";
-import type { LayoutItem, WidgetId } from "../../types/layout";
+import {
+  widgetEdgePositionOptions,
+  type LayoutItem,
+  type WidgetEdgePosition,
+  type WidgetId,
+} from "../../types/layout";
 
 type LayoutControlsProps = {
   layout: LayoutItem[];
   onToggleWidget: (widgetId: WidgetId) => void;
   onReorderWidgets: (orderedIds: WidgetId[]) => void;
+  onUpdateWidgetPosition: (
+    widgetId: WidgetId,
+    position: WidgetEdgePosition,
+  ) => void;
   renderInAccordion?: boolean;
 };
 
@@ -15,23 +23,10 @@ export function LayoutControls({
   layout,
   onToggleWidget,
   onReorderWidgets,
+  onUpdateWidgetPosition,
   renderInAccordion = false,
 }: LayoutControlsProps) {
-  const [orderedIds, setOrderedIds] = useState<WidgetId[]>(
-    layout.map((item) => item.id),
-  );
-
-  useEffect(() => {
-    setOrderedIds(layout.map((item) => item.id));
-  }, [layout]);
-
-  const orderedItems = useMemo(
-    () =>
-      orderedIds
-        .map((id) => layout.find((item) => item.id === id))
-        .filter((item): item is LayoutItem => Boolean(item)),
-    [orderedIds, layout],
-  );
+  const orderedItems = layout;
 
   const content = (
     <>
@@ -54,6 +49,31 @@ export function LayoutControls({
                     onChange={() => onToggleWidget(item.id)}
                   />
                 </label>
+
+                {item.id !== "clock" ? (
+                  <label className="admin-toggle">
+                    <span>Positie</span>
+                    <select
+                      value={item.position}
+                      onChange={(event) => {
+                        onUpdateWidgetPosition(
+                          item.id,
+                          event.target.value as WidgetEdgePosition,
+                        );
+                      }}
+                    >
+                      {widgetEdgePositionOptions.map((position) => (
+                        <option key={position} value={position}>
+                          {position}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : (
+                  <span className="admin-row-hint">
+                    Klok blijft vast midden-boven in normal state.
+                  </span>
+                )}
               </div>
             </div>
           </SortableLayoutItem>
@@ -81,14 +101,11 @@ export function LayoutControls({
           return;
         }
 
-        setOrderedIds((currentIds) => {
-          const nextIds = [...currentIds];
-          const [movedItem] = nextIds.splice(initialIndex, 1);
-          nextIds.splice(index, 0, movedItem);
+        const nextIds = layout.map((item) => item.id);
+        const [movedItem] = nextIds.splice(initialIndex, 1);
+        nextIds.splice(index, 0, movedItem);
 
-          onReorderWidgets(nextIds);
-          return nextIds;
-        });
+        onReorderWidgets(nextIds);
       }}
     >
       {renderInAccordion ? (
