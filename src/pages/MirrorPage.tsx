@@ -1,5 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { dashboardData } from "../data/mockDashboard";
+import type { WeatherIconKey } from "../types/dashboard";
 import type { LayoutItem } from "../types/layout";
 import type { MirrorSettings } from "../types/settings";
 import type { PresenceState } from "../types/presence";
@@ -14,6 +15,81 @@ type MirrorPageProps = {
   display: DisplayState;
   media: MediaState;
 };
+
+function getWeatherGlyph(iconKey: WeatherIconKey) {
+  switch (iconKey) {
+    case "sunny":
+      return "☀";
+    case "partly-cloudy":
+      return "⛅";
+    case "rain":
+      return "☂";
+    case "cloudy":
+    default:
+      return "☁";
+  }
+}
+
+function formatShortDate(date: Date) {
+  return date.toLocaleDateString("en-US", {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatMeridiemTime(date: Date) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).formatToParts(date);
+
+  const time = parts
+    .filter(
+      (part) =>
+        part.type === "hour" ||
+        part.type === "minute" ||
+        part.type === "literal",
+    )
+    .map((part) => part.value)
+    .join("")
+    .trim();
+
+  const meridiem =
+    parts.find((part) => part.type === "dayPeriod")?.value.toLowerCase() ?? "";
+
+  return { time, meridiem };
+}
+
+function formatAgendaTime(value: string) {
+  const [hour, minute] = value.split(":").map(Number);
+
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) {
+    return value;
+  }
+
+  const date = new Date();
+  date.setHours(hour, minute, 0, 0);
+
+  const formatted = formatMeridiemTime(date);
+  return `${formatted.time} ${formatted.meridiem}`;
+}
+
+function getScreenLabel(display: DisplayState) {
+  switch (display.focusedWidgetId) {
+    case "media":
+      return "MEDIA";
+    case "calendar":
+      return "AGENDA";
+    case "weather":
+      return "WEATHER";
+    case "clock":
+      return "CLOCK";
+    default:
+      return "MAIN";
+  }
+}
 
 export function MirrorPage({
   layout,
@@ -49,6 +125,15 @@ export function MirrorPage({
   const showCalendar = enabledWidgetIds.has("calendar");
   const showMedia = enabledWidgetIds.has("media");
 
+  const upcomingItems = dashboardData.calendar.items.slice(0, 2);
+  const screenLabel = getScreenLabel(display);
+
+  const formattedTime = formatMeridiemTime(currentTime);
+  const weekdayLabel = currentTime.toLocaleDateString("en-US", {
+    weekday: "long",
+  });
+  const fullDateLabel = formatShortDate(currentTime);
+
   return (
     <main
       className={`mirror-page mirror-page--mode-${settings.mirrorMode} mirror-page--${presence.mode} mirror-page--display-${display.mode}`}
@@ -61,77 +146,108 @@ export function MirrorPage({
         </div>
       ) : null}
 
-      <div className="mirror-shell">
-        <header className="mirror-shell__top">
-          <div className="mirror-shell__weather-slot">
-            {showWeather ? (
-              <section className="mirror-weather-hero">
-                <div className="mirror-weather-hero__icon">◔</div>
-                <div>
-                  <div className="mirror-weather-hero__temp">
-                    {dashboardData.weather.temperature}
-                  </div>
-                  <div className="mirror-weather-hero__location">
-                    {dashboardData.weather.location}
-                  </div>
+      <div className="mirror-portrait-shell">
+        <div className="mirror-edge-indicator">{screenLabel}</div>
+
+        {showWeather ? (
+          <section className="mirror-compact-weather">
+            <p className="mirror-compact-weather__location">
+              {dashboardData.weather.location}
+            </p>
+
+            <div className="mirror-compact-weather__hero">
+              <div className="mirror-compact-weather__icon">
+                {getWeatherGlyph(dashboardData.weather.iconKey)}
+              </div>
+
+              <div className="mirror-compact-weather__hero-right">
+                <div className="mirror-compact-weather__temp">
+                  {dashboardData.weather.temperature}
                 </div>
-              </section>
-            ) : null}
-          </div>
 
-          <div className="mirror-shell__clock-slot">
+                <div className="mirror-compact-weather__condition">
+                  {dashboardData.weather.condition}
+                </div>
+              </div>
+            </div>
+
+            <div className="mirror-compact-weather__stats">
+              <span>Wind: {dashboardData.weather.windSpeed}</span>
+              <span>Max: {dashboardData.weather.highTemperature}</span>
+              <span>Min: {dashboardData.weather.lowTemperature}</span>
+            </div>
+
+            <p className="mirror-compact-weather__detail">
+              {dashboardData.weather.detailLine}
+            </p>
+
+            <div className="mirror-compact-weather__forecast">
+              {dashboardData.weather.forecast.map((item) => (
+                <div
+                  key={`${item.day}-${item.highTemperature}-${item.lowTemperature}`}
+                  className="mirror-compact-weather__forecast-row"
+                >
+                  <span className="mirror-compact-weather__forecast-day">
+                    {item.day}
+                  </span>
+                  <span className="mirror-compact-weather__forecast-icon">
+                    {getWeatherGlyph(item.iconKey)}
+                  </span>
+                  <span className="mirror-compact-weather__forecast-high">
+                    {item.highTemperature}
+                  </span>
+                  <span className="mirror-compact-weather__forecast-low">
+                    {item.lowTemperature}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+        ) : null}
+
+        {showClock || showCalendar ? (
+          <section className="mirror-compact-time-stack">
             {showClock ? (
-              <section className="mirror-clock-hero">
-                <p className="mirror-clock-hero__time">
-                  {currentTime.toLocaleTimeString("nl-NL", {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                    second: settings.showSeconds ? "2-digit" : undefined,
-                  })}
-                </p>
+              <div className="mirror-compact-time">
+                <p className="mirror-compact-time__weekday">{weekdayLabel}</p>
+                <p className="mirror-compact-time__date">{fullDateLabel}</p>
 
-                <p className="mirror-clock-hero__date">
-                  {currentTime.toLocaleDateString("nl-NL", {
-                    weekday: "long",
-                    day: "numeric",
-                    month: "long",
-                  })}
+                <p className="mirror-compact-time__value">
+                  <span className="mirror-compact-time__digits">
+                    {formattedTime.time}
+                  </span>
+                  <span className="mirror-compact-time__meridiem">
+                    {formattedTime.meridiem}
+                  </span>
                 </p>
-              </section>
-            ) : null}
-          </div>
-
-          <div className="mirror-shell__meta-slot">
-            {showMedia && media.source ? (
-              <div className="mirror-shell__live-meta">
-                <span className="mirror-pill">{media.source}</span>
-                <span className="mirror-shell__live-status">{media.status}</span>
               </div>
             ) : null}
-          </div>
-        </header>
 
-        <div className="mirror-shell__spacer" />
-
-        <footer className="mirror-shell__bottom">
-          <div className="mirror-shell__agenda-slot">
-            {showCalendar ? (
-              <section className="mirror-agenda-hero">
-                <p className="mirror-agenda-hero__label">Volgende afspraak</p>
-                <p className="mirror-agenda-hero__time">
-                  {dashboardData.calendar.time}
-                </p>
-                <p className="mirror-agenda-hero__title">
-                  {dashboardData.calendar.title}
-                </p>
-              </section>
+            {showCalendar && upcomingItems.length > 0 ? (
+              <div className="mirror-compact-agenda">
+                {upcomingItems.map((item) => (
+                  <div
+                    key={`${item.time}-${item.title}`}
+                    className="mirror-compact-agenda__item"
+                  >
+                    <span className="mirror-compact-agenda__time">
+                      {formatAgendaTime(item.time)}
+                    </span>
+                    <span className="mirror-compact-agenda__title">
+                      {item.title}
+                    </span>
+                  </div>
+                ))}
+              </div>
             ) : null}
-          </div>
+          </section>
+        ) : null}
 
-          <div className="mirror-shell__media-slot">
-            {showMedia ? <MirrorMediaDock media={media} /> : null}
+        {showMedia ? (
+          <div className="mirror-portrait-media-zone">
+            <MirrorMediaDock media={media} />
           </div>
-        </footer>
+        ) : null}
       </div>
     </main>
   );

@@ -3,6 +3,8 @@ const { getSpotifySecrets } = require("../secretsStore");
 const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
 const SPOTIFY_CURRENTLY_PLAYING_URL =
   "https://api.spotify.com/v1/me/player/currently-playing";
+const SPOTIFY_SAVED_TRACKS_CONTAINS_URL =
+  "https://api.spotify.com/v1/me/tracks/contains";
 
 let cachedAccessToken = null;
 let cachedAccessTokenExpiresAt = 0;
@@ -164,6 +166,34 @@ function getProductionYear(item, currentlyPlayingType) {
   return Number.isFinite(year) ? year : null;
 }
 
+async function fetchSpotifyTrackLikedState(accessToken, trackId) {
+  if (!trackId) {
+    return null;
+  }
+
+  const url = new URL(SPOTIFY_SAVED_TRACKS_CONTAINS_URL);
+  url.searchParams.set("ids", trackId);
+
+  const response = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload = await response.json();
+
+  if (!Array.isArray(payload) || typeof payload[0] !== "boolean") {
+    return null;
+  }
+
+  return payload[0];
+}
+
 async function fetchSpotifyNowPlaying() {
   const checkedAt = Date.now();
 
@@ -241,6 +271,11 @@ async function fetchSpotifyNowPlaying() {
   const item = payload.item;
   const currentlyPlayingType = payload.currently_playing_type ?? "unknown";
 
+  const isLiked =
+    currentlyPlayingType === "track" && typeof item?.id === "string"
+      ? await fetchSpotifyTrackLikedState(accessToken, item.id)
+      : null;
+
   if (!item) {
     return {
       media: null,
@@ -275,6 +310,7 @@ async function fetchSpotifyNowPlaying() {
         typeof item.duration_ms === "number" ? item.duration_ms : null,
       deviceName: payload.device?.name ?? null,
       userName: "Spotify",
+      isLiked,
       lastUpdatedAt: checkedAt,
     },
     providerStatus: {

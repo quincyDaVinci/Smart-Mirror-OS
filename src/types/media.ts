@@ -22,6 +22,7 @@ export type MediaSnapshot = {
   durationMs: number | null;
   deviceName: string | null;
   userName: string | null;
+  isLiked: boolean | null;
   capturedAt: number;
 };
 
@@ -40,6 +41,7 @@ export type MediaState = {
   durationMs: number | null;
   deviceName: string | null;
   userName: string | null;
+  isLiked: boolean | null;
   lastUpdatedAt: number | null;
   lastPlayed: MediaSnapshot | null;
   sourceState: {
@@ -63,6 +65,7 @@ export const defaultMediaState: MediaState = {
   durationMs: null,
   deviceName: null,
   userName: null,
+  isLiked: null,
   lastUpdatedAt: null,
   lastPlayed: null,
   sourceState: {

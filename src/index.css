@@ -1132,3 +1132,335 @@ button:disabled {
 .sortable-item-content {
   flex: 1;
 }
+
+.mirror-portrait-shell {
+  position: relative;
+  width: calc(100% / var(--mirror-scale));
+  min-height: calc(100% / var(--mirror-scale));
+  padding: var(--mirror-padding);
+  transform-origin: top left;
+  transform: scale(var(--mirror-scale));
+}
+
+.mirror-edge-indicator {
+  position: absolute;
+  left: 2px;
+  top: 50%;
+  transform: translateY(-50%) rotate(-90deg);
+  transform-origin: left top;
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  opacity: 0.9;
+}
+
+.mirror-compact-weather {
+  position: absolute;
+  top: max(36px, var(--mirror-padding));
+  left: max(36px, var(--mirror-padding));
+  width: min(28vw, 280px);
+  padding: 18px 18px 16px;
+  border-radius: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mirror-compact-weather__location {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mirror-compact-weather__hero {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.mirror-compact-weather__icon {
+  font-size: 3rem;
+  line-height: 1;
+  color: var(--text-primary);
+  width: 52px;
+  text-align: center;
+}
+
+.mirror-compact-weather__hero-right {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mirror-compact-weather__temp {
+  font-size: clamp(3.2rem, 7vw, 4.4rem);
+  font-weight: 680;
+  line-height: 0.88;
+  letter-spacing: -0.08em;
+}
+
+.mirror-compact-weather__condition {
+  font-size: 1.08rem;
+  color: var(--text-secondary);
+  text-transform: lowercase;
+}
+
+.mirror-compact-weather__stats {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 18px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.mirror-compact-weather__stats span {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.mirror-compact-weather__forecast {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.mirror-compact-weather__forecast-row {
+  display: grid;
+  grid-template-columns: 52px 22px 1fr 34px 34px;
+  align-items: center;
+  column-gap: 8px;
+  font-size: 0.92rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.mirror-compact-weather__forecast-day {
+  color: var(--text-secondary);
+}
+
+.mirror-compact-weather__forecast-icon {
+  text-align: center;
+  color: var(--text-primary);
+}
+
+.mirror-compact-weather__forecast-high,
+.mirror-compact-weather__forecast-low {
+  justify-self: end;
+  width: 2.4ch;
+  text-align: right;
+}
+
+.mirror-compact-weather__forecast-high {
+  color: var(--text-primary);
+}
+
+.mirror-compact-weather__forecast-low {
+  color: var(--text-tertiary);
+}
+
+.mirror-compact-time-stack {
+  position: absolute;
+  top: max(36px, var(--mirror-padding));
+  right: max(36px, var(--mirror-padding));
+  width: min(30vw, 300px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: flex-end;
+}
+
+.mirror-compact-time {
+  width: 100%;
+  padding: 18px 18px 16px;
+  border-radius: 18px;
+  text-align: right;
+}
+
+.mirror-compact-time__weekday {
+  margin: 0;
+  font-size: 0.96rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.mirror-compact-time__date {
+  margin: 4px 0 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.mirror-compact-time__value {
+  margin: 18px 0 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  gap: 14px;
+  white-space: nowrap;
+}
+
+.mirror-compact-time__digits {
+  font-size: clamp(3.7rem, 7.6vw, 5.2rem);
+  font-weight: 700;
+  line-height: 0.92;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+}
+
+.mirror-compact-time__meridiem {
+  font-size: 1.5rem;
+  line-height: 1;
+  margin-bottom: 0.42rem;
+  color: var(--text-secondary);
+  text-transform: lowercase;
+}
+
+.mirror-compact-agenda {
+  width: 100%;
+  padding: 6px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  text-align: right;
+}
+
+.mirror-compact-agenda__item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 0;
+}
+
+.mirror-compact-agenda__item + .mirror-compact-agenda__item {
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.mirror-compact-agenda__time {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  text-transform: lowercase;
+}
+
+.mirror-compact-agenda__title {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+}
+
+.mirror-portrait-media-zone {
+  position: absolute;
+  left: 50%;
+  bottom: max(72px, calc(var(--mirror-padding) + 7vh));
+  transform: translateX(-50%);
+  width: min(58vw, 380px);
+}
+
+.mirror-main-media {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
+}
+
+.mirror-main-media--idle {
+  opacity: 0.72;
+}
+
+.mirror-main-media__art {
+  width: min(54vw, 280px);
+  aspect-ratio: 1 / 1;
+  border-radius: 28px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-soft);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.34);
+}
+
+.mirror-main-media__art-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.mirror-main-media__art-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.2rem;
+  color: var(--text-secondary);
+}
+
+.mirror-main-media__meta {
+  width: min(100%, 360px);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mirror-main-media__title-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+}
+
+.mirror-main-media__title {
+  margin: 0;
+  font-size: clamp(1.7rem, 3.8vw, 2.3rem);
+  line-height: 1.02;
+  letter-spacing: -0.05em;
+}
+
+.mirror-main-media__liked {
+  font-size: 1rem;
+  color: var(--text-tertiary);
+}
+
+.mirror-main-media__liked--active {
+  color: var(--accent-red);
+}
+
+.mirror-main-media__artist {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+.mirror-main-media__album {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+}
+
+.mirror-main-media__progress {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mirror-main-media__progress-track {
+  width: 100%;
+  height: 4px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.mirror-main-media__progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.mirror-main-media__progress-label {
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  letter-spacing: 0.06em;
+}

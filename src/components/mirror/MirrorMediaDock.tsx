@@ -38,11 +38,23 @@ function getLiveProgressMs(media: MediaState, nowMs: number) {
   return nextProgressMs;
 }
 
+function isSameTrackAsCurrent(media: MediaState) {
+  if (!media.lastPlayed) {
+    return media.source !== null;
+  }
+
+  return (
+    media.lastPlayed.title === media.title &&
+    media.lastPlayed.subtitle === media.subtitle &&
+    media.lastPlayed.artworkUrl === media.artworkUrl
+  );
+}
+
 export function MirrorMediaDock({ media }: MirrorMediaDockProps) {
   const [nowMs, setNowMs] = useState(Date.now());
 
   useEffect(() => {
-    if (media.status !== "playing" || media.progressMs === null) {
+    if (!isSameTrackAsCurrent(media) || media.progressMs === null) {
       return;
     }
 
@@ -55,68 +67,92 @@ export function MirrorMediaDock({ media }: MirrorMediaDockProps) {
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [media.status, media.progressMs, media.lastUpdatedAt, media.title]);
+  }, [media]);
+
+  const displayMedia = media.lastPlayed ?? {
+    source: media.source,
+    kind: media.kind,
+    title: media.title,
+    subtitle: media.subtitle,
+    secondaryText: media.secondaryText,
+    productionYear: media.productionYear,
+    genres: media.genres,
+    communityRating: media.communityRating,
+    artworkUrl: media.artworkUrl,
+    durationMs: media.durationMs,
+    deviceName: media.deviceName,
+    userName: media.userName,
+    isLiked: media.isLiked,
+    capturedAt: Date.now(),
+  };
 
   const liveProgressMs = useMemo(() => {
-    return getLiveProgressMs(media, nowMs);
+    return isSameTrackAsCurrent(media) ? getLiveProgressMs(media, nowMs) : null;
   }, [media, nowMs]);
 
   const progressPercentage =
-    liveProgressMs !== null && media.durationMs !== null && media.durationMs > 0
-      ? Math.min(100, Math.max(0, (liveProgressMs / media.durationMs) * 100))
+    liveProgressMs !== null &&
+    displayMedia.durationMs !== null &&
+    displayMedia.durationMs > 0
+      ? Math.min(100, Math.max(0, (liveProgressMs / displayMedia.durationMs) * 100))
       : 0;
 
-  const progressText =
-    liveProgressMs !== null && media.durationMs !== null
-      ? `${formatTime(liveProgressMs)} / ${formatTime(media.durationMs)}`
+  const progressLabel =
+    liveProgressMs !== null && displayMedia.durationMs !== null
+      ? `${formatTime(liveProgressMs)} / ${formatTime(displayMedia.durationMs)}`
       : null;
 
-  const isIdle = media.status === "idle" || media.source === null;
+  const isIdle =
+    !displayMedia.title || displayMedia.title === "Geen media actief";
 
   return (
-    <section className={`mirror-dock ${isIdle ? "mirror-dock--idle" : ""}`}>
-      <div className="mirror-dock__art">
-        {media.artworkUrl ? (
+    <section className={`mirror-main-media ${isIdle ? "mirror-main-media--idle" : ""}`}>
+      <div className="mirror-main-media__art">
+        {displayMedia.artworkUrl ? (
           <img
-            src={media.artworkUrl}
-            alt={media.title}
-            className="mirror-dock__art-image"
+            src={displayMedia.artworkUrl}
+            alt={displayMedia.title}
+            className="mirror-main-media__art-image"
           />
         ) : (
-          <div className="mirror-dock__art-fallback">♪</div>
+          <div className="mirror-main-media__art-fallback">♪</div>
         )}
       </div>
 
-      <div className="mirror-dock__body">
-        <div className="mirror-dock__eyebrow">
-          <span>Now playing</span>
-          {media.source ? (
-            <span className="mirror-pill">{media.source}</span>
+      <div className="mirror-main-media__meta">
+        <div className="mirror-main-media__title-row">
+          <h2 className="mirror-main-media__title">{displayMedia.title}</h2>
+
+          {displayMedia.isLiked !== null ? (
+            <span
+              className={`mirror-main-media__liked ${
+                displayMedia.isLiked ? "mirror-main-media__liked--active" : ""
+              }`}
+              aria-label={displayMedia.isLiked ? "Geliked" : "Niet geliked"}
+              title={displayMedia.isLiked ? "Geliked" : "Niet geliked"}
+            >
+              {displayMedia.isLiked ? "♥" : "♡"}
+            </span>
           ) : null}
         </div>
 
-        <h2 className="mirror-dock__title">{media.title}</h2>
+        <p className="mirror-main-media__artist">{displayMedia.subtitle}</p>
 
-        <p className="mirror-dock__subtitle">{media.subtitle}</p>
-
-        {media.secondaryText ? (
-          <p className="mirror-dock__secondary">{media.secondaryText}</p>
+        {displayMedia.secondaryText ? (
+          <p className="mirror-main-media__album">{displayMedia.secondaryText}</p>
         ) : null}
 
-        <div className="mirror-dock__progress">
-          <div className="mirror-dock__progress-track">
+        <div className="mirror-main-media__progress">
+          <div className="mirror-main-media__progress-track">
             <div
-              className="mirror-dock__progress-fill"
+              className="mirror-main-media__progress-fill"
               style={{ width: `${progressPercentage}%` }}
             />
           </div>
 
-          <div className="mirror-dock__progress-meta">
-            <span>{progressText ?? media.status}</span>
-            <span>
-              {media.deviceName ?? media.userName ?? ""}
-            </span>
-          </div>
+          {progressLabel ? (
+            <div className="mirror-main-media__progress-label">{progressLabel}</div>
+          ) : null}
         </div>
       </div>
     </section>

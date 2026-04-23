@@ -96,6 +96,7 @@ const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
 const SPOTIFY_SCOPES = [
   "user-read-currently-playing",
   "user-read-playback-state",
+  "user-library-read",
 ];
 const SPOTIFY_STATE_TTL_MS = 10 * 60 * 1000;
 
@@ -291,6 +292,7 @@ const defaultState = {
     durationMs: null,
     deviceName: null,
     userName: null,
+    isLiked: null,
     lastUpdatedAt: null,
     lastPlayed: null,
     sourceState: {
@@ -447,7 +449,9 @@ function normalizeLayout(layoutInput = []) {
   }
 
   const normalizedLayout = WIDGET_IDS.map((widgetId) => {
-    const fallbackItem = defaultState.layout.find((item) => item.id === widgetId);
+    const fallbackItem = defaultState.layout.find(
+      (item) => item.id === widgetId,
+    );
 
     if (!fallbackItem) {
       return {
@@ -559,9 +563,11 @@ function normalizeProviderRuntimeStatus(input = {}, fallback = {}) {
         ? input.enabled
         : Boolean(fallback.enabled),
     status:
-      input.status === "ok" || input.status === "error" || input.status === "idle"
+      input.status === "ok" ||
+      input.status === "error" ||
+      input.status === "idle"
         ? input.status
-        : fallback.status ?? "idle",
+        : (fallback.status ?? "idle"),
     message: typeof input.message === "string" ? input.message : null,
     lastCheckedAt: normalizeOptionalTimestamp(input.lastCheckedAt),
   };
@@ -610,7 +616,10 @@ function normalizeMediaSnapshot(snapshotInput = null) {
       snapshotInput.userName.length > 0
         ? snapshotInput.userName
         : null,
-    capturedAt: normalizeOptionalTimestamp(snapshotInput.capturedAt) ?? Date.now(),
+    isLiked:
+      typeof snapshotInput.isLiked === "boolean" ? snapshotInput.isLiked : null,
+    capturedAt:
+      normalizeOptionalTimestamp(snapshotInput.capturedAt) ?? Date.now(),
   };
 }
 
@@ -650,19 +659,23 @@ function normalizeMediaState(mediaInput = {}) {
       : [],
     communityRating: normalizeOptionalNumber(mediaInput.communityRating),
     artworkUrl:
-      typeof mediaInput.artworkUrl === "string" && mediaInput.artworkUrl.length > 0
+      typeof mediaInput.artworkUrl === "string" &&
+      mediaInput.artworkUrl.length > 0
         ? mediaInput.artworkUrl
         : null,
     progressMs: normalizeOptionalNumber(mediaInput.progressMs),
     durationMs: normalizeOptionalNumber(mediaInput.durationMs),
     deviceName:
-      typeof mediaInput.deviceName === "string" && mediaInput.deviceName.length > 0
+      typeof mediaInput.deviceName === "string" &&
+      mediaInput.deviceName.length > 0
         ? mediaInput.deviceName
         : null,
     userName:
       typeof mediaInput.userName === "string" && mediaInput.userName.length > 0
         ? mediaInput.userName
         : null,
+    isLiked:
+      typeof mediaInput.isLiked === "boolean" ? mediaInput.isLiked : null,
     lastUpdatedAt: normalizeOptionalTimestamp(mediaInput.lastUpdatedAt),
     lastPlayed: normalizeMediaSnapshot(mediaInput.lastPlayed),
     sourceState: {
@@ -791,6 +804,7 @@ function createLastPlayedSnapshot(mediaState) {
     durationMs: mediaState.durationMs,
     deviceName: mediaState.deviceName,
     userName: mediaState.userName,
+    isLiked: mediaState.isLiked,
     capturedAt: Date.now(),
   };
 }
@@ -807,7 +821,8 @@ function shouldRefreshLastPlayedSnapshot(previousSnapshot, nextMedia) {
     previousSnapshot.subtitle !== nextMedia.subtitle ||
     previousSnapshot.secondaryText !== nextMedia.secondaryText ||
     previousSnapshot.artworkUrl !== nextMedia.artworkUrl ||
-    previousSnapshot.durationMs !== nextMedia.durationMs
+    previousSnapshot.durationMs !== nextMedia.durationMs ||
+    previousSnapshot.isLiked !== nextMedia.isLiked
   );
 }
 
@@ -815,14 +830,20 @@ function isMediaPlayableSource(mediaState) {
   return mediaState.source === "jellyfin" || mediaState.source === "spotify";
 }
 
-function setFocusedWidget(widgetId, focusSource = "manual", reason = "focus:set") {
+function setFocusedWidget(
+  widgetId,
+  focusSource = "manual",
+  reason = "focus:set",
+) {
   if (!isWidgetId(widgetId)) {
     return false;
   }
 
   const now = Date.now();
-  const normalizedSource = focusSource === "media-auto" ? "media-auto" : "manual";
-  const normalizedWidgetId = normalizedSource === "media-auto" ? "media" : widgetId;
+  const normalizedSource =
+    focusSource === "media-auto" ? "media-auto" : "manual";
+  const normalizedWidgetId =
+    normalizedSource === "media-auto" ? "media" : widgetId;
   const nextFocusUntil = now + getFocusIdleTimeoutMs();
 
   const changed =
@@ -888,7 +909,11 @@ function reconcileFocusState(trigger = "focus:tick") {
 
   if (!focusedWidgetId) {
     if (mediaIsPlaying) {
-      const didChange = setFocusedWidget("media", "media-auto", "focus:auto-media");
+      const didChange = setFocusedWidget(
+        "media",
+        "media-auto",
+        "focus:auto-media",
+      );
 
       if (didChange) {
         appendLog("info", "focus", "Media auto-focus actief", trigger);
@@ -959,7 +984,10 @@ function updateRuntimeMedia(nextMedia) {
   const normalizedMedia = normalizeMediaState(nextMedia);
   const previousLastPlayed = state.media.lastPlayed;
 
-  if (normalizedMedia.status === "playing" || normalizedMedia.status === "paused") {
+  if (
+    normalizedMedia.status === "playing" ||
+    normalizedMedia.status === "paused"
+  ) {
     normalizedMedia.lastPlayed = shouldRefreshLastPlayedSnapshot(
       previousLastPlayed,
       normalizedMedia,
@@ -972,7 +1000,8 @@ function updateRuntimeMedia(nextMedia) {
 
   const mediaChanged = hasMediaChanged(state.media, normalizedMedia);
   const lastPlayedChanged =
-    JSON.stringify(previousLastPlayed) !== JSON.stringify(normalizedMedia.lastPlayed);
+    JSON.stringify(previousLastPlayed) !==
+    JSON.stringify(normalizedMedia.lastPlayed);
 
   if (mediaChanged) {
     state.media = normalizedMedia;
