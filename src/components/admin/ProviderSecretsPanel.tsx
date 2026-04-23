@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type {
+  ProviderSecretFieldStatus,
   ProviderConfigStatus,
   ProviderSecretsInput,
 } from "../../types/providerConfig";
@@ -11,67 +12,241 @@ type ProviderSecretsPanelProps = {
   onSaveSecrets: (nextSecrets: ProviderSecretsInput) => Promise<void>;
 };
 
-type EditableProviderConfig = {
-  weather: {
-    locationQuery: string;
-    countryCode: string;
-    latitude: string;
-    longitude: string;
-  };
-  calendar: {
-    feedUrlsText: string;
-  };
+type FixedProviderId = "jellyfin" | "spotify" | "weather";
+
+type FixedProviderFieldMeta = {
+  title: string;
+  placeholder: string;
+  inputType?: "text" | "password";
+  helperText?: string;
 };
 
-function StatusLine({ label, active }: { label: string; active: boolean }) {
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
-      <span>{label}</span>
-      <strong style={{ color: active ? "#b8ffb8" : "#ffb3b3" }}>
-        {active ? "aanwezig" : "ontbreekt"}
-      </strong>
-    </div>
-  );
+type EditorState =
+  | {
+      mode: "fixed-add";
+      provider: FixedProviderId;
+      fieldKey: string;
+      label: string;
+      value: string;
+    }
+  | {
+      mode: "fixed-edit";
+      provider: FixedProviderId;
+      fieldKey: string;
+      label: string;
+      value: string;
+    }
+  | {
+      mode: "calendar-add";
+      label: string;
+      value: string;
+    }
+  | {
+      mode: "calendar-edit";
+      entryId: string;
+      label: string;
+      value: string;
+    };
+
+const FIXED_PROVIDER_DEFINITIONS: Record<
+  FixedProviderId,
+  {
+    title: string;
+    fields: Record<string, FixedProviderFieldMeta>;
+  }
+> = {
+  jellyfin: {
+    title: "Jellyfin",
+    fields: {
+      baseUrl: {
+        title: "Base URL",
+        placeholder: "http://192.168.x.x:8096/",
+      },
+      apiKey: {
+        title: "API key",
+        placeholder: "Laat leeg om huidige waarde te behouden",
+        inputType: "password",
+      },
+      userName: {
+        title: "Preferred user",
+        placeholder: "Bijvoorbeeld admin",
+      },
+      deviceName: {
+        title: "Preferred device",
+        placeholder: "Bijvoorbeeld LG_C9_Quincy",
+      },
+    },
+  },
+  spotify: {
+    title: "Spotify",
+    fields: {
+      clientId: {
+        title: "Client ID",
+        placeholder: "Spotify app client ID",
+      },
+      clientSecret: {
+        title: "Client secret",
+        placeholder: "Laat leeg om huidige waarde te behouden",
+        inputType: "password",
+      },
+      refreshToken: {
+        title: "Refresh token",
+        placeholder: "Normaal via Koppel Spotify, handmatig alleen indien nodig",
+        inputType: "password",
+        helperText:
+          "De refresh token wordt normaal automatisch gezet via Koppel Spotify.",
+      },
+      redirectUri: {
+        title: "Redirect URI",
+        placeholder: "http://127.0.0.1:8787/auth/spotify/callback",
+        helperText:
+          "Gebruik lokaal meestal http://127.0.0.1:8787/auth/spotify/callback.",
+      },
+    },
+  },
+  weather: {
+    title: "Weather",
+    fields: {
+      apiKey: {
+        title: "WeatherAPI key",
+        placeholder: "Plak je WeatherAPI key",
+        inputType: "password",
+        helperText:
+          "We gebruiken WeatherAPI voor nauwkeurige voorspellingen en provider-icons.",
+      },
+      locationQuery: {
+        title: "Location query",
+        placeholder: "Bijvoorbeeld Den Haag",
+      },
+      countryCode: {
+        title: "Country code",
+        placeholder: "Bijvoorbeeld NL",
+      },
+    },
+  },
+};
+
+function requestCurrentPosition(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("Geolocatie wordt niet ondersteund door deze browser."));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 300000,
+    });
+  });
 }
 
-async function fetchEditableProviderConfig(
-  apiBaseUrl: string,
-): Promise<EditableProviderConfig> {
-  const response = await fetch(`${apiBaseUrl}/config/providers/editable`, {
-    cache: "no-store",
+type ReverseLocationResult = {
+  displayName: string;
+  countryCode?: string;
+};
+
+async function reverseGeocodePosition(
+  latitude: number,
+  longitude: number,
+): Promise<ReverseLocationResult> {
+  const url = new URL("https://nominatim.openstreetmap.org/reverse");
+  url.searchParams.set("format", "jsonv2");
+  url.searchParams.set("lat", String(latitude));
+  url.searchParams.set("lon", String(longitude));
+  url.searchParams.set("zoom", "10");
+  url.searchParams.set("accept-language", "nl");
+
+  const response = await fetch(url.toString(), {
+    headers: {
+      Accept: "application/json",
+    },
   });
 
   if (!response.ok) {
-    throw new Error(`HTTP ${response.status}`);
+    return { displayName: "Huidige locatie" };
   }
 
   const payload: unknown = await response.json();
 
-  if (
-    !payload ||
-    typeof payload !== "object" ||
-    !("editable" in payload) ||
-    !payload.editable ||
-    typeof payload.editable !== "object"
-  ) {
-    throw new Error(
-      "Editable provider config antwoord heeft ongeldig formaat.",
-    );
+  if (!payload || typeof payload !== "object") {
+    return { displayName: "Huidige locatie" };
   }
 
-  const editable = payload.editable as EditableProviderConfig;
+  const candidate = payload as {
+    address?: {
+      city?: string;
+      town?: string;
+      village?: string;
+      municipality?: string;
+      state?: string;
+      country_code?: string;
+    };
+    display_name?: string;
+  };
+
+  const locality =
+    candidate.address?.city ||
+    candidate.address?.town ||
+    candidate.address?.village ||
+    candidate.address?.municipality ||
+    candidate.address?.state ||
+    (typeof candidate.display_name === "string"
+      ? candidate.display_name.split(",")[0]?.trim()
+      : "");
 
   return {
-    weather: {
-      locationQuery: editable.weather?.locationQuery ?? "",
-      countryCode: editable.weather?.countryCode ?? "",
-      latitude: editable.weather?.latitude ?? "",
-      longitude: editable.weather?.longitude ?? "",
-    },
-    calendar: {
-      feedUrlsText: editable.calendar?.feedUrlsText ?? "",
-    },
+    displayName: locality && locality.length > 0 ? locality : "Huidige locatie",
+    countryCode:
+      typeof candidate.address?.country_code === "string"
+        ? candidate.address.country_code.toUpperCase()
+        : undefined,
   };
+}
+
+function formatUpdatedAt(updatedAt: number | null) {
+  if (updatedAt === null) {
+    return "nog niet opgeslagen";
+  }
+
+  return new Date(updatedAt).toLocaleString("nl-NL");
+}
+
+function getFixedProviderStatusMap(configStatus: ProviderConfigStatus) {
+  return {
+    jellyfin: configStatus.jellyfin,
+    spotify: configStatus.spotify,
+    weather: configStatus.weather,
+  } as const;
+}
+
+function getFixedFieldSummary(
+  configStatus: ProviderConfigStatus,
+  provider: FixedProviderId,
+  fieldKey: string,
+) {
+  const providerMap = getFixedProviderStatusMap(configStatus)[provider] as Record<
+    string,
+    ProviderSecretFieldStatus
+  >;
+
+  return providerMap[fieldKey] ?? null;
+}
+
+function buildFixedPayload(
+  provider: FixedProviderId,
+  fieldKey: string,
+  input: { label?: string; value?: string },
+): ProviderSecretsInput {
+  if (provider === "jellyfin") {
+    return { jellyfin: { [fieldKey]: input } };
+  }
+
+  if (provider === "spotify") {
+    return { spotify: { [fieldKey]: input } };
+  }
+
+  return { weather: { [fieldKey]: input } };
 }
 
 export function ProviderSecretsPanel({
@@ -80,195 +255,294 @@ export function ProviderSecretsPanel({
   onRefreshStatus,
   onSaveSecrets,
 }: ProviderSecretsPanelProps) {
-  const [jellyfinBaseUrl, setJellyfinBaseUrl] = useState("");
-  const [jellyfinApiKey, setJellyfinApiKey] = useState("");
-  const [jellyfinUserName, setJellyfinUserName] = useState("");
-  const [jellyfinDeviceName, setJellyfinDeviceName] = useState("");
-
-  const [spotifyClientId, setSpotifyClientId] = useState("");
-  const [spotifyClientSecret, setSpotifyClientSecret] = useState("");
-  const [spotifyRedirectUri, setSpotifyRedirectUri] = useState("");
-
-  const [isSavingJellyfin, setIsSavingJellyfin] = useState(false);
-  const [isSavingSpotify, setIsSavingSpotify] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [deletingCalendarId, setDeletingCalendarId] = useState<string | null>(
+    null,
+  );
+  const [panelMessage, setPanelMessage] = useState<string | null>(null);
+  const [panelError, setPanelError] = useState<string | null>(null);
+  const [editorState, setEditorState] = useState<EditorState | null>(null);
 
-  const [weatherLocationQuery, setWeatherLocationQuery] = useState("");
-  const [weatherCountryCode, setWeatherCountryCode] = useState("");
-  const [weatherLatitude, setWeatherLatitude] = useState("");
-  const [weatherLongitude, setWeatherLongitude] = useState("");
-
-  const [calendarFeedUrlsText, setCalendarFeedUrlsText] = useState("");
-
-  const [isSavingWeather, setIsSavingWeather] = useState(false);
-  const [isSavingCalendar, setIsSavingCalendar] = useState(false);
-
-  const effectiveSpotifyRedirectUri =
-    spotifyRedirectUri.trim() || "http://127.0.0.1:8787/auth/spotify/callback";
   const canStartSpotifyLink =
-    configStatus.spotify.hasClientId && configStatus.spotify.hasClientSecret;
-
-  async function loadEditableConfig() {
-    const editable = await fetchEditableProviderConfig(apiBaseUrl);
-
-    setWeatherLocationQuery(editable.weather.locationQuery);
-    setWeatherCountryCode(editable.weather.countryCode);
-    setWeatherLatitude(editable.weather.latitude);
-    setWeatherLongitude(editable.weather.longitude);
-    setCalendarFeedUrlsText(editable.calendar.feedUrlsText);
-  }
-
-  useEffect(() => {
-    void loadEditableConfig().catch((loadError) => {
-      setError(
-        loadError instanceof Error
-          ? loadError.message
-          : "Editable provider config laden mislukt.",
-      );
-    });
-  }, []);
+    configStatus.spotify.clientId.hasValue &&
+    configStatus.spotify.clientSecret.hasValue;
 
   async function handleRefresh() {
-    setError(null);
-    setMessage(null);
     setIsRefreshing(true);
 
     try {
       await onRefreshStatus();
-      await loadEditableConfig();
-      setMessage("Provider status vernieuwd.");
-    } catch (refreshError) {
-      setError(
-        refreshError instanceof Error
-          ? refreshError.message
-          : "Provider status verversen mislukt.",
-      );
     } finally {
       setIsRefreshing(false);
     }
   }
 
-  async function handleSaveJellyfin(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    setMessage(null);
-    setIsSavingJellyfin(true);
+  function openFixedAdd(provider: FixedProviderId) {
+    const providerStatusMap = getFixedProviderStatusMap(configStatus)[provider] as Record<
+      string,
+      ProviderSecretFieldStatus
+    >;
 
-    try {
-      await onSaveSecrets({
-        jellyfin: {
-          baseUrl: jellyfinBaseUrl,
-          apiKey: jellyfinApiKey,
-          userName: jellyfinUserName,
-          deviceName: jellyfinDeviceName,
-        },
-      });
+    const missingKeys = Object.entries(providerStatusMap)
+      .filter(([, summary]) => !summary.hasValue)
+      .map(([fieldKey]) => fieldKey);
 
-      setJellyfinBaseUrl("");
-      setJellyfinApiKey("");
-      setJellyfinUserName("");
-      setJellyfinDeviceName("");
-      setMessage("Jellyfin configuratie opgeslagen.");
-    } catch (saveError) {
-      setError(
-        saveError instanceof Error
-          ? saveError.message
-          : "Jellyfin configuratie opslaan mislukt.",
-      );
-    } finally {
-      setIsSavingJellyfin(false);
+    if (missingKeys.length === 0) {
+      return;
     }
+
+    const firstKey = missingKeys[0];
+    const fieldSummary = providerStatusMap[firstKey];
+
+    setPanelError(null);
+    setPanelMessage(null);
+    setEditorState({
+      mode: "fixed-add",
+      provider,
+      fieldKey: firstKey,
+      label: fieldSummary.label,
+      value: "",
+    });
   }
 
-  async function handleSaveSpotify(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    setMessage(null);
-    setIsSavingSpotify(true);
+  function openFixedEdit(provider: FixedProviderId, fieldKey: string) {
+    const summary = getFixedFieldSummary(configStatus, provider, fieldKey);
 
-    try {
-      await onSaveSecrets({
-        spotify: {
-          clientId: spotifyClientId,
-          clientSecret: spotifyClientSecret,
-          redirectUri: effectiveSpotifyRedirectUri,
-        },
-      });
-
-      setSpotifyClientId("");
-      setSpotifyClientSecret("");
-      setSpotifyRedirectUri("");
-      setMessage("Spotify app-config opgeslagen. Je kunt nu koppelen.");
-    } catch (saveError) {
-      setError(
-        saveError instanceof Error
-          ? saveError.message
-          : "Spotify configuratie opslaan mislukt.",
-      );
-    } finally {
-      setIsSavingSpotify(false);
+    if (!summary) {
+      return;
     }
+
+    setPanelError(null);
+    setPanelMessage(null);
+    setEditorState({
+      mode: "fixed-edit",
+      provider,
+      fieldKey,
+      label: summary.label,
+      value: "",
+    });
   }
 
-  async function handleSaveWeather(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    setMessage(null);
-    setIsSavingWeather(true);
-
-    try {
-      await onSaveSecrets({
-        weather: {
-          locationQuery: weatherLocationQuery,
-          countryCode: weatherCountryCode,
-          latitude: weatherLatitude,
-          longitude: weatherLongitude,
-        },
-      });
-
-      await loadEditableConfig();
-      setMessage("Weather configuratie opgeslagen.");
-    } catch (saveError) {
-      setError(
-        saveError instanceof Error
-          ? saveError.message
-          : "Weather configuratie opslaan mislukt.",
-      );
-    } finally {
-      setIsSavingWeather(false);
-    }
+  function openCalendarAdd() {
+    setPanelError(null);
+    setPanelMessage(null);
+    setEditorState({
+      mode: "calendar-add",
+      label: "",
+      value: "",
+    });
   }
 
-  async function handleSaveCalendar(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    setMessage(null);
-    setIsSavingCalendar(true);
+  function openCalendarEdit(entryId: string, label: string) {
+    setPanelError(null);
+    setPanelMessage(null);
+    setEditorState({
+      mode: "calendar-edit",
+      entryId,
+      label,
+      value: "",
+    });
+  }
+
+  async function handleCalendarDelete(entryId: string) {
+    setDeletingCalendarId(entryId);
+    setPanelError(null);
+    setPanelMessage(null);
 
     try {
       await onSaveSecrets({
         calendar: {
-          feedUrlsText: calendarFeedUrlsText,
+          removeEntryId: entryId,
         },
       });
 
-      await loadEditableConfig();
-      setMessage("Calendar feed configuratie opgeslagen.");
+      setPanelMessage("Calendar entry verwijderd.");
     } catch (saveError) {
-      setError(
-        saveError instanceof Error
-          ? saveError.message
-          : "Calendar configuratie opslaan mislukt.",
+      setPanelError(
+        saveError instanceof Error ? saveError.message : "Verwijderen mislukt.",
       );
     } finally {
-      setIsSavingCalendar(false);
+      setDeletingCalendarId(null);
+    }
+  }
+
+  async function handleEditorSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!editorState) {
+      return;
+    }
+
+    setIsSaving(true);
+    setPanelError(null);
+    setPanelMessage(null);
+
+    try {
+      if (editorState.mode === "fixed-add") {
+        const selectedSummary = getFixedFieldSummary(
+          configStatus,
+          editorState.provider,
+          editorState.fieldKey,
+        );
+
+        if (!selectedSummary) {
+          throw new Error("Geselecteerd field bestaat niet meer.");
+        }
+
+        const nextValue = editorState.value.trim();
+
+        if (nextValue.length === 0) {
+          throw new Error("Secret waarde is verplicht bij toevoegen.");
+        }
+
+        const nextLabel =
+          editorState.label.trim().length > 0
+            ? editorState.label.trim()
+            : selectedSummary.label;
+
+        await onSaveSecrets(
+          buildFixedPayload(editorState.provider, editorState.fieldKey, {
+            label: nextLabel,
+            value: nextValue,
+          }),
+        );
+
+        setPanelMessage("Provider secret toegevoegd.");
+        setEditorState(null);
+      }
+
+      if (editorState.mode === "fixed-edit") {
+        const selectedSummary = getFixedFieldSummary(
+          configStatus,
+          editorState.provider,
+          editorState.fieldKey,
+        );
+
+        if (!selectedSummary) {
+          throw new Error("Geselecteerd field bestaat niet meer.");
+        }
+
+        const nextLabel =
+          editorState.label.trim().length > 0
+            ? editorState.label.trim()
+            : selectedSummary.label;
+
+        const nextValue = editorState.value.trim();
+
+        await onSaveSecrets(
+          buildFixedPayload(editorState.provider, editorState.fieldKey, {
+            label: nextLabel,
+            value: nextValue.length > 0 ? nextValue : undefined,
+          }),
+        );
+
+        setPanelMessage("Provider secret bijgewerkt.");
+        setEditorState(null);
+      }
+
+      if (editorState.mode === "calendar-add") {
+        const nextValue = editorState.value.trim();
+
+        if (nextValue.length === 0) {
+          throw new Error("ICS URL is verplicht bij toevoegen.");
+        }
+
+        await onSaveSecrets({
+          calendar: {
+            addEntry: {
+              label:
+                editorState.label.trim().length > 0
+                  ? editorState.label.trim()
+                  : undefined,
+              value: nextValue,
+            },
+          },
+        });
+
+        setPanelMessage("Calendar entry toegevoegd.");
+        setEditorState(null);
+      }
+
+      if (editorState.mode === "calendar-edit") {
+        const nextValue = editorState.value.trim();
+
+        await onSaveSecrets({
+          calendar: {
+            updateEntry: {
+              id: editorState.entryId,
+              label:
+                editorState.label.trim().length > 0
+                  ? editorState.label.trim()
+                  : undefined,
+              value: nextValue.length > 0 ? nextValue : undefined,
+            },
+          },
+        });
+
+        setPanelMessage("Calendar entry bijgewerkt.");
+        setEditorState(null);
+      }
+    } catch (saveError) {
+      setPanelError(
+        saveError instanceof Error ? saveError.message : "Opslaan mislukt.",
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleUseCurrentWeatherLocation() {
+    setIsSaving(true);
+    setPanelError(null);
+    setPanelMessage(null);
+
+    try {
+      const position = await requestCurrentPosition();
+      const latitude = position.coords.latitude.toFixed(5);
+      const longitude = position.coords.longitude.toFixed(5);
+      const reverseLocation = await reverseGeocodePosition(
+        position.coords.latitude,
+        position.coords.longitude,
+      );
+
+      await onSaveSecrets({
+        weather: {
+          locationQuery: {
+            label: "Weather Location Query",
+            value: reverseLocation.displayName,
+          },
+          countryCode: {
+            label: "Weather Country Code",
+            value: reverseLocation.countryCode,
+          },
+          latitude: {
+            label: "Weather Latitude",
+            value: latitude,
+          },
+          longitude: {
+            label: "Weather Longitude",
+            value: longitude,
+          },
+        },
+      });
+
+      setPanelMessage(
+        `Huidige locatie opgeslagen voor Weather (${reverseLocation.displayName}).`,
+      );
+    } catch (locationError) {
+      setPanelError(
+        locationError instanceof Error
+          ? locationError.message
+          : "Huidige locatie ophalen mislukt.",
+      );
+    } finally {
+      setIsSaving(false);
     }
   }
 
   return (
-    <>
+    <div style={{ display: "grid", gap: 20 }}>
       <div
         style={{
           display: "flex",
@@ -285,108 +559,173 @@ export function ProviderSecretsPanel({
         </button>
       </div>
 
-      <p style={{ opacity: 0.78 }}>
-        Je kunt hier waarden toevoegen of overschrijven. Bestaande secrets
-        worden nooit teruggestuurd naar de browser. Laat een veld leeg om de
-        huidige opgeslagen waarde te behouden.
+      <p style={{ opacity: 0.78, margin: 0 }}>
+        Alle provider values zijn redacted. Je kunt labels wel terugzien, maar
+        de echte values nooit.
       </p>
 
-      {message ? <p style={{ color: "#b8ffb8" }}>{message}</p> : null}
-      {error ? <p style={{ color: "#ffb3b3" }}>{error}</p> : null}
+      {panelMessage ? <p style={{ color: "#b8ffb8", margin: 0 }}>{panelMessage}</p> : null}
+      {panelError ? <p style={{ color: "#ffb3b3", margin: 0 }}>{panelError}</p> : null}
 
       <div style={{ display: "grid", gap: 20 }}>
-        <form
-          onSubmit={handleSaveJellyfin}
-          style={{
-            padding: 16,
-            borderRadius: 16,
-            border: "1px solid rgba(255,255,255,0.08)",
-            background: "rgba(255,255,255,0.02)",
-          }}
-        >
-          <h3 style={{ marginTop: 0 }}>Jellyfin</h3>
+        {(Object.entries(FIXED_PROVIDER_DEFINITIONS) as Array<
+          [FixedProviderId, (typeof FIXED_PROVIDER_DEFINITIONS)[FixedProviderId]]
+        >).map(([providerId, providerDefinition]) => {
+          const providerStatus = getFixedProviderStatusMap(configStatus)[
+            providerId
+          ] as Record<string, ProviderSecretFieldStatus>;
 
-          <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
-            <StatusLine
-              label="Base URL"
-              active={configStatus.jellyfin.hasBaseUrl}
-            />
-            <StatusLine
-              label="API key"
-              active={configStatus.jellyfin.hasApiKey}
-            />
-            <StatusLine
-              label="Preferred user"
-              active={configStatus.jellyfin.hasUserName}
-            />
-            <StatusLine
-              label="Preferred device"
-              active={configStatus.jellyfin.hasDeviceName}
-            />
-          </div>
+          const fields = Object.entries(providerDefinition.fields)
+            .map(([fieldKey, fieldMeta]) => ({
+              fieldKey,
+              fieldMeta,
+              summary: providerStatus[fieldKey],
+            }))
+            .filter((item) => Boolean(item.summary));
 
-          <div style={{ display: "grid", gap: 12 }}>
-            <label>
-              Base URL
-              <input
-                type="text"
-                value={jellyfinBaseUrl}
-                onChange={(event) => setJellyfinBaseUrl(event.target.value)}
-                placeholder="http://192.168.x.x:8096/"
-                style={{ display: "block", width: "100%", marginTop: 6 }}
-              />
-            </label>
+          const missingFields = fields.filter((item) => !item.summary.hasValue);
 
-            <label>
-              API key
-              <input
-                type="password"
-                value={jellyfinApiKey}
-                onChange={(event) => setJellyfinApiKey(event.target.value)}
-                placeholder="Laat leeg om huidige waarde te behouden"
-                style={{ display: "block", width: "100%", marginTop: 6 }}
-              />
-            </label>
+          return (
+            <details key={providerId} open style={{ display: "grid", gap: 12 }}>
+              <summary
+                style={{
+                  cursor: "pointer",
+                  listStylePosition: "inside",
+                  fontWeight: 700,
+                  marginBottom: 6,
+                }}
+              >
+                {providerDefinition.title}
+              </summary>
 
-            <label>
-              Preferred user
-              <input
-                type="text"
-                value={jellyfinUserName}
-                onChange={(event) => setJellyfinUserName(event.target.value)}
-                placeholder="Bijvoorbeeld admin"
-                style={{ display: "block", width: "100%", marginTop: 6 }}
-              />
-            </label>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 12,
+                  flexWrap: "wrap",
+                  alignItems: "center",
+                }}
+              >
+                <h3 style={{ margin: 0 }}>{providerDefinition.title}</h3>
 
-            <label>
-              Preferred device
-              <input
-                type="text"
-                value={jellyfinDeviceName}
-                onChange={(event) => setJellyfinDeviceName(event.target.value)}
-                placeholder="Bijvoorbeeld LG_C9_Quincy"
-                style={{ display: "block", width: "100%", marginTop: 6 }}
-              />
-            </label>
-          </div>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                  {providerId === "spotify" ? (
+                    <a
+                      href={
+                        canStartSpotifyLink
+                          ? `${apiBaseUrl}/auth/spotify/login`
+                          : "#"
+                      }
+                      target={canStartSpotifyLink ? "_blank" : undefined}
+                      rel={canStartSpotifyLink ? "noreferrer" : undefined}
+                      className="admin-link"
+                      style={{
+                        padding: "8px 12px",
+                        opacity: canStartSpotifyLink ? 1 : 0.45,
+                        pointerEvents: canStartSpotifyLink ? "auto" : "none",
+                      }}
+                      aria-disabled={!canStartSpotifyLink}
+                    >
+                      Koppel Spotify
+                    </a>
+                  ) : null}
 
-          <div style={{ marginTop: 16 }}>
-            <button type="submit" disabled={isSavingJellyfin}>
-              {isSavingJellyfin ? "Opslaan..." : "Sla Jellyfin op"}
-            </button>
-          </div>
-        </form>
+                  {providerId === "weather" ? (
+                    <button
+                      type="button"
+                      onClick={handleUseCurrentWeatherLocation}
+                      disabled={isSaving}
+                    >
+                      Gebruik huidige locatie
+                    </button>
+                  ) : null}
 
-        <form
-          onSubmit={handleSaveSpotify}
-          style={{
-            padding: 16,
-            borderRadius: 16,
-            border: "1px solid rgba(255,255,255,0.08)",
-            background: "rgba(255,255,255,0.02)",
-          }}
-        >
+                  <button
+                    type="button"
+                    onClick={() => openFixedAdd(providerId)}
+                    disabled={missingFields.length === 0 || isSaving}
+                  >
+                    + Secret
+                  </button>
+                </div>
+              </div>
+
+              {missingFields.length === 0 ? (
+                <p style={{ margin: 0, opacity: 0.72 }}>
+                  Alle beschikbare fields voor {providerDefinition.title} hebben
+                  al een waarde.
+                </p>
+              ) : null}
+
+              {providerId === "weather" ? (
+                <p style={{ margin: 0, opacity: 0.72 }}>
+                  Weather gebruikt WeatherAPI met provider-icons en uitgebreide
+                  condities voor nauwkeurige weergave over de dag.
+                </p>
+              ) : null}
+
+              {fields.map(({ fieldKey, fieldMeta, summary }) => (
+                <div
+                  key={`${providerId}-${fieldKey}`}
+                  style={{
+                    padding: 14,
+                    borderRadius: 14,
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    background: "rgba(255,255,255,0.02)",
+                    display: "grid",
+                    gap: 8,
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      gap: 12,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <strong>{fieldMeta.title}</strong>
+                    <span style={{ opacity: 0.72, fontSize: 14 }}>
+                      {summary.hasValue ? "waarde ingesteld" : "nog geen waarde"}
+                    </span>
+                  </div>
+
+                  <div style={{ opacity: 0.8, fontSize: 14 }}>
+                    Label: {summary.label}
+                  </div>
+                  <div style={{ opacity: 0.72, fontSize: 14 }}>
+                    Laatst bijgewerkt: {formatUpdatedAt(summary.updatedAt)}
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                    <button
+                      type="button"
+                      onClick={() => openFixedEdit(providerId, fieldKey)}
+                      disabled={isSaving}
+                    >
+                      Edit
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </details>
+          );
+        })}
+
+        <details open style={{ display: "grid", gap: 12 }}>
+          <summary
+            style={{
+              cursor: "pointer",
+              listStylePosition: "inside",
+              fontWeight: 700,
+              marginBottom: 6,
+            }}
+          >
+            Calendar
+          </summary>
+
           <div
             style={{
               display: "flex",
@@ -396,241 +735,230 @@ export function ProviderSecretsPanel({
               alignItems: "center",
             }}
           >
-            <h3 style={{ margin: 0 }}>Spotify</h3>
+            <h3 style={{ margin: 0 }}>Calendar</h3>
 
-            <a
-              href={
-                canStartSpotifyLink ? `${apiBaseUrl}/auth/spotify/login` : "#"
-              }
-              target={canStartSpotifyLink ? "_blank" : undefined}
-              rel={canStartSpotifyLink ? "noreferrer" : undefined}
-              className="admin-link"
-              style={{
-                padding: "8px 12px",
-                opacity: canStartSpotifyLink ? 1 : 0.45,
-                pointerEvents: canStartSpotifyLink ? "auto" : "none",
-              }}
-              aria-disabled={!canStartSpotifyLink}
-            >
-              Koppel Spotify
-            </a>
+            <button type="button" onClick={openCalendarAdd} disabled={isSaving}>
+              + ICS feed
+            </button>
           </div>
 
-          <div style={{ display: "grid", gap: 8, margin: "16px 0" }}>
-            <StatusLine
-              label="Client ID"
-              active={configStatus.spotify.hasClientId}
-            />
-            <StatusLine
-              label="Client secret"
-              active={configStatus.spotify.hasClientSecret}
-            />
-            <StatusLine
-              label="Refresh token"
-              active={configStatus.spotify.hasRefreshToken}
-            />
-            <StatusLine
-              label="Redirect URI"
-              active={configStatus.spotify.hasRedirectUri}
-            />
-          </div>
-
-          <p style={{ opacity: 0.8, marginTop: 0 }}>
-            Hier sla je alleen de Spotify app-config op. De refresh token wordt
-            automatisch opgehaald via <strong>Koppel Spotify</strong>.
+          <p style={{ margin: 0, opacity: 0.72 }}>
+            Voeg onbeperkt feeds toe. Elke feed krijgt een eigen label voor jouw
+            overzicht. Waarden blijven altijd verborgen.
           </p>
 
-          <div style={{ display: "grid", gap: 12 }}>
-            <label>
-              Client ID
-              <input
-                type="text"
-                value={spotifyClientId}
-                onChange={(event) => setSpotifyClientId(event.target.value)}
-                placeholder="Laat leeg om huidige waarde te behouden"
-                style={{ display: "block", width: "100%", marginTop: 6 }}
-              />
-            </label>
+          {configStatus.calendar.entries.length === 0 ? (
+            <p style={{ margin: 0, opacity: 0.72 }}>
+              Nog geen calendar feeds toegevoegd.
+            </p>
+          ) : null}
 
-            <label>
-              Client secret
-              <input
-                type="password"
-                value={spotifyClientSecret}
-                onChange={(event) => setSpotifyClientSecret(event.target.value)}
-                placeholder="Laat leeg om huidige waarde te behouden"
-                style={{ display: "block", width: "100%", marginTop: 6 }}
-              />
-            </label>
-
-            <label>
-              Callback URL
-              <input
-                type="text"
-                value={spotifyRedirectUri}
-                onChange={(event) => setSpotifyRedirectUri(event.target.value)}
-                placeholder="http://127.0.0.1:8787/auth/spotify/callback"
+          {configStatus.calendar.entries.map((entry) => (
+            <div
+              key={entry.id}
+              style={{
+                padding: 14,
+                borderRadius: 14,
+                border: "1px solid rgba(255,255,255,0.08)",
+                background: "rgba(255,255,255,0.02)",
+                display: "grid",
+                gap: 8,
+              }}
+            >
+              <div
                 style={{
-                  display: "block",
-                  width: "100%",
-                  marginTop: 6,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  gap: 12,
+                  flexWrap: "wrap",
                 }}
-              />
-              <p style={{ margin: "6px 0 0", opacity: 0.72, fontSize: 14 }}>
-                Gebruik{" "}
-                <strong>http://127.0.0.1:8787/auth/spotify/callback</strong> als
-                je de koppeling uitvoert op dezelfde machine als de backend.
-                Gebruik voor remote koppelen alleen een{" "}
-                <strong>https://</strong> callback URL.
-              </p>
-            </label>
-          </div>
+              >
+                <strong>{entry.label}</strong>
+                <span style={{ opacity: 0.72, fontSize: 14 }}>
+                  {entry.hasValue ? "waarde ingesteld" : "nog geen waarde"}
+                </span>
+              </div>
 
-          <div
+              <div style={{ opacity: 0.72, fontSize: 14 }}>
+                Laatst bijgewerkt: {formatUpdatedAt(entry.updatedAt)}
+              </div>
+
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                <button
+                  type="button"
+                  onClick={() => openCalendarEdit(entry.id, entry.label)}
+                  disabled={isSaving || deletingCalendarId === entry.id}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCalendarDelete(entry.id)}
+                  disabled={isSaving || deletingCalendarId === entry.id}
+                >
+                  {deletingCalendarId === entry.id ? "Verwijderen..." : "Verwijder"}
+                </button>
+              </div>
+            </div>
+          ))}
+        </details>
+
+        {editorState ? (
+          <section
             style={{
-              marginTop: 16,
-              display: "flex",
+              display: "grid",
               gap: 12,
-              flexWrap: "wrap",
+              border: "1px solid rgba(255,255,255,0.12)",
+              borderRadius: 16,
+              padding: 16,
+              background: "rgba(255,255,255,0.03)",
             }}
           >
-            <button type="submit" disabled={isSavingSpotify}>
-              {isSavingSpotify ? "Opslaan..." : "Sla Spotify app-config op"}
-            </button>
+            <h3 style={{ margin: 0 }}>
+              {editorState.mode === "fixed-add" && "Nieuw provider secret"}
+              {editorState.mode === "fixed-edit" && "Bewerk provider secret"}
+              {editorState.mode === "calendar-add" && "Nieuwe calendar feed"}
+              {editorState.mode === "calendar-edit" && "Bewerk calendar feed"}
+            </h3>
 
-            {!canStartSpotifyLink ? (
-              <span style={{ opacity: 0.72, alignSelf: "center" }}>
-                Sla eerst client ID en client secret op.
-              </span>
-            ) : null}
-          </div>
-        </form>
+            <form onSubmit={handleEditorSubmit} style={{ display: "grid", gap: 10 }}>
+              {editorState.mode === "fixed-add" ? (
+                <label>
+                  Secret veld
+                  <select
+                    value={editorState.fieldKey}
+                    onChange={(event) => {
+                      const nextFieldKey = event.target.value;
+                      const nextSummary = getFixedFieldSummary(
+                        configStatus,
+                        editorState.provider,
+                        nextFieldKey,
+                      );
+
+                      setEditorState(
+                        nextSummary
+                          ? {
+                              ...editorState,
+                              fieldKey: nextFieldKey,
+                              label: nextSummary.label,
+                            }
+                          : editorState,
+                      );
+                    }}
+                    style={{ display: "block", width: "100%", marginTop: 6 }}
+                  >
+                    {Object.entries(
+                      FIXED_PROVIDER_DEFINITIONS[editorState.provider].fields,
+                    )
+                      .filter(([fieldKey]) => {
+                        const summary = getFixedFieldSummary(
+                          configStatus,
+                          editorState.provider,
+                          fieldKey,
+                        );
+                        return summary ? !summary.hasValue : false;
+                      })
+                      .map(([fieldKey, fieldMeta]) => (
+                        <option key={fieldKey} value={fieldKey}>
+                          {fieldMeta.title}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              ) : null}
+
+              {editorState.mode === "fixed-edit" ? (
+                <p style={{ margin: 0, opacity: 0.8 }}>
+                  Veld: {FIXED_PROVIDER_DEFINITIONS[editorState.provider].fields[editorState.fieldKey]?.title ?? editorState.fieldKey}
+                </p>
+              ) : null}
+
+              <label>
+                Label
+                <input
+                  type="text"
+                  value={editorState.label}
+                  onChange={(event) =>
+                    setEditorState({ ...editorState, label: event.target.value })
+                  }
+                  placeholder="Alleen voor jezelf"
+                  style={{ display: "block", width: "100%", marginTop: 6 }}
+                />
+              </label>
+
+              {(editorState.mode === "fixed-add" ||
+                editorState.mode === "fixed-edit") &&
+              FIXED_PROVIDER_DEFINITIONS[editorState.provider].fields[
+                editorState.fieldKey
+              ]?.helperText ? (
+                <p style={{ margin: 0, opacity: 0.72, fontSize: 14 }}>
+                  {
+                    FIXED_PROVIDER_DEFINITIONS[editorState.provider].fields[
+                      editorState.fieldKey
+                    ]?.helperText
+                  }
+                </p>
+              ) : null}
+
+              <label>
+                {editorState.mode === "calendar-add" ||
+                editorState.mode === "calendar-edit"
+                  ? "ICS URL"
+                  : "Secret value"}
+                <input
+                  type={
+                    editorState.mode === "fixed-add" ||
+                    editorState.mode === "fixed-edit"
+                      ? FIXED_PROVIDER_DEFINITIONS[editorState.provider].fields[
+                          editorState.fieldKey
+                        ]?.inputType ?? "text"
+                      : "text"
+                  }
+                  value={editorState.value}
+                  onChange={(event) =>
+                    setEditorState({ ...editorState, value: event.target.value })
+                  }
+                  placeholder={
+                    editorState.mode === "fixed-add" ||
+                    editorState.mode === "fixed-edit"
+                      ? FIXED_PROVIDER_DEFINITIONS[editorState.provider].fields[
+                          editorState.fieldKey
+                        ]?.placeholder ?? ""
+                      : "https://example.com/calendar.ics"
+                  }
+                  style={{ display: "block", width: "100%", marginTop: 6 }}
+                />
+              </label>
+
+              <p style={{ margin: 0, opacity: 0.72, fontSize: 14 }}>
+                Value wordt nooit teruggestuurd naar de browser. Laat de value
+                leeg bij edit als je alleen het label wilt aanpassen.
+              </p>
+
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "flex-end",
+                  gap: 10,
+                  flexWrap: "wrap",
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => setEditorState(null)}
+                  disabled={isSaving}
+                >
+                  Annuleer
+                </button>
+                <button type="submit" disabled={isSaving}>
+                  {isSaving ? "Opslaan..." : "Opslaan"}
+                </button>
+              </div>
+            </form>
+          </section>
+        ) : null}
       </div>
-      <form
-        onSubmit={handleSaveWeather}
-        style={{
-          padding: 16,
-          borderRadius: 16,
-          border: "1px solid rgba(255,255,255,0.08)",
-          background: "rgba(255,255,255,0.02)",
-        }}
-      >
-        <h3 style={{ marginTop: 0 }}>Weather</h3>
-
-        <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
-          <StatusLine
-            label="Location query"
-            active={configStatus.weather.hasLocationQuery}
-          />
-          <StatusLine
-            label="Country code"
-            active={configStatus.weather.hasCountryCode}
-          />
-          <StatusLine
-            label="Latitude"
-            active={configStatus.weather.hasLatitude}
-          />
-          <StatusLine
-            label="Longitude"
-            active={configStatus.weather.hasLongitude}
-          />
-        </div>
-
-        <div style={{ display: "grid", gap: 12 }}>
-          <label>
-            Location query
-            <input
-              type="text"
-              value={weatherLocationQuery}
-              onChange={(event) => setWeatherLocationQuery(event.target.value)}
-              placeholder="Bijvoorbeeld Den Haag"
-              style={{ display: "block", width: "100%", marginTop: 6 }}
-            />
-          </label>
-
-          <label>
-            Country code
-            <input
-              type="text"
-              value={weatherCountryCode}
-              onChange={(event) => setWeatherCountryCode(event.target.value)}
-              placeholder="Bijvoorbeeld NL"
-              style={{ display: "block", width: "100%", marginTop: 6 }}
-            />
-          </label>
-
-          <label>
-            Latitude
-            <input
-              type="text"
-              value={weatherLatitude}
-              onChange={(event) => setWeatherLatitude(event.target.value)}
-              placeholder="Bijvoorbeeld 52.08"
-              style={{ display: "block", width: "100%", marginTop: 6 }}
-            />
-          </label>
-
-          <label>
-            Longitude
-            <input
-              type="text"
-              value={weatherLongitude}
-              onChange={(event) => setWeatherLongitude(event.target.value)}
-              placeholder="Bijvoorbeeld 4.31"
-              style={{ display: "block", width: "100%", marginTop: 6 }}
-            />
-          </label>
-        </div>
-
-        <div style={{ marginTop: 16 }}>
-          <button type="submit" disabled={isSavingWeather}>
-            {isSavingWeather ? "Opslaan..." : "Sla Weather op"}
-          </button>
-        </div>
-      </form>
-
-      <form
-        onSubmit={handleSaveCalendar}
-        style={{
-          padding: 16,
-          borderRadius: 16,
-          border: "1px solid rgba(255,255,255,0.08)",
-          background: "rgba(255,255,255,0.02)",
-        }}
-      >
-        <h3 style={{ marginTop: 0 }}>Calendar feeds</h3>
-
-        <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
-          <StatusLine
-            label="ICS feed URLs"
-            active={configStatus.calendar.hasFeedUrls}
-          />
-        </div>
-
-        <label>
-          Feed URLs
-          <textarea
-            value={calendarFeedUrlsText}
-            onChange={(event) => setCalendarFeedUrlsText(event.target.value)}
-            placeholder={
-              "Één ICS URL per regel\nhttps://...\nhttps://...\nhttps://..."
-            }
-            rows={6}
-            style={{ display: "block", width: "100%", marginTop: 6 }}
-          />
-        </label>
-
-        <p style={{ margin: "8px 0 0", opacity: 0.72, fontSize: 14 }}>
-          Plak hier iCloud, Google, Outlook of Quinyx ICS feed URLs. Gebruik één
-          feed per regel.
-        </p>
-
-        <div style={{ marginTop: 16 }}>
-          <button type="submit" disabled={isSavingCalendar}>
-            {isSavingCalendar ? "Opslaan..." : "Sla Calendar feeds op"}
-          </button>
-        </div>
-      </form>
-    </>
+    </div>
   );
 }

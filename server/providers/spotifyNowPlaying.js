@@ -8,6 +8,33 @@ const SPOTIFY_SAVED_TRACKS_CONTAINS_URL =
 
 let cachedAccessToken = null;
 let cachedAccessTokenExpiresAt = 0;
+let spotifyRateLimitedUntil = 0;
+
+function parseRetryAfterToMs(retryAfterHeader) {
+  if (typeof retryAfterHeader !== "string" || retryAfterHeader.trim().length === 0) {
+    return null;
+  }
+
+  const asSeconds = Number(retryAfterHeader);
+
+  if (Number.isFinite(asSeconds) && asSeconds > 0) {
+    return asSeconds * 1000;
+  }
+
+  const asDateMs = Date.parse(retryAfterHeader);
+
+  if (!Number.isFinite(asDateMs)) {
+    return null;
+  }
+
+  const delta = asDateMs - Date.now();
+  return delta > 0 ? delta : null;
+}
+
+function formatRateLimitWaitMessage(msRemaining) {
+  const secondsRemaining = Math.max(1, Math.ceil(msRemaining / 1000));
+  return `Spotify rate-limited, opnieuw proberen over ${secondsRemaining}s.`;
+}
 
 function resetSpotifyAccessTokenCache() {
   cachedAccessToken = null;
@@ -215,6 +242,18 @@ async function fetchSpotifyNowPlaying() {
     };
   }
 
+  if (spotifyRateLimitedUntil > checkedAt) {
+    return {
+      media: null,
+      providerStatus: {
+        enabled: true,
+        status: "ok",
+        message: formatRateLimitWaitMessage(spotifyRateLimitedUntil - checkedAt),
+        lastCheckedAt: checkedAt,
+      },
+    };
+  }
+
   const accessToken = await getSpotifyAccessToken();
 
   if (!accessToken) {
@@ -263,9 +302,31 @@ async function fetchSpotifyNowPlaying() {
     };
   }
 
+  if (response.status === 429) {
+    const retryAfterMs = parseRetryAfterToMs(response.headers.get("retry-after"));
+    const boundedRetryAfterMs = Math.min(
+      Math.max(retryAfterMs ?? 30000, 15000),
+      5 * 60 * 1000,
+    );
+
+    spotifyRateLimitedUntil = checkedAt + boundedRetryAfterMs;
+
+    return {
+      media: null,
+      providerStatus: {
+        enabled: true,
+        status: "ok",
+        message: formatRateLimitWaitMessage(boundedRetryAfterMs),
+        lastCheckedAt: checkedAt,
+      },
+    };
+  }
+
   if (!response.ok) {
     throw new Error(`Spotify gaf status ${response.status}`);
   }
+
+  spotifyRateLimitedUntil = 0;
 
   const payload = await response.json();
   const item = payload.item;

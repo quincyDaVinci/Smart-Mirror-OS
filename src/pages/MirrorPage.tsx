@@ -18,16 +18,40 @@ type MirrorPageProps = {
 
 function getWeatherGlyph(iconKey: WeatherIconKey) {
   switch (iconKey) {
-    case "sunny":
+    case "clear-day":
       return "☀";
-    case "partly-cloudy":
+    case "clear-night":
+      return "🌙";
+    case "partly-cloudy-day":
       return "⛅";
+    case "partly-cloudy-night":
+      return "☁";
+    case "fog":
+      return "🌫";
+    case "drizzle":
+      return "🌦";
     case "rain":
-      return "☂";
+      return "🌧";
+    case "freezing-rain":
+      return "🌨";
+    case "snow":
+      return "❄";
+    case "thunderstorm":
+      return "⛈";
+    case "hail":
+      return "🧊";
     case "cloudy":
     default:
       return "☁";
   }
+}
+
+function renderWeatherIcon(iconKey: WeatherIconKey, iconUrl?: string) {
+  if (iconUrl) {
+    return <img src={iconUrl} alt="" aria-hidden width={24} height={24} />;
+  }
+
+  return getWeatherGlyph(iconKey);
 }
 
 function formatShortDate(date: Date) {
@@ -155,54 +179,86 @@ export function MirrorPage({
             <p className="mirror-compact-weather__location">
               {dashboardData.weather.location}
             </p>
+            {dashboardData.weather.locationSubtitle ? (
+              <p className="mirror-compact-weather__location-subtitle">
+                {dashboardData.weather.locationSubtitle}
+              </p>
+            ) : null}
 
-            <div className="mirror-compact-weather__hero">
-              <div className="mirror-compact-weather__icon">
-                {getWeatherGlyph(dashboardData.weather.iconKey)}
+            <section className="mirror-compact-weather__today">
+              <p className="mirror-compact-weather__section-label">Vandaag</p>
+
+              <div className="mirror-compact-weather__hero">
+                <div className="mirror-compact-weather__icon">
+                  {renderWeatherIcon(
+                    dashboardData.weather.iconKey,
+                    dashboardData.weather.iconUrl,
+                  )}
+                </div>
+
+                <div className="mirror-compact-weather__hero-right">
+                  <div className="mirror-compact-weather__temp">
+                    {dashboardData.weather.temperature}
+                  </div>
+                </div>
               </div>
 
-              <div className="mirror-compact-weather__hero-right">
-                <div className="mirror-compact-weather__temp">
-                  {dashboardData.weather.temperature}
-                </div>
-
-                <div className="mirror-compact-weather__condition">
-                  {dashboardData.weather.condition}
-                </div>
+              <div className="mirror-compact-weather__stats">
+                <span>Wind: {dashboardData.weather.windSpeed}</span>
+                <span>Max: {dashboardData.weather.highTemperature}</span>
+                <span>Min: {dashboardData.weather.lowTemperature}</span>
               </div>
-            </div>
 
-            <div className="mirror-compact-weather__stats">
-              <span>Wind: {dashboardData.weather.windSpeed}</span>
-              <span>Max: {dashboardData.weather.highTemperature}</span>
-              <span>Min: {dashboardData.weather.lowTemperature}</span>
-            </div>
+              <div className="mirror-compact-weather__hourly">
+                {dashboardData.weather.hourlyTrend.map((item) => (
+                  <div
+                    key={`${item.time}-${item.temperature}-${item.precipitationChance}`}
+                    className="mirror-compact-weather__hourly-row"
+                  >
+                    <span className="mirror-compact-weather__hourly-time">
+                      {item.time}
+                    </span>
+                    <span className="mirror-compact-weather__hourly-icon">
+                      {renderWeatherIcon(item.iconKey, item.iconUrl)}
+                    </span>
+                    <span className="mirror-compact-weather__hourly-temp">
+                      {item.temperature}
+                    </span>
+                    <span className="mirror-compact-weather__hourly-rain">
+                      {item.precipitationChance}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
 
-            <p className="mirror-compact-weather__detail">
-              {dashboardData.weather.detailLine}
-            </p>
+            <hr className="mirror-compact-weather__divider" />
 
-            <div className="mirror-compact-weather__forecast">
-              {dashboardData.weather.forecast.map((item) => (
-                <div
-                  key={`${item.day}-${item.highTemperature}-${item.lowTemperature}`}
-                  className="mirror-compact-weather__forecast-row"
-                >
-                  <span className="mirror-compact-weather__forecast-day">
-                    {item.day}
-                  </span>
-                  <span className="mirror-compact-weather__forecast-icon">
-                    {getWeatherGlyph(item.iconKey)}
-                  </span>
-                  <span className="mirror-compact-weather__forecast-high">
-                    {item.highTemperature}
-                  </span>
-                  <span className="mirror-compact-weather__forecast-low">
-                    {item.lowTemperature}
-                  </span>
-                </div>
-              ))}
-            </div>
+            <section className="mirror-compact-weather__upcoming">
+              <p className="mirror-compact-weather__section-label">Komende dagen</p>
+
+              <div className="mirror-compact-weather__forecast">
+                {dashboardData.weather.forecast.map((item) => (
+                  <div
+                    key={`${item.day}-${item.highTemperature}-${item.lowTemperature}`}
+                    className="mirror-compact-weather__forecast-row"
+                  >
+                    <span className="mirror-compact-weather__forecast-day">
+                      {item.day}
+                    </span>
+                    <span className="mirror-compact-weather__forecast-icon">
+                      {renderWeatherIcon(item.iconKey, item.iconUrl)}
+                    </span>
+                    <span className="mirror-compact-weather__forecast-high">
+                      {item.highTemperature}
+                    </span>
+                    <span className="mirror-compact-weather__forecast-low">
+                      {item.lowTemperature}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
           </section>
         ) : null}
 

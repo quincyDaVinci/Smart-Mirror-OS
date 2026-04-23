@@ -1,10 +1,6 @@
 import { Link } from "react-router-dom";
 import { LayoutControls } from "../components/admin/LayoutControls";
-import type {
-  LayoutItem,
-  WidgetEdgePosition,
-  WidgetId,
-} from "../types/layout";
+import type { LayoutItem, WidgetEdgePosition, WidgetId } from "../types/layout";
 import type { MirrorSettings } from "../types/settings";
 import type { PresenceState } from "../types/presence";
 import type { DisplayState } from "../types/display";
@@ -126,7 +122,10 @@ export function AdminPage({
       </p>
 
       {!isConnected && lastHttpSuccessAt ? (
-        <p className="admin-status" style={{ marginTop: "-8px", color: "#cfcfcf" }}>
+        <p
+          className="admin-status"
+          style={{ marginTop: "-8px", color: "#cfcfcf" }}
+        >
           Transport: HTTP fallback actief
         </p>
       ) : null}
@@ -420,7 +419,7 @@ export function AdminPage({
 
         <AccordionSection
           title="Provider secrets"
-          subtitle="Jellyfin en Spotify configuratie"
+          subtitle="Jellyfin, Spotify, Weather en Calendar configuratie"
         >
           <ProviderSecretsPanel
             configStatus={providerConfigStatus}

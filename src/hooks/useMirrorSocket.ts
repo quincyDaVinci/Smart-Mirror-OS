@@ -84,6 +84,44 @@ function isServerMessage(value: unknown): value is ServerMessage {
   );
 }
 
+function isProviderSecretFieldStatus(value: unknown): boolean {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as {
+    label?: unknown;
+    hasValue?: unknown;
+    updatedAt?: unknown;
+  };
+
+  return (
+    typeof candidate.label === "string" &&
+    typeof candidate.hasValue === "boolean" &&
+    (candidate.updatedAt === null || typeof candidate.updatedAt === "number")
+  );
+}
+
+function isCalendarSecretEntryStatus(value: unknown): boolean {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as {
+    id?: unknown;
+    label?: unknown;
+    hasValue?: unknown;
+    updatedAt?: unknown;
+  };
+
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.label === "string" &&
+    typeof candidate.hasValue === "boolean" &&
+    (candidate.updatedAt === null || typeof candidate.updatedAt === "number")
+  );
+}
+
 function isProviderConfigStatus(value: unknown): value is ProviderConfigStatus {
   if (!value || typeof value !== "object") {
     return false;
@@ -92,19 +130,21 @@ function isProviderConfigStatus(value: unknown): value is ProviderConfigStatus {
   const candidate = value as ProviderConfigStatus;
 
   return (
-    typeof candidate.jellyfin?.hasBaseUrl === "boolean" &&
-    typeof candidate.jellyfin?.hasApiKey === "boolean" &&
-    typeof candidate.jellyfin?.hasUserName === "boolean" &&
-    typeof candidate.jellyfin?.hasDeviceName === "boolean" &&
-    typeof candidate.spotify?.hasClientId === "boolean" &&
-    typeof candidate.spotify?.hasClientSecret === "boolean" &&
-    typeof candidate.spotify?.hasRefreshToken === "boolean" &&
-    typeof candidate.spotify?.hasRedirectUri === "boolean" &&
-    typeof candidate.weather?.hasLocationQuery === "boolean" &&
-    typeof candidate.weather?.hasCountryCode === "boolean" &&
-    typeof candidate.weather?.hasLatitude === "boolean" &&
-    typeof candidate.weather?.hasLongitude === "boolean" &&
-    typeof candidate.calendar?.hasFeedUrls === "boolean"
+    isProviderSecretFieldStatus(candidate.jellyfin?.baseUrl) &&
+    isProviderSecretFieldStatus(candidate.jellyfin?.apiKey) &&
+    isProviderSecretFieldStatus(candidate.jellyfin?.userName) &&
+    isProviderSecretFieldStatus(candidate.jellyfin?.deviceName) &&
+    isProviderSecretFieldStatus(candidate.spotify?.clientId) &&
+    isProviderSecretFieldStatus(candidate.spotify?.clientSecret) &&
+    isProviderSecretFieldStatus(candidate.spotify?.refreshToken) &&
+    isProviderSecretFieldStatus(candidate.spotify?.redirectUri) &&
+    isProviderSecretFieldStatus(candidate.weather?.locationQuery) &&
+    isProviderSecretFieldStatus(candidate.weather?.countryCode) &&
+    isProviderSecretFieldStatus(candidate.weather?.apiKey) &&
+    isProviderSecretFieldStatus(candidate.weather?.latitude) &&
+    isProviderSecretFieldStatus(candidate.weather?.longitude) &&
+    Array.isArray(candidate.calendar?.entries) &&
+    candidate.calendar.entries.every(isCalendarSecretEntryStatus)
   );
 }
 

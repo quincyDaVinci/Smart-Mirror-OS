@@ -23,8 +23,8 @@ const {
   saveSpotifySecrets,
   saveWeatherConfig,
   saveCalendarConfig,
-  getRedactedProviderSecrets,
   getEditableProviderConfig,
+  getRedactedProviderSecrets,
 } = require("./secretsStore");
 const { fetchMirrorWeather } = require("./providers/weatherOpenMeteo");
 const { fetchMirrorAgenda } = require("./providers/calendarFeeds");
@@ -1675,7 +1675,7 @@ app.post("/config/providers/secrets", async (req, res) => {
   ) {
     res.status(400).json({
       ok: false,
-      error: "Geen jellyfin of spotify configuratie ontvangen.",
+      error: "Geen provider configuratie ontvangen.",
     });
     return;
   }
@@ -1704,6 +1704,76 @@ app.post("/config/providers/secrets", async (req, res) => {
       error: "Calendar configuratie heeft ongeldig formaat.",
     });
     return;
+  }
+
+  if (calendarInput !== undefined) {
+    const { addEntry, updateEntry, removeEntryId } = calendarInput;
+
+    if (
+      addEntry !== undefined &&
+      (typeof addEntry !== "object" || addEntry === null || Array.isArray(addEntry))
+    ) {
+      res.status(400).json({
+        ok: false,
+        error: "Calendar addEntry heeft ongeldig formaat.",
+      });
+      return;
+    }
+
+    if (
+      updateEntry !== undefined &&
+      (typeof updateEntry !== "object" ||
+        updateEntry === null ||
+        Array.isArray(updateEntry))
+    ) {
+      res.status(400).json({
+        ok: false,
+        error: "Calendar updateEntry heeft ongeldig formaat.",
+      });
+      return;
+    }
+
+    if (removeEntryId !== undefined && typeof removeEntryId !== "string") {
+      res.status(400).json({
+        ok: false,
+        error: "Calendar removeEntryId moet een string zijn.",
+      });
+      return;
+    }
+
+    if (
+      addEntry === undefined &&
+      updateEntry === undefined &&
+      removeEntryId === undefined
+    ) {
+      res.status(400).json({
+        ok: false,
+        error: "Calendar configuratie bevat geen wijziging.",
+      });
+      return;
+    }
+
+    if (
+      addEntry !== undefined &&
+      (typeof addEntry.value !== "string" || addEntry.value.trim().length === 0)
+    ) {
+      res.status(400).json({
+        ok: false,
+        error: "Calendar addEntry.value moet een niet-lege string zijn.",
+      });
+      return;
+    }
+
+    if (
+      updateEntry !== undefined &&
+      (typeof updateEntry.id !== "string" || updateEntry.id.trim().length === 0)
+    ) {
+      res.status(400).json({
+        ok: false,
+        error: "Calendar updateEntry.id moet een niet-lege string zijn.",
+      });
+      return;
+    }
   }
 
   if (
@@ -1746,7 +1816,18 @@ app.post("/config/providers/secrets", async (req, res) => {
   }
 
   if (calendarInput) {
-    saveCalendarConfig(calendarInput);
+    try {
+      saveCalendarConfig(calendarInput);
+    } catch (calendarError) {
+      res.status(400).json({
+        ok: false,
+        error:
+          calendarError instanceof Error
+            ? calendarError.message
+            : "Calendar configuratie opslaan mislukt.",
+      });
+      return;
+    }
   }
 
   appendLog(
@@ -1757,7 +1838,13 @@ app.post("/config/providers/secrets", async (req, res) => {
       jellyfinKeys: jellyfinInput ? Object.keys(jellyfinInput) : [],
       spotifyKeys: spotifyInput ? Object.keys(spotifyInput) : [],
       weatherKeys: weatherInput ? Object.keys(weatherInput) : [],
-      calendarKeys: calendarInput ? Object.keys(calendarInput) : [],
+      calendarMutation: calendarInput
+        ? {
+            hasAdd: Boolean(calendarInput.addEntry),
+            hasUpdate: Boolean(calendarInput.updateEntry),
+            hasRemove: typeof calendarInput.removeEntryId === "string",
+          }
+        : null,
     }),
   );
 

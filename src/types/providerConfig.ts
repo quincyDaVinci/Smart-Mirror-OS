@@ -1,71 +1,115 @@
+export type ProviderSecretFieldStatus = {
+  label: string;
+  hasValue: boolean;
+  updatedAt: number | null;
+};
+
+export type ProviderSecretFieldInput = {
+  label?: string;
+  value?: string;
+};
+
+export type CalendarSecretEntryStatus = {
+  id: string;
+  label: string;
+  hasValue: boolean;
+  updatedAt: number | null;
+};
+
+export type CalendarSecretsInput = {
+  addEntry?: {
+    label?: string;
+    value: string;
+  };
+  updateEntry?: {
+    id: string;
+    label?: string;
+    value?: string;
+  };
+  removeEntryId?: string;
+};
+
 export type ProviderConfigStatus = {
   jellyfin: {
-    hasBaseUrl: boolean;
-    hasApiKey: boolean;
-    hasUserName: boolean;
-    hasDeviceName: boolean;
+    baseUrl: ProviderSecretFieldStatus;
+    apiKey: ProviderSecretFieldStatus;
+    userName: ProviderSecretFieldStatus;
+    deviceName: ProviderSecretFieldStatus;
   };
   spotify: {
-    hasClientId: boolean;
-    hasClientSecret: boolean;
-    hasRefreshToken: boolean;
-    hasRedirectUri: boolean;
+    clientId: ProviderSecretFieldStatus;
+    clientSecret: ProviderSecretFieldStatus;
+    refreshToken: ProviderSecretFieldStatus;
+    redirectUri: ProviderSecretFieldStatus;
   };
   weather: {
-    hasLocationQuery: boolean;
-    hasCountryCode: boolean;
-    hasLatitude: boolean;
-    hasLongitude: boolean;
+    locationQuery: ProviderSecretFieldStatus;
+    countryCode: ProviderSecretFieldStatus;
+    apiKey: ProviderSecretFieldStatus;
+    latitude: ProviderSecretFieldStatus;
+    longitude: ProviderSecretFieldStatus;
   };
   calendar: {
-    hasFeedUrls: boolean;
+    entries: CalendarSecretEntryStatus[];
   };
 };
 
 export type ProviderSecretsInput = {
   jellyfin?: {
-    baseUrl?: string;
-    apiKey?: string;
-    userName?: string;
-    deviceName?: string;
+    baseUrl?: ProviderSecretFieldInput | string;
+    apiKey?: ProviderSecretFieldInput | string;
+    userName?: ProviderSecretFieldInput | string;
+    deviceName?: ProviderSecretFieldInput | string;
   };
   spotify?: {
-    clientId?: string;
-    clientSecret?: string;
-    refreshToken?: string;
-    redirectUri?: string;
+    clientId?: ProviderSecretFieldInput | string;
+    clientSecret?: ProviderSecretFieldInput | string;
+    refreshToken?: ProviderSecretFieldInput | string;
+    redirectUri?: ProviderSecretFieldInput | string;
   };
   weather?: {
-    locationQuery?: string;
-    countryCode?: string;
-    latitude?: string;
-    longitude?: string;
+    locationQuery?: ProviderSecretFieldInput | string;
+    countryCode?: ProviderSecretFieldInput | string;
+    apiKey?: ProviderSecretFieldInput | string;
+    latitude?: ProviderSecretFieldInput | string;
+    longitude?: ProviderSecretFieldInput | string;
   };
   calendar?: {
-    feedUrlsText?: string;
+    addEntry?: CalendarSecretsInput["addEntry"];
+    updateEntry?: CalendarSecretsInput["updateEntry"];
+    removeEntryId?: string;
   };
 };
 
+function createDefaultField(label: string): ProviderSecretFieldStatus {
+  return {
+    label,
+    hasValue: false,
+    updatedAt: null,
+  };
+}
+
 export const defaultProviderConfigStatus: ProviderConfigStatus = {
   jellyfin: {
-    hasBaseUrl: false,
-    hasApiKey: false,
-    hasUserName: false,
-    hasDeviceName: false,
+    baseUrl: createDefaultField("Jellyfin Base URL"),
+    apiKey: createDefaultField("Jellyfin API Key"),
+    userName: createDefaultField("Preferred Jellyfin User"),
+    deviceName: createDefaultField("Preferred Jellyfin Device"),
   },
   spotify: {
-    hasClientId: false,
-    hasClientSecret: false,
-    hasRefreshToken: false,
-    hasRedirectUri: false,
+    clientId: createDefaultField("Spotify Client ID"),
+    clientSecret: createDefaultField("Spotify Client Secret"),
+    refreshToken: createDefaultField("Spotify Refresh Token"),
+    redirectUri: createDefaultField("Spotify Redirect URI"),
   },
   weather: {
-    hasLocationQuery: false,
-    hasCountryCode: false,
-    hasLatitude: false,
-    hasLongitude: false,
+    locationQuery: createDefaultField("Weather Location Query"),
+    countryCode: createDefaultField("Weather Country Code"),
+    apiKey: createDefaultField("WeatherAPI Key"),
+    latitude: createDefaultField("Weather Latitude"),
+    longitude: createDefaultField("Weather Longitude"),
   },
   calendar: {
-    hasFeedUrls: false,
+    entries: [],
   },
 };

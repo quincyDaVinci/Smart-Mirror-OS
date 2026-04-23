@@ -1172,6 +1172,36 @@ button:disabled {
   color: var(--text-primary);
 }
 
+.mirror-compact-weather__location-subtitle {
+  margin: -4px 0 2px;
+  font-size: 0.78rem;
+  color: var(--text-tertiary);
+  text-transform: lowercase;
+}
+
+.mirror-compact-weather__section-label {
+  margin: 0;
+  font-size: 0.76rem;
+  color: var(--text-tertiary);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mirror-compact-weather__today,
+.mirror-compact-weather__upcoming {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mirror-compact-weather__divider {
+  width: 100%;
+  height: 1px;
+  border: 0;
+  margin: 2px 0;
+  background: rgba(255, 255, 255, 0.12);
+}
+
 .mirror-compact-weather__hero {
   display: flex;
   align-items: flex-start;
@@ -1179,11 +1209,27 @@ button:disabled {
 }
 
 .mirror-compact-weather__icon {
-  font-size: 3rem;
+  font-size: clamp(3.4rem, 8vw, 4.8rem);
   line-height: 1;
   color: var(--text-primary);
-  width: 52px;
+  width: clamp(58px, 10vw, 84px);
+  height: clamp(58px, 10vw, 84px);
   text-align: center;
+  display: grid;
+  place-items: center;
+}
+
+.mirror-compact-weather__icon img {
+  width: clamp(56px, 9.4vw, 78px);
+  height: clamp(56px, 9.4vw, 78px);
+  object-fit: contain;
+}
+
+.mirror-compact-weather__forecast-icon img,
+.mirror-compact-weather__hourly-icon img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
 
 .mirror-compact-weather__hero-right {
@@ -1197,12 +1243,6 @@ button:disabled {
   font-weight: 680;
   line-height: 0.88;
   letter-spacing: -0.08em;
-}
-
-.mirror-compact-weather__condition {
-  font-size: 1.08rem;
-  color: var(--text-secondary);
-  text-transform: lowercase;
 }
 
 .mirror-compact-weather__stats {
@@ -1228,7 +1268,7 @@ button:disabled {
 
 .mirror-compact-weather__forecast-row {
   display: grid;
-  grid-template-columns: 52px 22px 25% 34px;
+  grid-template-columns: 58px 24px minmax(34px, 1fr) minmax(34px, 1fr);
   align-items: center;
   column-gap: 8px;
   font-size: 0.92rem;
@@ -1256,6 +1296,40 @@ button:disabled {
 }
 
 .mirror-compact-weather__forecast-low {
+  color: var(--text-tertiary);
+}
+
+.mirror-compact-weather__hourly {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.mirror-compact-weather__hourly-row {
+  display: grid;
+  grid-template-columns: 58px 24px minmax(34px, 1fr) minmax(42px, 1fr);
+  align-items: center;
+  column-gap: 8px;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.mirror-compact-weather__hourly-time {
+  color: var(--text-secondary);
+}
+
+.mirror-compact-weather__hourly-icon {
+  text-align: center;
+}
+
+.mirror-compact-weather__hourly-temp,
+.mirror-compact-weather__hourly-rain {
+  justify-self: end;
+  text-align: right;
+}
+
+.mirror-compact-weather__hourly-rain {
   color: var(--text-tertiary);
 }
 
