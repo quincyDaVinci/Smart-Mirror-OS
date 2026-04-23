@@ -32,9 +32,7 @@ function writeSecretsFile(nextSecrets) {
 function pickNonEmptyStringValues(input = {}) {
   return Object.fromEntries(
     Object.entries(input)
-      .filter(
-        ([, value]) => typeof value === "string" && value.trim().length > 0,
-      )
+      .filter(([, value]) => typeof value === "string" && value.trim().length > 0)
       .map(([key, value]) => [key, value.trim()]),
   );
 }
@@ -80,10 +78,8 @@ function getSpotifySecrets() {
 
   return {
     clientId: spotify.clientId ?? process.env.SPOTIFY_CLIENT_ID ?? null,
-    clientSecret:
-      spotify.clientSecret ?? process.env.SPOTIFY_CLIENT_SECRET ?? null,
-    refreshToken:
-      spotify.refreshToken ?? process.env.SPOTIFY_REFRESH_TOKEN ?? null,
+    clientSecret: spotify.clientSecret ?? process.env.SPOTIFY_CLIENT_SECRET ?? null,
+    refreshToken: spotify.refreshToken ?? process.env.SPOTIFY_REFRESH_TOKEN ?? null,
     redirectUri:
       spotify.redirectUri ??
       process.env.SPOTIFY_REDIRECT_URI ??
@@ -99,23 +95,21 @@ function getWeatherConfig() {
   const fileSecrets = readSecretsFile();
   const weather = fileSecrets.weather ?? {};
 
+  const latitudeRaw = weather.latitude ?? process.env.WEATHER_LATITUDE ?? "";
+  const longitudeRaw = weather.longitude ?? process.env.WEATHER_LONGITUDE ?? "";
+
+  const latitude =
+    String(latitudeRaw).trim().length > 0 ? Number(latitudeRaw) : null;
+  const longitude =
+    String(longitudeRaw).trim().length > 0 ? Number(longitudeRaw) : null;
+
   return {
     locationQuery:
       weather.locationQuery ?? process.env.WEATHER_LOCATION_QUERY ?? "Den Haag",
     countryCode:
       weather.countryCode ?? process.env.WEATHER_COUNTRY_CODE ?? "NL",
-    latitude:
-      typeof weather.latitude === "string" && weather.latitude.length > 0
-        ? Number(weather.latitude)
-        : process.env.WEATHER_LATITUDE
-          ? Number(process.env.WEATHER_LATITUDE)
-          : null,
-    longitude:
-      typeof weather.longitude === "string" && weather.longitude.length > 0
-        ? Number(weather.longitude)
-        : process.env.WEATHER_LONGITUDE
-          ? Number(process.env.WEATHER_LONGITUDE)
-          : null,
+    latitude: Number.isFinite(latitude) ? latitude : null,
+    longitude: Number.isFinite(longitude) ? longitude : null,
   };
 }
 
@@ -141,6 +135,10 @@ function getCalendarConfig() {
   };
 }
 
+function saveCalendarConfig(partialCalendarConfig) {
+  return saveSection("calendar", partialCalendarConfig);
+}
+
 function getEditableProviderConfig() {
   const weather = getWeatherConfig();
   const calendar = getCalendarConfig();
@@ -149,59 +147,12 @@ function getEditableProviderConfig() {
     weather: {
       locationQuery: weather.locationQuery ?? "",
       countryCode: weather.countryCode ?? "",
-      latitude:
-        Number.isFinite(weather.latitude) ? String(weather.latitude) : "",
-      longitude:
-        Number.isFinite(weather.longitude) ? String(weather.longitude) : "",
+      latitude: Number.isFinite(weather.latitude) ? String(weather.latitude) : "",
+      longitude: Number.isFinite(weather.longitude) ? String(weather.longitude) : "",
     },
     calendar: {
       feedUrlsText: calendar.feedUrlsText ?? "",
     },
-  };
-}
-
-function saveCalendarConfig(partialCalendarConfig) {
-  return saveSection("calendar", partialCalendarConfig);
-}
-
-function getWeatherConfig() {
-  const fileSecrets = readSecretsFile();
-  const weather = fileSecrets.weather ?? {};
-
-  return {
-    locationQuery:
-      weather.locationQuery ?? process.env.WEATHER_LOCATION_QUERY ?? "Den Haag",
-    countryCode:
-      weather.countryCode ?? process.env.WEATHER_COUNTRY_CODE ?? "NL",
-    latitude:
-      typeof weather.latitude === "number"
-        ? weather.latitude
-        : process.env.WEATHER_LATITUDE
-          ? Number(process.env.WEATHER_LATITUDE)
-          : null,
-    longitude:
-      typeof weather.longitude === "number"
-        ? weather.longitude
-        : process.env.WEATHER_LONGITUDE
-          ? Number(process.env.WEATHER_LONGITUDE)
-          : null,
-  };
-}
-
-function getCalendarConfig() {
-  const fileSecrets = readSecretsFile();
-  const calendar = fileSecrets.calendar ?? {};
-
-  const rawFeedUrls =
-    calendar.feedUrlsText ?? process.env.CALENDAR_FEED_URLS ?? "";
-
-  const feedUrls = rawFeedUrls
-    .split(/\r?\n|,/)
-    .map((value) => value.trim())
-    .filter(Boolean);
-
-  return {
-    feedUrls,
   };
 }
 
