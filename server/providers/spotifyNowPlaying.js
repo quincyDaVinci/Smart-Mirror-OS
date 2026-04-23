@@ -11,7 +11,10 @@ let cachedAccessTokenExpiresAt = 0;
 let spotifyRateLimitedUntil = 0;
 
 function parseRetryAfterToMs(retryAfterHeader) {
-  if (typeof retryAfterHeader !== "string" || retryAfterHeader.trim().length === 0) {
+  if (
+    typeof retryAfterHeader !== "string" ||
+    retryAfterHeader.trim().length === 0
+  ) {
     return null;
   }
 
@@ -248,7 +251,9 @@ async function fetchSpotifyNowPlaying() {
       providerStatus: {
         enabled: true,
         status: "ok",
-        message: formatRateLimitWaitMessage(spotifyRateLimitedUntil - checkedAt),
+        message: formatRateLimitWaitMessage(
+          spotifyRateLimitedUntil - checkedAt,
+        ),
         lastCheckedAt: checkedAt,
       },
     };
@@ -303,20 +308,26 @@ async function fetchSpotifyNowPlaying() {
   }
 
   if (response.status === 429) {
-    const retryAfterMs = parseRetryAfterToMs(response.headers.get("retry-after"));
-    const boundedRetryAfterMs = Math.min(
-      Math.max(retryAfterMs ?? 30000, 15000),
-      5 * 60 * 1000,
+    const retryAfterMs = parseRetryAfterToMs(
+      response.headers.get("retry-after"),
     );
+    const effectiveRetryAfterMs = Math.max(retryAfterMs ?? 30000, 15000);
 
-    spotifyRateLimitedUntil = checkedAt + boundedRetryAfterMs;
+    spotifyRateLimitedUntil = checkedAt + effectiveRetryAfterMs;
+
+    logSpotifyDebug("fetchSpotifyNowPlaying:rate-limited-429", {
+      retryAfterHeader: response.headers.get("retry-after"),
+      retryAfterMs,
+      effectiveRetryAfterMs,
+      retryUntilIso: new Date(spotifyRateLimitedUntil).toISOString(),
+    });
 
     return {
       media: null,
       providerStatus: {
         enabled: true,
         status: "ok",
-        message: formatRateLimitWaitMessage(boundedRetryAfterMs),
+        message: formatRateLimitWaitMessage(effectiveRetryAfterMs),
         lastCheckedAt: checkedAt,
       },
     };
