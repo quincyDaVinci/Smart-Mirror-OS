@@ -21,8 +21,13 @@ const {
   saveJellyfinSecrets,
   getSpotifySecrets,
   saveSpotifySecrets,
+  saveWeatherConfig,
+  saveCalendarConfig,
   getRedactedProviderSecrets,
+  getEditableProviderConfig,
 } = require("./secretsStore");
+const { fetchMirrorWeather } = require("./providers/weatherOpenMeteo");
+const { fetchMirrorAgenda } = require("./providers/calendarFeeds");
 
 const app = express();
 app.use(express.json());
@@ -1644,6 +1649,13 @@ app.get("/config/providers/status", (_req, res) => {
   });
 });
 
+app.get("/config/providers/editable", (_req, res) => {
+  res.json({
+    ok: true,
+    editable: getEditableProviderConfig(),
+  });
+});
+
 app.post("/config/providers/secrets", async (req, res) => {
   if (!req.body || typeof req.body !== "object" || Array.isArray(req.body)) {
     res.status(400).json({ ok: false, error: "Ongeldige request body." });
@@ -1652,11 +1664,44 @@ app.post("/config/providers/secrets", async (req, res) => {
 
   const jellyfinInput = req.body.jellyfin;
   const spotifyInput = req.body.spotify;
+  const weatherInput = req.body.weather;
+  const calendarInput = req.body.calendar;
 
-  if (jellyfinInput === undefined && spotifyInput === undefined) {
+  if (
+    jellyfinInput === undefined &&
+    spotifyInput === undefined &&
+    weatherInput === undefined &&
+    calendarInput === undefined
+  ) {
     res.status(400).json({
       ok: false,
       error: "Geen jellyfin of spotify configuratie ontvangen.",
+    });
+    return;
+  }
+
+  if (
+    weatherInput !== undefined &&
+    (typeof weatherInput !== "object" ||
+      weatherInput === null ||
+      Array.isArray(weatherInput))
+  ) {
+    res.status(400).json({
+      ok: false,
+      error: "Weather configuratie heeft ongeldig formaat.",
+    });
+    return;
+  }
+
+  if (
+    calendarInput !== undefined &&
+    (typeof calendarInput !== "object" ||
+      calendarInput === null ||
+      Array.isArray(calendarInput))
+  ) {
+    res.status(400).json({
+      ok: false,
+      error: "Calendar configuratie heeft ongeldig formaat.",
     });
     return;
   }
@@ -1696,6 +1741,14 @@ app.post("/config/providers/secrets", async (req, res) => {
     resetSpotifyAccessTokenCache();
   }
 
+  if (weatherInput) {
+    saveWeatherConfig(weatherInput);
+  }
+
+  if (calendarInput) {
+    saveCalendarConfig(calendarInput);
+  }
+
   appendLog(
     "info",
     "config",
@@ -1703,6 +1756,8 @@ app.post("/config/providers/secrets", async (req, res) => {
     JSON.stringify({
       jellyfinKeys: jellyfinInput ? Object.keys(jellyfinInput) : [],
       spotifyKeys: spotifyInput ? Object.keys(spotifyInput) : [],
+      weatherKeys: weatherInput ? Object.keys(weatherInput) : [],
+      calendarKeys: calendarInput ? Object.keys(calendarInput) : [],
     }),
   );
 
@@ -1843,20 +1898,41 @@ app.get("/auth/spotify/callback", async (req, res) => {
   }
 });
 
-console.log("[boot] registering health route");
+app.get("/dashboard", async (_req, res) => {
+  try {
+    const [weatherResult, agendaResult] = await Promise.all([
+      fetchMirrorWeather(),
+      fetchMirrorAgenda(),
+    ]);
 
+    res.json({
+      ok: true,
+      weather: weatherResult.weather,
+      calendar: agendaResult.calendar,
+      updatedAt: Date.now(),
+    });
+  } catch (error) {
+    console.error("failed to build dashboard data", error);
+
+    res.status(500).json({
+      ok: false,
+      error:
+        error instanceof Error ? error.message : "Dashboard ophalen mislukt.",
+    });
+  }
+});
+
+console.log("[boot] registering health route");
 app.get("/health", (_req, res) => {
   res.json({ ok: true });
 });
 
 console.log("[boot] registering state route");
-
 app.get("/state", (_req, res) => {
   res.json(state);
 });
 
 console.log("[boot] registering action route");
-
 app.post("/action", (req, res) => {
   const handled = handleClientMessage(req.body);
 

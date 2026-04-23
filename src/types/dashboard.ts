@@ -23,11 +23,6 @@ export type WeatherData = {
   forecast: WeatherForecastItem[];
 };
 
-export type MediaData = {
-  title: string;
-  artist: string;
-};
-
 export type CalendarItem = {
   time: string;
   title: string;
@@ -39,6 +34,5 @@ export type CalendarData = {
 
 export type DashboardData = {
   weather: WeatherData;
-  media: MediaData;
   calendar: CalendarData;
 };

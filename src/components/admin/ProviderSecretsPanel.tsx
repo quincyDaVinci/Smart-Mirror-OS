@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type {
   ProviderConfigStatus,
   ProviderSecretsInput,
@@ -11,6 +11,18 @@ type ProviderSecretsPanelProps = {
   onSaveSecrets: (nextSecrets: ProviderSecretsInput) => Promise<void>;
 };
 
+type EditableProviderConfig = {
+  weather: {
+    locationQuery: string;
+    countryCode: string;
+    latitude: string;
+    longitude: string;
+  };
+  calendar: {
+    feedUrlsText: string;
+  };
+};
+
 function StatusLine({ label, active }: { label: string; active: boolean }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
@@ -20,6 +32,46 @@ function StatusLine({ label, active }: { label: string; active: boolean }) {
       </strong>
     </div>
   );
+}
+
+async function fetchEditableProviderConfig(
+  apiBaseUrl: string,
+): Promise<EditableProviderConfig> {
+  const response = await fetch(`${apiBaseUrl}/config/providers/editable`, {
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+
+  const payload: unknown = await response.json();
+
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    !("editable" in payload) ||
+    !payload.editable ||
+    typeof payload.editable !== "object"
+  ) {
+    throw new Error(
+      "Editable provider config antwoord heeft ongeldig formaat.",
+    );
+  }
+
+  const editable = payload.editable as EditableProviderConfig;
+
+  return {
+    weather: {
+      locationQuery: editable.weather?.locationQuery ?? "",
+      countryCode: editable.weather?.countryCode ?? "",
+      latitude: editable.weather?.latitude ?? "",
+      longitude: editable.weather?.longitude ?? "",
+    },
+    calendar: {
+      feedUrlsText: editable.calendar?.feedUrlsText ?? "",
+    },
+  };
 }
 
 export function ProviderSecretsPanel({
@@ -43,10 +95,40 @@ export function ProviderSecretsPanel({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [weatherLocationQuery, setWeatherLocationQuery] = useState("");
+  const [weatherCountryCode, setWeatherCountryCode] = useState("");
+  const [weatherLatitude, setWeatherLatitude] = useState("");
+  const [weatherLongitude, setWeatherLongitude] = useState("");
+
+  const [calendarFeedUrlsText, setCalendarFeedUrlsText] = useState("");
+
+  const [isSavingWeather, setIsSavingWeather] = useState(false);
+  const [isSavingCalendar, setIsSavingCalendar] = useState(false);
+
   const effectiveSpotifyRedirectUri =
     spotifyRedirectUri.trim() || "http://127.0.0.1:8787/auth/spotify/callback";
   const canStartSpotifyLink =
     configStatus.spotify.hasClientId && configStatus.spotify.hasClientSecret;
+
+  async function loadEditableConfig() {
+    const editable = await fetchEditableProviderConfig(apiBaseUrl);
+
+    setWeatherLocationQuery(editable.weather.locationQuery);
+    setWeatherCountryCode(editable.weather.countryCode);
+    setWeatherLatitude(editable.weather.latitude);
+    setWeatherLongitude(editable.weather.longitude);
+    setCalendarFeedUrlsText(editable.calendar.feedUrlsText);
+  }
+
+  useEffect(() => {
+    void loadEditableConfig().catch((loadError) => {
+      setError(
+        loadError instanceof Error
+          ? loadError.message
+          : "Editable provider config laden mislukt.",
+      );
+    });
+  }, []);
 
   async function handleRefresh() {
     setError(null);
@@ -55,6 +137,7 @@ export function ProviderSecretsPanel({
 
     try {
       await onRefreshStatus();
+      await loadEditableConfig();
       setMessage("Provider status vernieuwd.");
     } catch (refreshError) {
       setError(
@@ -126,6 +209,61 @@ export function ProviderSecretsPanel({
       );
     } finally {
       setIsSavingSpotify(false);
+    }
+  }
+
+  async function handleSaveWeather(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setMessage(null);
+    setIsSavingWeather(true);
+
+    try {
+      await onSaveSecrets({
+        weather: {
+          locationQuery: weatherLocationQuery,
+          countryCode: weatherCountryCode,
+          latitude: weatherLatitude,
+          longitude: weatherLongitude,
+        },
+      });
+
+      await loadEditableConfig();
+      setMessage("Weather configuratie opgeslagen.");
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Weather configuratie opslaan mislukt.",
+      );
+    } finally {
+      setIsSavingWeather(false);
+    }
+  }
+
+  async function handleSaveCalendar(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    setMessage(null);
+    setIsSavingCalendar(true);
+
+    try {
+      await onSaveSecrets({
+        calendar: {
+          feedUrlsText: calendarFeedUrlsText,
+        },
+      });
+
+      await loadEditableConfig();
+      setMessage("Calendar feed configuratie opgeslagen.");
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "Calendar configuratie opslaan mislukt.",
+      );
+    } finally {
+      setIsSavingCalendar(false);
     }
   }
 
@@ -368,6 +506,131 @@ export function ProviderSecretsPanel({
           </div>
         </form>
       </div>
+      <form
+        onSubmit={handleSaveWeather}
+        style={{
+          padding: 16,
+          borderRadius: 16,
+          border: "1px solid rgba(255,255,255,0.08)",
+          background: "rgba(255,255,255,0.02)",
+        }}
+      >
+        <h3 style={{ marginTop: 0 }}>Weather</h3>
+
+        <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
+          <StatusLine
+            label="Location query"
+            active={configStatus.weather.hasLocationQuery}
+          />
+          <StatusLine
+            label="Country code"
+            active={configStatus.weather.hasCountryCode}
+          />
+          <StatusLine
+            label="Latitude"
+            active={configStatus.weather.hasLatitude}
+          />
+          <StatusLine
+            label="Longitude"
+            active={configStatus.weather.hasLongitude}
+          />
+        </div>
+
+        <div style={{ display: "grid", gap: 12 }}>
+          <label>
+            Location query
+            <input
+              type="text"
+              value={weatherLocationQuery}
+              onChange={(event) => setWeatherLocationQuery(event.target.value)}
+              placeholder="Bijvoorbeeld Den Haag"
+              style={{ display: "block", width: "100%", marginTop: 6 }}
+            />
+          </label>
+
+          <label>
+            Country code
+            <input
+              type="text"
+              value={weatherCountryCode}
+              onChange={(event) => setWeatherCountryCode(event.target.value)}
+              placeholder="Bijvoorbeeld NL"
+              style={{ display: "block", width: "100%", marginTop: 6 }}
+            />
+          </label>
+
+          <label>
+            Latitude
+            <input
+              type="text"
+              value={weatherLatitude}
+              onChange={(event) => setWeatherLatitude(event.target.value)}
+              placeholder="Bijvoorbeeld 52.08"
+              style={{ display: "block", width: "100%", marginTop: 6 }}
+            />
+          </label>
+
+          <label>
+            Longitude
+            <input
+              type="text"
+              value={weatherLongitude}
+              onChange={(event) => setWeatherLongitude(event.target.value)}
+              placeholder="Bijvoorbeeld 4.31"
+              style={{ display: "block", width: "100%", marginTop: 6 }}
+            />
+          </label>
+        </div>
+
+        <div style={{ marginTop: 16 }}>
+          <button type="submit" disabled={isSavingWeather}>
+            {isSavingWeather ? "Opslaan..." : "Sla Weather op"}
+          </button>
+        </div>
+      </form>
+
+      <form
+        onSubmit={handleSaveCalendar}
+        style={{
+          padding: 16,
+          borderRadius: 16,
+          border: "1px solid rgba(255,255,255,0.08)",
+          background: "rgba(255,255,255,0.02)",
+        }}
+      >
+        <h3 style={{ marginTop: 0 }}>Calendar feeds</h3>
+
+        <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
+          <StatusLine
+            label="ICS feed URLs"
+            active={configStatus.calendar.hasFeedUrls}
+          />
+        </div>
+
+        <label>
+          Feed URLs
+          <textarea
+            value={calendarFeedUrlsText}
+            onChange={(event) => setCalendarFeedUrlsText(event.target.value)}
+            placeholder={
+              "Één ICS URL per regel\nhttps://...\nhttps://...\nhttps://..."
+            }
+            rows={6}
+            style={{ display: "block", width: "100%", marginTop: 6 }}
+          />
+        </label>
+
+        <p style={{ margin: "8px 0 0", opacity: 0.72, fontSize: 14 }}>
+          Plak hier iCloud, Google, Outlook of Quinyx ICS feed URLs. Gebruik één
+          feed per regel.
+        </p>
+
+        <div style={{ marginTop: 16 }}>
+          <button type="submit" disabled={isSavingCalendar}>
+            {isSavingCalendar ? "Opslaan..." : "Sla Calendar feeds op"}
+          </button>
+        </div>
+      </form>
     </>
   );
 }

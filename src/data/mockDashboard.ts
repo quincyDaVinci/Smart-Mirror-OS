@@ -31,10 +31,6 @@ export const dashboardData: DashboardData = {
       },
     ],
   },
-  media: {
-    title: "Placeholder Track",
-    artist: "Placeholder Artist",
-  },
   calendar: {
     items: [
       {

@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
-import { dashboardData } from "../data/mockDashboard";
+import { useMirrorDashboard } from "../hooks/useMirrorDashboard";
 import type { WeatherIconKey } from "../types/dashboard";
 import type { LayoutItem } from "../types/layout";
 import type { MirrorSettings } from "../types/settings";
@@ -99,6 +99,7 @@ export function MirrorPage({
   media,
 }: MirrorPageProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const dashboardData = useMirrorDashboard();
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {

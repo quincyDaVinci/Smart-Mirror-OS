@@ -11,6 +11,15 @@ export type ProviderConfigStatus = {
     hasRefreshToken: boolean;
     hasRedirectUri: boolean;
   };
+  weather: {
+    hasLocationQuery: boolean;
+    hasCountryCode: boolean;
+    hasLatitude: boolean;
+    hasLongitude: boolean;
+  };
+  calendar: {
+    hasFeedUrls: boolean;
+  };
 };
 
 export type ProviderSecretsInput = {
@@ -26,6 +35,15 @@ export type ProviderSecretsInput = {
     refreshToken?: string;
     redirectUri?: string;
   };
+  weather?: {
+    locationQuery?: string;
+    countryCode?: string;
+    latitude?: string;
+    longitude?: string;
+  };
+  calendar?: {
+    feedUrlsText?: string;
+  };
 };
 
 export const defaultProviderConfigStatus: ProviderConfigStatus = {
@@ -40,5 +58,14 @@ export const defaultProviderConfigStatus: ProviderConfigStatus = {
     hasClientSecret: false,
     hasRefreshToken: false,
     hasRedirectUri: false,
+  },
+  weather: {
+    hasLocationQuery: false,
+    hasCountryCode: false,
+    hasLatitude: false,
+    hasLongitude: false,
+  },
+  calendar: {
+    hasFeedUrls: false,
   },
 };

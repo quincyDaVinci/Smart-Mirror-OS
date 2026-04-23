@@ -1,15 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import type {
-  LayoutItem,
-  WidgetEdgePosition,
-  WidgetId,
-} from "../types/layout";
+import type { LayoutItem, WidgetEdgePosition, WidgetId } from "../types/layout";
 import type { MirrorSettings } from "../types/settings";
 import type { PresenceState } from "../types/presence";
 import type { DisplayState } from "../types/display";
 import { getWebSocketUrl } from "../utils/getWebSocketUrl";
 import type { DeploymentState } from "../types/deployment";
-import type { MediaState } from "../types/media";
+import { defaultMediaState, type MediaState } from "../types/media";
 import type { DebugLogEntry } from "../types/log";
 import type {
   ProviderConfigStatus,
@@ -103,7 +99,12 @@ function isProviderConfigStatus(value: unknown): value is ProviderConfigStatus {
     typeof candidate.spotify?.hasClientId === "boolean" &&
     typeof candidate.spotify?.hasClientSecret === "boolean" &&
     typeof candidate.spotify?.hasRefreshToken === "boolean" &&
-    typeof candidate.spotify?.hasRedirectUri === "boolean"
+    typeof candidate.spotify?.hasRedirectUri === "boolean" &&
+    typeof candidate.weather?.hasLocationQuery === "boolean" &&
+    typeof candidate.weather?.hasCountryCode === "boolean" &&
+    typeof candidate.weather?.hasLatitude === "boolean" &&
+    typeof candidate.weather?.hasLongitude === "boolean" &&
+    typeof candidate.calendar?.hasFeedUrls === "boolean"
   );
 }
 
@@ -155,38 +156,7 @@ export function useMirrorSocket() {
     lastDeployedAt: null,
     message: null,
   });
-  const [media, setMedia] = useState<MediaState>({
-    status: "idle",
-    source: null,
-    kind: "unknown",
-    title: "Geen media actief",
-    subtitle: "Er wordt nu niets afgespeeld",
-    secondaryText: "",
-    productionYear: null,
-    genres: [],
-    communityRating: null,
-    artworkUrl: null,
-    progressMs: null,
-    durationMs: null,
-    deviceName: null,
-    userName: null,
-    lastUpdatedAt: null,
-    lastPlayed: null,
-    sourceState: {
-      jellyfin: {
-        enabled: true,
-        status: "idle",
-        message: null,
-        lastCheckedAt: null,
-      },
-      spotify: {
-        enabled: true,
-        status: "idle",
-        message: null,
-        lastCheckedAt: null,
-      },
-    },
-  });
+  const [media, setMedia] = useState<MediaState>(defaultMediaState);
   const [logs, setLogs] = useState<DebugLogEntry[]>([]);
   const [clientLogs, setClientLogs] = useState<DebugLogEntry[]>([]);
   const [lastHttpSuccessAt, setLastHttpSuccessAt] = useState<number | null>(
@@ -736,7 +706,10 @@ export function useMirrorSocket() {
     });
   }
 
-  function updateWidgetPosition(widgetId: WidgetId, position: WidgetEdgePosition) {
+  function updateWidgetPosition(
+    widgetId: WidgetId,
+    position: WidgetEdgePosition,
+  ) {
     void sendAction({
       type: "layout:position",
       payload: {
