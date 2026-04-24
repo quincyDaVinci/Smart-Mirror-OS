@@ -54,21 +54,13 @@ function buildSubtitle(item) {
   return item.Type ?? "Onbekend";
 }
 
-function buildSecondaryText(item, session) {
+function buildSecondaryText(item) {
   if (!item) {
     return "";
   }
 
   if (item.Type === "Audio") {
     return item.Album ?? "";
-  }
-
-  if (item.Type === "Episode") {
-    return session.DeviceName ?? "";
-  }
-
-  if (item.Type === "Movie") {
-    return session.DeviceName ?? "";
   }
 
   return "";
@@ -98,8 +90,8 @@ function buildArtworkUrl(baseUrl, item, apiKey) {
   }
 
   const url = new URL(`/Items/${artworkTargetItemId}/Images/Primary`, baseUrl);
-  url.searchParams.set("maxWidth", "500");
-  url.searchParams.set("quality", "90");
+  url.searchParams.set("maxWidth", "1400");
+  url.searchParams.set("quality", "96");
   url.searchParams.set("api_key", apiKey);
 
   return url.toString();
@@ -207,7 +199,7 @@ async function fetchJellyfinNowPlaying() {
       kind: getMediaKind(item.Type),
       title: item.Name ?? "Onbekende titel",
       subtitle: buildSubtitle(item),
-      secondaryText: buildSecondaryText(item, bestSession),
+      secondaryText: buildSecondaryText(item),
       productionYear: item.ProductionYear ?? null,
       genres: Array.isArray(item.Genres) ? item.Genres : [],
       communityRating:

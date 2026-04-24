@@ -3,6 +3,7 @@ const path = require("path");
 const crypto = require("crypto");
 
 const SECRETS_FILE = path.join(__dirname, "secrets.local.json");
+const PROJECT_ENV_FILE = path.join(__dirname, "..", ".env.local");
 
 const PROVIDER_FIELD_LABELS = {
   jellyfin: {
@@ -61,6 +62,57 @@ function readSecretsFile() {
     return JSON.parse(raw);
   } catch (error) {
     console.error("failed to read secrets file", error);
+    return {};
+  }
+}
+
+function stripEnvValueQuotes(value) {
+  const trimmedValue = value.trim();
+
+  if (
+    (trimmedValue.startsWith('"') && trimmedValue.endsWith('"')) ||
+    (trimmedValue.startsWith("'") && trimmedValue.endsWith("'"))
+  ) {
+    return trimmedValue.slice(1, -1);
+  }
+
+  return trimmedValue;
+}
+
+function readProjectEnvFile() {
+  try {
+    if (!fs.existsSync(PROJECT_ENV_FILE)) {
+      return {};
+    }
+
+    const entries = {};
+    const raw = fs.readFileSync(PROJECT_ENV_FILE, "utf-8");
+
+    for (const line of raw.split(/\r?\n/)) {
+      const trimmedLine = line.trim();
+
+      if (!trimmedLine || trimmedLine.startsWith("#")) {
+        continue;
+      }
+
+      const powershellMatch = trimmedLine.match(
+        /^\$env:([A-Za-z_][A-Za-z0-9_]*)=(.*)$/,
+      );
+      const dotenvMatch = trimmedLine.match(
+        /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/,
+      );
+      const match = powershellMatch ?? dotenvMatch;
+
+      if (!match) {
+        continue;
+      }
+
+      entries[match[1]] = stripEnvValueQuotes(match[2]);
+    }
+
+    return entries;
+  } catch (error) {
+    console.error("failed to read project env file", error);
     return {};
   }
 }
@@ -137,6 +189,7 @@ function getProviderSectionState(sectionName) {
   }
 
   const fileSecrets = readSecretsFile();
+  const localEnv = readProjectEnvFile();
   const storedSection = fileSecrets[sectionName] ?? {};
   const fieldLabels = PROVIDER_FIELD_LABELS[sectionName];
   const envKeys = PROVIDER_ENV_KEYS[sectionName];
@@ -145,7 +198,9 @@ function getProviderSectionState(sectionName) {
     Object.entries(fieldLabels).map(([fieldKey, defaultLabel]) => {
       const envKey = envKeys[fieldKey];
       const fallbackValue =
-        typeof envKey === "string" ? (process.env[envKey] ?? "") : "";
+        typeof envKey === "string"
+          ? (process.env[envKey] ?? localEnv[envKey] ?? "")
+          : "";
 
       return [
         fieldKey,

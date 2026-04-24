@@ -11,4 +11,8 @@ export type DisplayState = {
   focusSetAt: number | null;
   focusUntil: number | null;
   mediaIdleSince: number | null;
+  mediaAutoFocusSuppressed: boolean;
+  mediaAutoFocusSuppressedAt: number | null;
+  mediaAutoFocusSuppressionSawActive: boolean;
+  mediaLyricsVisible: boolean;
 };

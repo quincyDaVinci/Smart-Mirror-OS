@@ -19,6 +19,7 @@ function App() {
     updateSettings,
     focusWidget,
     clearWidgetFocus,
+    setMediaLyricsVisible,
     simulateMotion,
     resetIdleTimer,
     deployment,
@@ -91,6 +92,7 @@ function App() {
               connectionError={connectionError}
               onFocusWidget={focusWidget}
               onClearFocus={clearWidgetFocus}
+              onSetMediaLyricsVisible={setMediaLyricsVisible}
               onResetIdleTimer={resetIdleTimer}
             />
           }

@@ -44,8 +44,12 @@ export type WeatherData = {
 };
 
 export type CalendarItem = {
+  date?: string;
   time: string;
+  endTime?: string;
   title: string;
+  startsAt?: number;
+  endsAt?: number;
 };
 
 export type CalendarData = {

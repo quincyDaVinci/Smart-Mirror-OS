@@ -7,11 +7,9 @@ function normalizeIconUrl(iconPath) {
     return undefined;
   }
 
-  if (iconPath.startsWith("//")) {
-    return `https:${iconPath}`;
-  }
+  const normalizedPath = iconPath.startsWith("//") ? `https:${iconPath}` : iconPath;
 
-  return iconPath;
+  return normalizedPath.replace("/64x64/", "/128x128/");
 }
 
 function mapWeatherApiCodeToIconKey(code, isDay) {
@@ -115,7 +113,7 @@ function formatHourLabel(localDateTime) {
 }
 
 function roundTemperature(value) {
-  return `${Math.round(Number(value))}°`;
+  return `${Math.round(Number(value))}\u00b0`;
 }
 
 async function fetchMirrorWeather() {
@@ -184,7 +182,7 @@ async function fetchMirrorWeather() {
 
   return {
     weather: {
-      temperature: `${Math.round(Number(current.temp_c))}°C`,
+      temperature: `${Math.round(Number(current.temp_c))}\u00b0C`,
       location: locationDisplay.location,
       locationSubtitle: locationDisplay.locationSubtitle,
       condition: current.condition?.text ?? "Onbekend",
@@ -192,7 +190,7 @@ async function fetchMirrorWeather() {
       iconUrl: normalizeIconUrl(current.condition?.icon),
       highTemperature: roundTemperature(today.day?.maxtemp_c),
       lowTemperature: roundTemperature(today.day?.mintemp_c),
-      detailLine: `Voelt als ${Math.round(Number(current.feelslike_c))}° · regenkans ${Math.round(Number(today.day?.daily_chance_of_rain ?? 0))}%`,
+      detailLine: `Voelt als ${Math.round(Number(current.feelslike_c))}\u00b0 · regenkans ${Math.round(Number(today.day?.daily_chance_of_rain ?? 0))}%`,
       windSpeed: `${Math.round(Number(current.wind_kph))} km/h`,
       hourlyTrend: futureHours.map((hourItem) => ({
         time: formatHourLabel(hourItem.time),
@@ -201,7 +199,7 @@ async function fetchMirrorWeather() {
           Number(hourItem?.is_day) === 1,
         ),
         iconUrl: normalizeIconUrl(hourItem?.condition?.icon),
-        temperature: `${Math.round(Number(hourItem?.temp_c ?? 0))}°`,
+        temperature: `${Math.round(Number(hourItem?.temp_c ?? 0))}\u00b0`,
         precipitationChance: `${Math.round(Number(hourItem?.chance_of_rain ?? 0))}%`,
       })),
       forecast: forecastDays.slice(1, 4).map((dayPayload) => ({
@@ -211,8 +209,8 @@ async function fetchMirrorWeather() {
           true,
         ),
         iconUrl: normalizeIconUrl(dayPayload?.day?.condition?.icon),
-        highTemperature: String(Math.round(Number(dayPayload?.day?.maxtemp_c ?? 0))),
-        lowTemperature: String(Math.round(Number(dayPayload?.day?.mintemp_c ?? 0))),
+        highTemperature: roundTemperature(dayPayload?.day?.maxtemp_c ?? 0),
+        lowTemperature: roundTemperature(dayPayload?.day?.mintemp_c ?? 0),
       })),
     },
   };

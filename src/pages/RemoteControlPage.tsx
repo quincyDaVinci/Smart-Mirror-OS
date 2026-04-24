@@ -19,6 +19,7 @@ type RemoteControlPageProps = {
   connectionError: string | null;
   onFocusWidget: (widgetId: WidgetId) => void;
   onClearFocus: () => void;
+  onSetMediaLyricsVisible: (visible: boolean) => void;
   onResetIdleTimer: () => void;
 };
 
@@ -116,6 +117,18 @@ function FocusButtonIcon({ widgetId }: { widgetId: WidgetId }) {
   );
 }
 
+function getRemoteMediaTitle(media: MediaState) {
+  if (media.kind === "episode" && media.subtitle.trim().length > 0) {
+    const [seriesTitle] = media.subtitle.split(/\s+(?:·|Â·)\s+/);
+
+    if (seriesTitle?.trim()) {
+      return seriesTitle.trim();
+    }
+  }
+
+  return media.title;
+}
+
 export function RemoteControlPage({
   layout,
   display,
@@ -126,6 +139,7 @@ export function RemoteControlPage({
   connectionError,
   onFocusWidget,
   onClearFocus,
+  onSetMediaLyricsVisible,
   onResetIdleTimer,
 }: RemoteControlPageProps) {
   const [now, setNow] = useState(0);
@@ -149,6 +163,11 @@ export function RemoteControlPage({
     display.focusUntil !== null && now > 0
       ? Math.max(0, Math.ceil((display.focusUntil - now) / 1000))
       : null;
+  const remoteMediaTitle = getRemoteMediaTitle(media);
+  const canToggleLyrics =
+    display.focusedWidgetId === "media" &&
+    media.kind === "track" &&
+    (media.status === "playing" || media.status === "paused");
 
   return (
     <main className="remote-page">
@@ -190,7 +209,7 @@ export function RemoteControlPage({
         </p>
         <p>
           Media: <strong>{media.status}</strong>
-          {media.title ? ` - ${media.title}` : ""}
+          {remoteMediaTitle ? ` - ${remoteMediaTitle}` : ""}
         </p>
         <p>
           Focus timeout: <strong>{focusSecondsLeft ?? "-"}</strong>
@@ -233,6 +252,16 @@ export function RemoteControlPage({
 
         <button type="button" onClick={onResetIdleTimer} disabled={!isConnected}>
           Reset idle timer
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            onSetMediaLyricsVisible(!display.mediaLyricsVisible);
+          }}
+          disabled={!isConnected || !canToggleLyrics}
+        >
+          Lyrics {display.mediaLyricsVisible ? "uit" : "aan"}
         </button>
       </div>
     </main>

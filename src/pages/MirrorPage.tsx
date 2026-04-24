@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useMirrorDashboard } from "../hooks/useMirrorDashboard";
-import type { WeatherIconKey } from "../types/dashboard";
+import type { CalendarItem, WeatherIconKey } from "../types/dashboard";
 import type { LayoutItem } from "../types/layout";
 import type { MirrorSettings } from "../types/settings";
 import type { PresenceState } from "../types/presence";
@@ -46,12 +46,51 @@ function getWeatherGlyph(iconKey: WeatherIconKey) {
   }
 }
 
-function renderWeatherIcon(iconKey: WeatherIconKey, iconUrl?: string) {
-  if (iconUrl) {
-    return <img src={iconUrl} alt="" aria-hidden width={24} height={24} />;
+function getMeteoconIconName(iconKey: WeatherIconKey) {
+  switch (iconKey) {
+    case "clear-day":
+      return "clear-day";
+    case "clear-night":
+      return "clear-night";
+    case "partly-cloudy-day":
+      return "partly-cloudy-day";
+    case "partly-cloudy-night":
+      return "partly-cloudy-night";
+    case "fog":
+      return "fog";
+    case "drizzle":
+      return "drizzle";
+    case "rain":
+      return "rain";
+    case "freezing-rain":
+      return "sleet";
+    case "snow":
+      return "snow";
+    case "thunderstorm":
+      return "thunderstorms-rain";
+    case "hail":
+      return "hail";
+    case "cloudy":
+    default:
+      return "overcast";
   }
+}
 
-  return getWeatherGlyph(iconKey);
+function renderWeatherIcon(iconKey: WeatherIconKey, iconUrl?: string) {
+  const iconName = getMeteoconIconName(iconKey);
+
+  return (
+    <img
+      src={`https://cdn.jsdelivr.net/gh/basmilius/weather-icons@2.0.0/production/fill/all/${iconName}.svg`}
+      alt=""
+      aria-hidden
+      width={64}
+      height={64}
+      decoding="async"
+      data-weather-api-icon={iconUrl ? "available" : "missing"}
+      data-fallback={getWeatherGlyph(iconKey)}
+    />
+  );
 }
 
 function formatShortDate(date: Date) {
@@ -98,6 +137,59 @@ function formatAgendaTime(value: string) {
 
   const formatted = formatMeridiemTime(date);
   return `${formatted.time} ${formatted.meridiem}`;
+}
+
+function formatDegreeLabel(value: string) {
+  if (/[\u00b0\u2103]/.test(value)) {
+    return value;
+  }
+
+  return `${value}\u00b0`;
+}
+
+function getAgendaTimeLabel(item: { time: string; endTime?: string }) {
+  const startTime = formatAgendaTime(item.time);
+
+  if (!item.endTime) {
+    return startTime;
+  }
+
+  return `${startTime} - ${formatAgendaTime(item.endTime)}`;
+}
+
+function getCalendarSortValue(item: CalendarItem, fallbackIndex: number) {
+  if (typeof item.startsAt === "number" && Number.isFinite(item.startsAt)) {
+    return item.startsAt;
+  }
+
+  const timeParts = item.time.split(":").map(Number);
+  const hour = timeParts[0];
+  const minute = timeParts[1];
+  const minutesOfDay =
+    typeof hour === "number" &&
+    typeof minute === "number" &&
+    Number.isFinite(hour) &&
+    Number.isFinite(minute)
+      ? hour * 60 + minute
+      : fallbackIndex;
+
+  const dateRank =
+    item.date === "Vandaag" ? 0 : item.date === "Morgen" ? 1 : 2;
+
+  return dateRank * 24 * 60 + minutesOfDay;
+}
+
+function sortCalendarItems(items: CalendarItem[]) {
+  return [...items].sort((a, b) => {
+    const startDelta =
+      getCalendarSortValue(a, 0) - getCalendarSortValue(b, 0);
+
+    if (startDelta !== 0) {
+      return startDelta;
+    }
+
+    return a.title.localeCompare(b.title, "nl-NL");
+  });
 }
 
 function getScreenLabel(display: DisplayState) {
@@ -149,8 +241,12 @@ export function MirrorPage({
   const showClock = enabledWidgetIds.has("clock");
   const showCalendar = enabledWidgetIds.has("calendar");
   const showMedia = enabledWidgetIds.has("media");
+  const isMediaFocused = showMedia && display.focusedWidgetId === "media";
 
-  const upcomingItems = dashboardData.calendar.items.slice(0, 2);
+  const upcomingItems = sortCalendarItems(dashboardData.calendar.items).slice(
+    0,
+    3,
+  );
   const screenLabel = getScreenLabel(display);
 
   const formattedTime = formatMeridiemTime(currentTime);
@@ -171,10 +267,14 @@ export function MirrorPage({
         </div>
       ) : null}
 
-      <div className="mirror-portrait-shell">
+      <div
+        className={`mirror-portrait-shell ${
+          isMediaFocused ? "mirror-portrait-shell--media-focus" : ""
+        }`}
+      >
         <div className="mirror-edge-indicator">{screenLabel}</div>
 
-        {showWeather ? (
+        {showWeather && !isMediaFocused ? (
           <section className="mirror-compact-weather">
             <p className="mirror-compact-weather__location">
               {dashboardData.weather.location}
@@ -200,13 +300,32 @@ export function MirrorPage({
                   <div className="mirror-compact-weather__temp">
                     {dashboardData.weather.temperature}
                   </div>
+                  <p className="mirror-compact-weather__condition">
+                    {dashboardData.weather.condition}
+                  </p>
                 </div>
               </div>
+
+              <p className="mirror-compact-weather__detail">
+                {dashboardData.weather.detailLine}
+              </p>
 
               <div className="mirror-compact-weather__stats">
                 <span>Wind: {dashboardData.weather.windSpeed}</span>
                 <span>Max: {dashboardData.weather.highTemperature}</span>
                 <span>Min: {dashboardData.weather.lowTemperature}</span>
+              </div>
+
+              <div className="mirror-compact-weather__table-head mirror-compact-weather__table-head--hourly">
+                <span className="mirror-compact-weather__section-label">
+                  Aankomende uren
+                </span>
+                <span className="mirror-compact-weather__table-label">
+                  Temp {"\u00b0"}C
+                </span>
+                <span className="mirror-compact-weather__table-label">
+                  Regen
+                </span>
               </div>
 
               <div className="mirror-compact-weather__hourly">
@@ -235,7 +354,17 @@ export function MirrorPage({
             <hr className="mirror-compact-weather__divider" />
 
             <section className="mirror-compact-weather__upcoming">
-              <p className="mirror-compact-weather__section-label">Komende dagen</p>
+              <div className="mirror-compact-weather__table-head mirror-compact-weather__table-head--forecast">
+                <span className="mirror-compact-weather__section-label">
+                  Komende dagen
+                </span>
+                <span className="mirror-compact-weather__table-label">
+                  Max {"\u00b0"}C
+                </span>
+                <span className="mirror-compact-weather__table-label">
+                  Min {"\u00b0"}C
+                </span>
+              </div>
 
               <div className="mirror-compact-weather__forecast">
                 {dashboardData.weather.forecast.map((item) => (
@@ -250,10 +379,10 @@ export function MirrorPage({
                       {renderWeatherIcon(item.iconKey, item.iconUrl)}
                     </span>
                     <span className="mirror-compact-weather__forecast-high">
-                      {item.highTemperature}
+                      {formatDegreeLabel(item.highTemperature)}
                     </span>
                     <span className="mirror-compact-weather__forecast-low">
-                      {item.lowTemperature}
+                      {formatDegreeLabel(item.lowTemperature)}
                     </span>
                   </div>
                 ))}
@@ -262,7 +391,7 @@ export function MirrorPage({
           </section>
         ) : null}
 
-        {showClock || showCalendar ? (
+        {(showClock || showCalendar || showMedia) && !isMediaFocused ? (
           <section className="mirror-compact-time-stack">
             {showClock ? (
               <div className="mirror-compact-time">
@@ -284,11 +413,16 @@ export function MirrorPage({
               <div className="mirror-compact-agenda">
                 {upcomingItems.map((item) => (
                   <div
-                    key={`${item.time}-${item.title}`}
+                    key={`${item.date ?? "today"}-${item.time}-${item.title}`}
                     className="mirror-compact-agenda__item"
                   >
+                    {item.date ? (
+                      <span className="mirror-compact-agenda__date">
+                        {item.date}
+                      </span>
+                    ) : null}
                     <span className="mirror-compact-agenda__time">
-                      {formatAgendaTime(item.time)}
+                      {getAgendaTimeLabel(item)}
                     </span>
                     <span className="mirror-compact-agenda__title">
                       {item.title}
@@ -297,13 +431,25 @@ export function MirrorPage({
                 ))}
               </div>
             ) : null}
+
+            {showMedia ? (
+              <div className="mirror-compact-media-card">
+                <MirrorMediaDock media={media} />
+              </div>
+            ) : null}
           </section>
         ) : null}
 
         {showMedia ? (
-          <div className="mirror-portrait-media-zone">
-            <MirrorMediaDock media={media} />
-          </div>
+          isMediaFocused ? (
+            <div className="mirror-media-focus-zone">
+              <MirrorMediaDock
+                media={media}
+                showLyrics={display.mediaLyricsVisible}
+                variant="focus"
+              />
+            </div>
+          ) : null
         ) : null}
       </div>
     </main>

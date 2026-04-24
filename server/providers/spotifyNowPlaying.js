@@ -9,6 +9,8 @@ const SPOTIFY_SAVED_TRACKS_CONTAINS_URL =
 let cachedAccessToken = null;
 let cachedAccessTokenExpiresAt = 0;
 let spotifyRateLimitedUntil = 0;
+const likedStateCache = new Map();
+const LIKED_STATE_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const DEBUG_SPOTIFY = false;
 
@@ -57,6 +59,7 @@ function formatRateLimitWaitMessage(msRemaining) {
 function resetSpotifyAccessTokenCache() {
   cachedAccessToken = null;
   cachedAccessTokenExpiresAt = 0;
+  likedStateCache.clear();
 }
 
 function getBasicAuthorizationHeader(clientId, clientSecret) {
@@ -157,16 +160,24 @@ function getSpotifyArtworkUrl(item) {
     return null;
   }
 
-  if (Array.isArray(item.album?.images) && item.album.images.length > 0) {
-    return item.album.images[0].url ?? null;
-  }
+  const imageSets = [item.album?.images, item.images, item.show?.images];
 
-  if (Array.isArray(item.images) && item.images.length > 0) {
-    return item.images[0].url ?? null;
-  }
+  for (const images of imageSets) {
+    if (!Array.isArray(images) || images.length === 0) {
+      continue;
+    }
 
-  if (Array.isArray(item.show?.images) && item.show.images.length > 0) {
-    return item.show.images[0].url ?? null;
+    const largestImage = [...images]
+      .filter((image) => typeof image?.url === "string")
+      .sort((a, b) => {
+        const aArea = Number(a.width ?? 0) * Number(a.height ?? 0);
+        const bArea = Number(b.width ?? 0) * Number(b.height ?? 0);
+        return bArea - aArea;
+      })[0];
+
+    if (largestImage?.url) {
+      return largestImage.url;
+    }
   }
 
   return null;
@@ -191,16 +202,16 @@ function getSpotifySubtitle(item, currentlyPlayingType) {
   return "Onbekende artiest";
 }
 
-function getSpotifySecondaryText(item, currentlyPlayingType, deviceName) {
+function getSpotifySecondaryText(item, currentlyPlayingType) {
   if (!item) {
     return "";
   }
 
   if (currentlyPlayingType === "episode") {
-    return deviceName ?? item.show?.publisher ?? "";
+    return item.show?.publisher ?? "";
   }
 
-  return item.album?.name ?? deviceName ?? "";
+  return item.album?.name ?? "";
 }
 
 function getSpotifyKind(currentlyPlayingType) {
@@ -236,6 +247,12 @@ async function fetchSpotifyTrackLikedState(accessToken, trackId) {
     return null;
   }
 
+  const cachedLikedState = likedStateCache.get(trackId);
+
+  if (cachedLikedState && cachedLikedState.expiresAt > Date.now()) {
+    return cachedLikedState.value;
+  }
+
   const url = new URL(SPOTIFY_SAVED_TRACKS_CONTAINS_URL);
   url.searchParams.set("ids", trackId);
 
@@ -255,6 +272,11 @@ async function fetchSpotifyTrackLikedState(accessToken, trackId) {
   if (!Array.isArray(payload) || typeof payload[0] !== "boolean") {
     return null;
   }
+
+  likedStateCache.set(trackId, {
+    value: payload[0],
+    expiresAt: Date.now() + LIKED_STATE_CACHE_TTL_MS,
+  });
 
   return payload[0];
 }
@@ -441,11 +463,7 @@ async function fetchSpotifyNowPlaying() {
       kind: getSpotifyKind(currentlyPlayingType),
       title: item.name ?? "Onbekende titel",
       subtitle: getSpotifySubtitle(item, currentlyPlayingType),
-      secondaryText: getSpotifySecondaryText(
-        item,
-        currentlyPlayingType,
-        payload.device?.name ?? null,
-      ),
+      secondaryText: getSpotifySecondaryText(item, currentlyPlayingType),
       productionYear: getProductionYear(item, currentlyPlayingType),
       genres: [],
       communityRating: null,

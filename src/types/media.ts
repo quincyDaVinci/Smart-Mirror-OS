@@ -43,6 +43,7 @@ export type MediaState = {
   userName: string | null;
   isLiked: boolean | null;
   lastUpdatedAt: number | null;
+  statusChangedAt: number | null;
   lastPlayed: MediaSnapshot | null;
   sourceState: {
     jellyfin: ProviderStatus;
@@ -67,6 +68,7 @@ export const defaultMediaState: MediaState = {
   userName: null,
   isLiked: null,
   lastUpdatedAt: null,
+  statusChangedAt: null,
   lastPlayed: null,
   sourceState: {
     jellyfin: {

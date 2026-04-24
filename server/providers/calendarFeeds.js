@@ -25,17 +25,66 @@ function formatTimeLabel(date) {
   }).format(date);
 }
 
-function normalizeCalendarItem(summary, startDate) {
-  if (!summary || !startDate) {
+function formatDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function formatDateLabel(date) {
+  const now = new Date();
+  const tomorrow = new Date(now);
+  tomorrow.setDate(now.getDate() + 1);
+
+  const eventDateKey = formatDateKey(date);
+
+  if (eventDateKey === formatDateKey(now)) {
+    return "Vandaag";
+  }
+
+  if (eventDateKey === formatDateKey(tomorrow)) {
+    return "Morgen";
+  }
+
+  return new Intl.DateTimeFormat("nl-NL", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  }).format(date);
+}
+
+function isValidDate(date) {
+  return date instanceof Date && !Number.isNaN(date.getTime());
+}
+
+function normalizeCalendarItem(summary, startDate, endDate) {
+  if (!summary || !isValidDate(startDate)) {
     return null;
   }
+
+  const normalizedEndDate = isValidDate(endDate) && endDate > startDate
+    ? endDate
+    : null;
 
   return {
     id: `${summary}-${startDate.toISOString()}`,
     title: summary,
+    date: formatDateLabel(startDate),
     time: formatTimeLabel(startDate),
+    endTime: normalizedEndDate ? formatTimeLabel(normalizedEndDate) : undefined,
     startsAt: startDate.getTime(),
+    endsAt: normalizedEndDate ? normalizedEndDate.getTime() : undefined,
   };
+}
+
+function compareCalendarItemsByStart(a, b) {
+  if (a.startsAt !== b.startsAt) {
+    return a.startsAt - b.startsAt;
+  }
+
+  return a.title.localeCompare(b.title, "nl-NL");
 }
 
 async function fetchSingleFeed(url, windowStart, windowEnd) {
@@ -59,6 +108,7 @@ async function fetchSingleFeed(url, windowStart, windowEnd) {
       normalizeCalendarItem(
         event.summary,
         toJsDate(event.startDate),
+        toJsDate(event.endDate),
       ),
     )
     .filter(Boolean);
@@ -68,6 +118,7 @@ async function fetchSingleFeed(url, windowStart, windowEnd) {
       normalizeCalendarItem(
         occurrence.item?.summary,
         toJsDate(occurrence.startDate),
+        toJsDate(occurrence.endDate),
       ),
     )
     .filter(Boolean);
@@ -100,13 +151,17 @@ async function fetchMirrorAgenda() {
 
   const dedupedItems = Array.from(
     new Map(items.map((item) => [`${item.title}-${item.startsAt}`, item])).values(),
-  );
+  ).sort(compareCalendarItemsByStart);
 
   return {
     calendar: {
       items: dedupedItems.slice(0, 4).map((item) => ({
+        date: item.date,
         time: item.time,
+        endTime: item.endTime,
         title: item.title,
+        startsAt: item.startsAt,
+        endsAt: item.endsAt,
       })),
     },
   };

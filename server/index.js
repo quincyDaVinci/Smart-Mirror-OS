@@ -95,10 +95,14 @@ process.on("unhandledRejection", (reason) => {
 console.log("[boot] backend process starting");
 
 const HEARTBEAT_INTERVAL_MS = 25000;
-const NOW_PLAYING_POLL_INTERVAL_MS = 10000;
+const NOW_PLAYING_IDLE_POLL_INTERVAL_MS = 10000;
+const NOW_PLAYING_ACTIVE_POLL_INTERVAL_MS = 2500;
+const LYRICS_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const LYRICS_NOT_FOUND_CACHE_TTL_MS = 15 * 60 * 1000;
 
 const SPOTIFY_AUTHORIZE_URL = "https://accounts.spotify.com/authorize";
 const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
+const LRCLIB_GET_URL = "https://lrclib.net/api/get";
 const SPOTIFY_SCOPES = [
   "user-read-currently-playing",
   "user-read-playback-state",
@@ -107,6 +111,7 @@ const SPOTIFY_SCOPES = [
 const SPOTIFY_STATE_TTL_MS = 10 * 60 * 1000;
 
 const pendingSpotifyStates = new Map();
+const lyricsCache = new Map();
 
 function cleanupPendingSpotifyStates() {
   const now = Date.now();
@@ -271,6 +276,10 @@ const defaultState = {
     focusSetAt: null,
     focusUntil: null,
     mediaIdleSince: null,
+    mediaAutoFocusSuppressed: false,
+    mediaAutoFocusSuppressedAt: null,
+    mediaAutoFocusSuppressionSawActive: false,
+    mediaLyricsVisible: false,
   },
   deployment: {
     status: "idle",
@@ -300,6 +309,7 @@ const defaultState = {
     userName: null,
     isLiked: null,
     lastUpdatedAt: null,
+    statusChangedAt: null,
     lastPlayed: null,
     sourceState: {
       jellyfin: {
@@ -508,6 +518,23 @@ function normalizeDisplay(displayInput = {}) {
     mediaIdleSince: Number.isFinite(Number(displayInput.mediaIdleSince))
       ? Number(displayInput.mediaIdleSince)
       : null,
+    mediaAutoFocusSuppressed:
+      typeof displayInput.mediaAutoFocusSuppressed === "boolean"
+        ? displayInput.mediaAutoFocusSuppressed
+        : defaultState.display.mediaAutoFocusSuppressed,
+    mediaAutoFocusSuppressedAt: Number.isFinite(
+      Number(displayInput.mediaAutoFocusSuppressedAt),
+    )
+      ? Number(displayInput.mediaAutoFocusSuppressedAt)
+      : null,
+    mediaAutoFocusSuppressionSawActive:
+      typeof displayInput.mediaAutoFocusSuppressionSawActive === "boolean"
+        ? displayInput.mediaAutoFocusSuppressionSawActive
+        : defaultState.display.mediaAutoFocusSuppressionSawActive,
+    mediaLyricsVisible:
+      typeof displayInput.mediaLyricsVisible === "boolean"
+        ? displayInput.mediaLyricsVisible
+        : defaultState.display.mediaLyricsVisible,
   };
 
   if (!nextDisplay.focusedWidgetId) {
@@ -515,10 +542,18 @@ function normalizeDisplay(displayInput = {}) {
     nextDisplay.focusSetAt = null;
     nextDisplay.focusUntil = null;
     nextDisplay.mediaIdleSince = null;
+    nextDisplay.mediaLyricsVisible = false;
+  }
+
+  if (nextDisplay.focusedWidgetId !== "media") {
+    nextDisplay.mediaLyricsVisible = false;
   }
 
   if (nextDisplay.focusSource === "media-auto") {
     nextDisplay.focusedWidgetId = "media";
+    nextDisplay.mediaAutoFocusSuppressed = false;
+    nextDisplay.mediaAutoFocusSuppressedAt = null;
+    nextDisplay.mediaAutoFocusSuppressionSawActive = false;
   }
 
   return nextDisplay;
@@ -683,6 +718,7 @@ function normalizeMediaState(mediaInput = {}) {
     isLiked:
       typeof mediaInput.isLiked === "boolean" ? mediaInput.isLiked : null,
     lastUpdatedAt: normalizeOptionalTimestamp(mediaInput.lastUpdatedAt),
+    statusChangedAt: normalizeOptionalTimestamp(mediaInput.statusChangedAt),
     lastPlayed: normalizeMediaSnapshot(mediaInput.lastPlayed),
     sourceState: {
       jellyfin: normalizeProviderRuntimeStatus(
@@ -850,7 +886,8 @@ function setFocusedWidget(
     focusSource === "media-auto" ? "media-auto" : "manual";
   const normalizedWidgetId =
     normalizedSource === "media-auto" ? "media" : widgetId;
-  const nextFocusUntil = now + getFocusIdleTimeoutMs();
+  const nextFocusUntil =
+    normalizedSource === "media-auto" ? null : now + getFocusIdleTimeoutMs();
 
   const changed =
     state.display.focusedWidgetId !== normalizedWidgetId ||
@@ -863,6 +900,11 @@ function setFocusedWidget(
     focusSetAt: now,
     focusUntil: nextFocusUntil,
     mediaIdleSince: null,
+    mediaAutoFocusSuppressed: false,
+    mediaAutoFocusSuppressedAt: null,
+    mediaAutoFocusSuppressionSawActive: false,
+    mediaLyricsVisible:
+      normalizedWidgetId === "media" ? state.display.mediaLyricsVisible : false,
     reason,
     updatedAt: now,
   };
@@ -879,12 +921,19 @@ function setFocusedWidget(
   return true;
 }
 
-function clearFocusedWidget(reason = "focus:clear") {
+function clearFocusedWidget(reason = "focus:clear", options = {}) {
   if (!state.display.focusedWidgetId && !state.display.focusSource) {
     return false;
   }
 
   const previousWidgetId = state.display.focusedWidgetId;
+  const now = Date.now();
+  const mediaIsCurrentlyActive =
+    (state.media.status === "playing" || state.media.status === "paused") &&
+    isMediaPlayableSource(state.media);
+  const shouldSuppressMediaAutoFocus =
+    options.suppressMediaAutoFocus === true &&
+    previousWidgetId === "media";
 
   state.display = {
     ...state.display,
@@ -893,8 +942,14 @@ function clearFocusedWidget(reason = "focus:clear") {
     focusSetAt: null,
     focusUntil: null,
     mediaIdleSince: null,
+    mediaAutoFocusSuppressed: shouldSuppressMediaAutoFocus,
+    mediaAutoFocusSuppressedAt: shouldSuppressMediaAutoFocus ? now : null,
+    mediaAutoFocusSuppressionSawActive:
+      shouldSuppressMediaAutoFocus &&
+      (mediaIsCurrentlyActive || state.display.focusSource === "media-auto"),
+    mediaLyricsVisible: false,
     reason,
-    updatedAt: Date.now(),
+    updatedAt: now,
   };
 
   appendLog(
@@ -907,14 +962,95 @@ function clearFocusedWidget(reason = "focus:clear") {
   return true;
 }
 
+function setMediaLyricsVisible(visible, reason = "lyrics:toggle") {
+  const nextVisible =
+    visible === true &&
+    state.display.focusedWidgetId === "media" &&
+    state.media.kind === "track" &&
+    (state.media.status === "playing" || state.media.status === "paused");
+
+  const changed = state.display.mediaLyricsVisible !== nextVisible;
+
+  state.display = {
+    ...state.display,
+    mediaLyricsVisible: nextVisible,
+    reason,
+    updatedAt: Date.now(),
+  };
+
+  if (changed) {
+    appendLog(
+      "info",
+      "focus",
+      "Media lyrics zichtbaarheid gewijzigd",
+      nextVisible ? "aan" : "uit",
+    );
+  }
+
+  return true;
+}
+
 function reconcileFocusState(trigger = "focus:tick") {
   const now = Date.now();
   const focusedWidgetId = state.display.focusedWidgetId;
   const mediaIsPlaying =
     state.media.status === "playing" && isMediaPlayableSource(state.media);
+  const mediaIsActive =
+    (state.media.status === "playing" || state.media.status === "paused") &&
+    isMediaPlayableSource(state.media);
+
+  if (state.display.mediaAutoFocusSuppressed && mediaIsActive) {
+    if (!state.display.mediaAutoFocusSuppressionSawActive) {
+      state.display = {
+        ...state.display,
+        mediaAutoFocusSuppressionSawActive: true,
+        reason: "focus:media-auto-suppression-active",
+        updatedAt: now,
+      };
+
+      return true;
+    }
+
+    return false;
+  }
+
+  if (
+    state.display.mediaAutoFocusSuppressed &&
+    state.display.mediaAutoFocusSuppressionSawActive &&
+    !mediaIsActive
+  ) {
+    state.display = {
+      ...state.display,
+      mediaAutoFocusSuppressed: false,
+      mediaAutoFocusSuppressedAt: null,
+      mediaAutoFocusSuppressionSawActive: false,
+      reason: "focus:media-auto-suppression-cleared",
+      updatedAt: now,
+    };
+
+    return true;
+  }
+
+  if (
+    state.display.mediaAutoFocusSuppressed &&
+    !state.display.mediaAutoFocusSuppressionSawActive &&
+    state.display.mediaAutoFocusSuppressedAt !== null &&
+    now - state.display.mediaAutoFocusSuppressedAt >= getFocusIdleTimeoutMs()
+  ) {
+    state.display = {
+      ...state.display,
+      mediaAutoFocusSuppressed: false,
+      mediaAutoFocusSuppressedAt: null,
+      mediaAutoFocusSuppressionSawActive: false,
+      reason: "focus:media-auto-suppression-expired",
+      updatedAt: now,
+    };
+
+    return true;
+  }
 
   if (!focusedWidgetId) {
-    if (mediaIsPlaying) {
+    if (mediaIsPlaying && !state.display.mediaAutoFocusSuppressed) {
       const didChange = setFocusedWidget(
         "media",
         "media-auto",
@@ -941,10 +1077,14 @@ function reconcileFocusState(trigger = "focus:tick") {
 
   if (state.display.focusSource === "media-auto") {
     if (state.media.status === "playing") {
-      if (state.display.mediaIdleSince !== null) {
+      if (
+        state.display.mediaIdleSince !== null ||
+        state.display.focusUntil !== null
+      ) {
         state.display = {
           ...state.display,
           mediaIdleSince: null,
+          focusUntil: null,
           reason: "focus:media-resumed",
           updatedAt: now,
         };
@@ -955,15 +1095,17 @@ function reconcileFocusState(trigger = "focus:tick") {
       return false;
     }
 
-    if (state.media.status === "paused") {
-      return false;
-    }
-
     if (state.display.mediaIdleSince === null) {
+      const nextFocusUntil = now + getFocusIdleTimeoutMs();
+
       state.display = {
         ...state.display,
         mediaIdleSince: now,
-        reason: "focus:media-idle",
+        focusUntil: nextFocusUntil,
+        reason:
+          state.media.status === "paused"
+            ? "focus:media-paused"
+            : "focus:media-idle",
         updatedAt: now,
       };
 
@@ -972,8 +1114,11 @@ function reconcileFocusState(trigger = "focus:tick") {
 
     const elapsedMs = now - state.display.mediaIdleSince;
 
-    if (elapsedMs >= getMediaFocusExitDelayMs()) {
-      return clearFocusedWidget("focus:media-idle-timeout");
+    if (
+      elapsedMs >= getFocusIdleTimeoutMs() ||
+      (state.display.focusUntil !== null && now >= state.display.focusUntil)
+    ) {
+      return clearFocusedWidget("focus:media-timeout");
     }
 
     return false;
@@ -989,6 +1134,20 @@ function reconcileFocusState(trigger = "focus:tick") {
 function updateRuntimeMedia(nextMedia) {
   const normalizedMedia = normalizeMediaState(nextMedia);
   const previousLastPlayed = state.media.lastPlayed;
+  const statusContextChanged =
+    state.media.status !== normalizedMedia.status ||
+    state.media.source !== normalizedMedia.source ||
+    state.media.kind !== normalizedMedia.kind ||
+    state.media.title !== normalizedMedia.title ||
+    state.media.subtitle !== normalizedMedia.subtitle ||
+    state.media.artworkUrl !== normalizedMedia.artworkUrl;
+
+  normalizedMedia.statusChangedAt = statusContextChanged
+    ? (normalizedMedia.lastUpdatedAt ?? Date.now())
+    : (state.media.statusChangedAt ??
+      state.media.lastUpdatedAt ??
+      normalizedMedia.lastUpdatedAt ??
+      Date.now());
 
   if (
     normalizedMedia.status === "playing" ||
@@ -1038,18 +1197,17 @@ function buildResolvedMedia({
     spotify: spotifyStatus,
   };
 
-  if (jellyfinMedia) {
-    return {
-      ...defaultState.media,
-      ...jellyfinMedia,
-      sourceState,
-    };
-  }
+  const resolvedMedia =
+    jellyfinMedia?.status === "playing"
+      ? jellyfinMedia
+      : spotifyMedia?.status === "playing"
+        ? spotifyMedia
+        : (jellyfinMedia ?? spotifyMedia);
 
-  if (spotifyMedia) {
+  if (resolvedMedia) {
     return {
       ...defaultState.media,
-      ...spotifyMedia,
+      ...resolvedMedia,
       sourceState,
     };
   }
@@ -1067,6 +1225,168 @@ function buildProviderErrorStatus(message) {
     message,
     lastCheckedAt: Date.now(),
   };
+}
+
+function normalizeLyricsQueryValue(value) {
+  return typeof value === "string" ? value.trim().slice(0, 180) : "";
+}
+
+function getLyricsCacheKey({ trackName, artistName, albumName, durationSeconds }) {
+  return JSON.stringify({
+    trackName: trackName.toLowerCase(),
+    artistName: artistName.toLowerCase(),
+    albumName: albumName.toLowerCase(),
+    durationSeconds,
+  });
+}
+
+function pruneLyricsCache() {
+  const now = Date.now();
+
+  for (const [key, entry] of lyricsCache.entries()) {
+    if (!entry || entry.expiresAt <= now) {
+      lyricsCache.delete(key);
+    }
+  }
+}
+
+async function fetchLyricsFromLrclib({
+  trackName,
+  artistName,
+  albumName,
+  durationMs,
+}) {
+  const normalizedTrackName = normalizeLyricsQueryValue(trackName);
+  const normalizedArtistName = normalizeLyricsQueryValue(artistName);
+  const normalizedAlbumName = normalizeLyricsQueryValue(albumName);
+  const parsedDurationMs = Number(durationMs);
+  const durationSeconds =
+    Number.isFinite(parsedDurationMs) && parsedDurationMs > 0
+      ? Math.round(parsedDurationMs / 1000)
+      : null;
+
+  if (!normalizedTrackName || !normalizedArtistName) {
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        error: "trackName en artistName zijn verplicht.",
+      },
+    };
+  }
+
+  pruneLyricsCache();
+
+  const cacheKey = getLyricsCacheKey({
+    trackName: normalizedTrackName,
+    artistName: normalizedArtistName,
+    albumName: normalizedAlbumName,
+    durationSeconds,
+  });
+  const cachedEntry = lyricsCache.get(cacheKey);
+
+  if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+    return {
+      status: 200,
+      body: cachedEntry.body,
+    };
+  }
+
+  const url = new URL(LRCLIB_GET_URL);
+  url.searchParams.set("track_name", normalizedTrackName);
+  url.searchParams.set("artist_name", normalizedArtistName);
+
+  if (normalizedAlbumName) {
+    url.searchParams.set("album_name", normalizedAlbumName);
+  }
+
+  if (durationSeconds !== null) {
+    url.searchParams.set("duration", String(durationSeconds));
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+  }, 5000);
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent": "Smart-Mirror-OS/0.0.0 (lyrics lookup)",
+      },
+      signal: controller.signal,
+    });
+
+    if (response.status === 404) {
+      const body = {
+        ok: true,
+        lyrics: null,
+        message: "Geen lyrics gevonden.",
+      };
+
+      lyricsCache.set(cacheKey, {
+        body,
+        expiresAt: Date.now() + LYRICS_NOT_FOUND_CACHE_TTL_MS,
+      });
+
+      return { status: 200, body };
+    }
+
+    if (!response.ok) {
+      return {
+        status: response.status,
+        body: {
+          ok: false,
+          error: `LRCLIB gaf status ${response.status}.`,
+        },
+      };
+    }
+
+    const payload = await response.json();
+    const body = {
+      ok: true,
+      lyrics: {
+        trackName:
+          typeof payload.trackName === "string"
+            ? payload.trackName
+            : normalizedTrackName,
+        artistName:
+          typeof payload.artistName === "string"
+            ? payload.artistName
+            : normalizedArtistName,
+        albumName:
+          typeof payload.albumName === "string"
+            ? payload.albumName
+            : normalizedAlbumName,
+        instrumental: payload.instrumental === true,
+        plainLyrics:
+          typeof payload.plainLyrics === "string" ? payload.plainLyrics : null,
+        syncedLyrics:
+          typeof payload.syncedLyrics === "string" ? payload.syncedLyrics : null,
+      },
+    };
+
+    lyricsCache.set(cacheKey, {
+      body,
+      expiresAt: Date.now() + LYRICS_CACHE_TTL_MS,
+    });
+
+    return { status: 200, body };
+  } catch (error) {
+    return {
+      status: error?.name === "AbortError" ? 504 : 500,
+      body: {
+        ok: false,
+        error:
+          error?.name === "AbortError"
+            ? "Lyrics ophalen duurde te lang."
+            : "Lyrics ophalen mislukt.",
+      },
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 async function pollNowPlayingProviders() {
@@ -1106,6 +1426,17 @@ async function pollNowPlayingProviders() {
 }
 
 let nowPlayingPollInFlight = false;
+let nowPlayingPollTimeout = null;
+
+function getNowPlayingPollIntervalMs() {
+  const mediaIsActive =
+    (state.media.status === "playing" || state.media.status === "paused") &&
+    isMediaPlayableSource(state.media);
+
+  return mediaIsActive || state.display.focusedWidgetId === "media"
+    ? NOW_PLAYING_ACTIVE_POLL_INTERVAL_MS
+    : NOW_PLAYING_IDLE_POLL_INTERVAL_MS;
+}
 
 async function runNowPlayingPollTick(trigger = "interval") {
   if (nowPlayingPollInFlight) {
@@ -1130,6 +1461,16 @@ async function runNowPlayingPollTick(trigger = "interval") {
   } finally {
     nowPlayingPollInFlight = false;
   }
+}
+
+function scheduleNextNowPlayingPoll() {
+  if (nowPlayingPollTimeout) {
+    clearTimeout(nowPlayingPollTimeout);
+  }
+
+  nowPlayingPollTimeout = setTimeout(() => {
+    void runNowPlayingPollTick("interval").finally(scheduleNextNowPlayingPoll);
+  }, getNowPlayingPollIntervalMs());
 }
 
 async function checkForDeploymentUpdate() {
@@ -1366,14 +1707,11 @@ function updateDisplayState(reason = "system") {
 
 function startBackgroundJobs() {
   console.log("[boot] starting now playing polling", {
-    intervalMs: NOW_PLAYING_POLL_INTERVAL_MS,
+    idleIntervalMs: NOW_PLAYING_IDLE_POLL_INTERVAL_MS,
+    activeIntervalMs: NOW_PLAYING_ACTIVE_POLL_INTERVAL_MS,
   });
 
-  void runNowPlayingPollTick("boot");
-
-  setInterval(() => {
-    void runNowPlayingPollTick("interval");
-  }, NOW_PLAYING_POLL_INTERVAL_MS);
+  void runNowPlayingPollTick("boot").finally(scheduleNextNowPlayingPoll);
 }
 
 console.log("[boot] registering presence timeout interval");
@@ -1565,7 +1903,17 @@ function handleClientMessage(message) {
   }
 
   if (message.type === "display:focus:clear") {
-    clearFocusedWidget("focus:manual-clear");
+    clearFocusedWidget("focus:manual-clear", {
+      suppressMediaAutoFocus: true,
+    });
+    persistAndBroadcast();
+    return true;
+  }
+
+  if (message.type === "display:media-lyrics") {
+    const { visible } = message.payload ?? {};
+
+    setMediaLyricsVisible(visible === true, "lyrics:remote");
     persistAndBroadcast();
     return true;
   }
@@ -2050,6 +2398,17 @@ app.get("/health", (_req, res) => {
 console.log("[boot] registering state route");
 app.get("/state", (_req, res) => {
   res.json(state);
+});
+
+app.get("/media/lyrics", async (req, res) => {
+  const result = await fetchLyricsFromLrclib({
+    trackName: req.query.trackName,
+    artistName: req.query.artistName,
+    albumName: req.query.albumName,
+    durationMs: req.query.durationMs,
+  });
+
+  res.status(result.status).json(result.body);
 });
 
 console.log("[boot] registering action route");

@@ -184,6 +184,10 @@ export function useMirrorSocket() {
     focusSetAt: null,
     focusUntil: null,
     mediaIdleSince: null,
+    mediaAutoFocusSuppressed: false,
+    mediaAutoFocusSuppressedAt: null,
+    mediaAutoFocusSuppressionSawActive: false,
+    mediaLyricsVisible: false,
   });
   const [deployment, setDeployment] = useState<DeploymentState>({
     status: "idle",
@@ -779,6 +783,13 @@ export function useMirrorSocket() {
     });
   }
 
+  function setMediaLyricsVisible(visible: boolean) {
+    void sendAction({
+      type: "display:media-lyrics",
+      payload: { visible },
+    });
+  }
+
   function simulateMotion() {
     void sendAction({
       type: "presence:motion",
@@ -818,6 +829,7 @@ export function useMirrorSocket() {
     updateSettings,
     focusWidget,
     clearWidgetFocus,
+    setMediaLyricsVisible,
     simulateMotion,
     resetIdleTimer,
     checkDeploymentUpdate,
