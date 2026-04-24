@@ -1536,3 +1536,50 @@ button:disabled {
   color: var(--text-tertiary);
   letter-spacing: 0.06em;
 }
+
+.mirror-main-media__status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.mirror-main-media__status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.72rem;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.mirror-main-media__status-pill--live {
+  border-color: rgba(140, 231, 255, 0.22);
+  background: rgba(140, 231, 255, 0.08);
+  color: var(--accent-cyan);
+}
+
+.mirror-main-media__status-pill--paused {
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.mirror-main-media__status-pill--stale {
+  border-color: rgba(255, 196, 107, 0.22);
+  background: rgba(255, 196, 107, 0.08);
+  color: var(--accent-amber);
+}
+
+.mirror-main-media__message {
+  margin: 10px 0 0;
+  font-size: 0.9rem;
+  color: var(--text-tertiary);
+}

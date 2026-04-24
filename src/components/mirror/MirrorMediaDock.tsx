@@ -50,26 +50,26 @@ function isSameTrackAsCurrent(media: MediaState) {
   );
 }
 
+function getProviderMessage(media: MediaState, source: MediaState["source"]) {
+  if (source === "spotify") {
+    return media.sourceState.spotify.message;
+  }
+
+  if (source === "jellyfin") {
+    return media.sourceState.jellyfin.message;
+  }
+
+  return null;
+}
+
 export function MirrorMediaDock({ media }: MirrorMediaDockProps) {
   const [nowMs, setNowMs] = useState(Date.now());
 
-  useEffect(() => {
-    if (!isSameTrackAsCurrent(media) || media.progressMs === null) {
-      return;
-    }
+  const hasLiveMedia =
+    media.source !== null &&
+    (media.status === "playing" || media.status === "paused");
 
-    setNowMs(Date.now());
-
-    const intervalId = window.setInterval(() => {
-      setNowMs(Date.now());
-    }, 250);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [media]);
-
-  const displayMedia = media.lastPlayed ?? {
+  const currentMedia = {
     source: media.source,
     kind: media.kind,
     title: media.title,
@@ -83,18 +83,47 @@ export function MirrorMediaDock({ media }: MirrorMediaDockProps) {
     deviceName: media.deviceName,
     userName: media.userName,
     isLiked: media.isLiked,
-    capturedAt: Date.now(),
+    capturedAt: media.lastUpdatedAt ?? Date.now(),
   };
 
+  const displayMedia = hasLiveMedia
+    ? currentMedia
+    : (media.lastPlayed ?? currentMedia);
+
+  const isStaleLastPlayed = !hasLiveMedia && media.lastPlayed !== null;
+
+  useEffect(() => {
+    if (!hasLiveMedia || media.progressMs === null) {
+      return;
+    }
+
+    setNowMs(Date.now());
+
+    const intervalId = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 250);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [hasLiveMedia, media.progressMs, media.lastUpdatedAt, media.status]);
+
   const liveProgressMs = useMemo(() => {
-    return isSameTrackAsCurrent(media) ? getLiveProgressMs(media, nowMs) : null;
-  }, [media, nowMs]);
+    if (!hasLiveMedia) {
+      return null;
+    }
+
+    return getLiveProgressMs(media, nowMs);
+  }, [hasLiveMedia, media, nowMs]);
 
   const progressPercentage =
     liveProgressMs !== null &&
     displayMedia.durationMs !== null &&
     displayMedia.durationMs > 0
-      ? Math.min(100, Math.max(0, (liveProgressMs / displayMedia.durationMs) * 100))
+      ? Math.min(
+          100,
+          Math.max(0, (liveProgressMs / displayMedia.durationMs) * 100),
+        )
       : 0;
 
   const progressLabel =
@@ -102,11 +131,34 @@ export function MirrorMediaDock({ media }: MirrorMediaDockProps) {
       ? `${formatTime(liveProgressMs)} / ${formatTime(displayMedia.durationMs)}`
       : null;
 
+  const sourceLabel =
+    displayMedia.source === "spotify"
+      ? "Spotify"
+      : displayMedia.source === "jellyfin"
+        ? "Jellyfin"
+        : "Media";
+
+  const stateLabel = isStaleLastPlayed
+    ? "Last played"
+    : media.status === "playing"
+      ? "Now playing"
+      : media.status === "paused"
+        ? "Paused"
+        : null;
+
+  const providerMessage = getProviderMessage(media, displayMedia.source);
+
   const isIdle =
-    !displayMedia.title || displayMedia.title === "Geen media actief";
+    !hasLiveMedia &&
+    !media.lastPlayed &&
+    (!displayMedia.title || displayMedia.title === "Geen media actief");
+
+  const showProgress = !isStaleLastPlayed && progressLabel !== null;
 
   return (
-    <section className={`mirror-main-media ${isIdle ? "mirror-main-media--idle" : ""}`}>
+    <section
+      className={`mirror-main-media ${isIdle ? "mirror-main-media--idle" : ""}`}
+    >
       <div className="mirror-main-media__art">
         {displayMedia.artworkUrl ? (
           <img
@@ -120,6 +172,24 @@ export function MirrorMediaDock({ media }: MirrorMediaDockProps) {
       </div>
 
       <div className="mirror-main-media__meta">
+        <div className="mirror-main-media__status-row">
+          <span className="mirror-main-media__status-pill">{sourceLabel}</span>
+
+          {stateLabel ? (
+            <span
+              className={`mirror-main-media__status-pill ${
+                isStaleLastPlayed
+                  ? "mirror-main-media__status-pill--stale"
+                  : media.status === "playing"
+                    ? "mirror-main-media__status-pill--live"
+                    : "mirror-main-media__status-pill--paused"
+              }`}
+            >
+              {stateLabel}
+            </span>
+          ) : null}
+        </div>
+
         <div className="mirror-main-media__title-row">
           <h2 className="mirror-main-media__title">{displayMedia.title}</h2>
 
@@ -139,21 +209,29 @@ export function MirrorMediaDock({ media }: MirrorMediaDockProps) {
         <p className="mirror-main-media__artist">{displayMedia.subtitle}</p>
 
         {displayMedia.secondaryText ? (
-          <p className="mirror-main-media__album">{displayMedia.secondaryText}</p>
+          <p className="mirror-main-media__album">
+            {displayMedia.secondaryText}
+          </p>
         ) : null}
 
-        <div className="mirror-main-media__progress">
-          <div className="mirror-main-media__progress-track">
-            <div
-              className="mirror-main-media__progress-fill"
-              style={{ width: `${progressPercentage}%` }}
-            />
-          </div>
+        {showProgress ? (
+          <div className="mirror-main-media__progress">
+            <div className="mirror-main-media__progress-track">
+              <div
+                className="mirror-main-media__progress-fill"
+                style={{ width: `${progressPercentage}%` }}
+              />
+            </div>
 
-          {progressLabel ? (
-            <div className="mirror-main-media__progress-label">{progressLabel}</div>
-          ) : null}
-        </div>
+            <div className="mirror-main-media__progress-label">
+              {progressLabel}
+            </div>
+          </div>
+        ) : null}
+
+        {isStaleLastPlayed && providerMessage ? (
+          <p className="mirror-main-media__message">{providerMessage}</p>
+        ) : null}
       </div>
     </section>
   );
