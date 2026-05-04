@@ -324,6 +324,61 @@ export function AdminPage({
             />
           </label>
 
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+              gap: "0.75rem",
+              marginBottom: "1rem",
+            }}
+          >
+            {(
+              [
+                {
+                  label: "Boven",
+                  key: "layoutPaddingTopPx",
+                  value: settings.layoutPaddingTopPx,
+                },
+                {
+                  label: "Rechts",
+                  key: "layoutPaddingRightPx",
+                  value: settings.layoutPaddingRightPx,
+                },
+                {
+                  label: "Onder",
+                  key: "layoutPaddingBottomPx",
+                  value: settings.layoutPaddingBottomPx,
+                },
+                {
+                  label: "Links",
+                  key: "layoutPaddingLeftPx",
+                  value: settings.layoutPaddingLeftPx,
+                },
+              ] as const
+            ).map(({ label, key, value }) => (
+              <label key={key} style={{ display: "block" }}>
+                {label} padding ({value}px)
+                <input
+                  type="range"
+                  min={0}
+                  max={160}
+                  step={2}
+                  value={Number(value)}
+                  onChange={(event) => {
+                    onUpdateSettings({
+                      [key]: Number(event.target.value),
+                    } as Partial<MirrorSettings>);
+                  }}
+                  style={{
+                    display: "block",
+                    marginTop: "0.5rem",
+                    width: "100%",
+                  }}
+                />
+              </label>
+            ))}
+          </div>
+
           <label style={{ display: "block" }}>
             Widget spacing ({settings.widgetGapPx}px)
             <input

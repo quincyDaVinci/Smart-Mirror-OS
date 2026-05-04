@@ -258,6 +258,10 @@ const defaultState = {
     sleepTimeoutSeconds: 180,
     showStatusBar: true,
     layoutPaddingPx: 32,
+    layoutPaddingTopPx: 32,
+    layoutPaddingRightPx: 32,
+    layoutPaddingBottomPx: 32,
+    layoutPaddingLeftPx: 32,
     widgetGapPx: 16,
     zoomPercent: 100,
     focusIdleTimeoutSeconds: 45,
@@ -348,6 +352,10 @@ function normalizeSettings(input = {}) {
     autoSleepEnabled,
     showStatusBar,
     layoutPaddingPx,
+    layoutPaddingTopPx,
+    layoutPaddingRightPx,
+    layoutPaddingBottomPx,
+    layoutPaddingLeftPx,
     widgetGapPx,
     zoomPercent,
     focusIdleTimeoutSeconds,
@@ -385,6 +393,30 @@ function normalizeSettings(input = {}) {
       0,
       96,
       defaultState.settings.layoutPaddingPx,
+    ),
+    layoutPaddingTopPx: clampNumber(
+      layoutPaddingTopPx ?? layoutPaddingPx,
+      0,
+      160,
+      defaultState.settings.layoutPaddingTopPx,
+    ),
+    layoutPaddingRightPx: clampNumber(
+      layoutPaddingRightPx ?? layoutPaddingPx,
+      0,
+      160,
+      defaultState.settings.layoutPaddingRightPx,
+    ),
+    layoutPaddingBottomPx: clampNumber(
+      layoutPaddingBottomPx ?? layoutPaddingPx,
+      0,
+      160,
+      defaultState.settings.layoutPaddingBottomPx,
+    ),
+    layoutPaddingLeftPx: clampNumber(
+      layoutPaddingLeftPx ?? layoutPaddingPx,
+      0,
+      160,
+      defaultState.settings.layoutPaddingLeftPx,
     ),
     widgetGapPx: clampNumber(
       widgetGapPx,
@@ -1227,6 +1259,61 @@ function buildProviderErrorStatus(message) {
   };
 }
 
+function createCurrentMediaFallback(source) {
+  if (
+    state.media.source !== source ||
+    (state.media.status !== "playing" && state.media.status !== "paused")
+  ) {
+    return null;
+  }
+
+  const now = Date.now();
+  let progressMs = state.media.progressMs;
+
+  if (
+    state.media.status === "playing" &&
+    progressMs !== null &&
+    state.media.lastUpdatedAt !== null
+  ) {
+    progressMs += Math.max(0, now - state.media.lastUpdatedAt);
+
+    if (state.media.durationMs !== null) {
+      progressMs = Math.min(progressMs, state.media.durationMs);
+    }
+  }
+
+  return {
+    status: state.media.status,
+    source: state.media.source,
+    kind: state.media.kind,
+    title: state.media.title,
+    subtitle: state.media.subtitle,
+    secondaryText: state.media.secondaryText,
+    productionYear: state.media.productionYear,
+    genres: [...state.media.genres],
+    communityRating: state.media.communityRating,
+    artworkUrl: state.media.artworkUrl,
+    progressMs,
+    durationMs: state.media.durationMs,
+    deviceName: state.media.deviceName,
+    userName: state.media.userName,
+    isLiked: state.media.isLiked,
+    lastUpdatedAt: now,
+  };
+}
+
+function shouldKeepPreviousSpotifyMedia(providerStatus) {
+  if (!providerStatus) {
+    return false;
+  }
+
+  return (
+    providerStatus.status === "error" ||
+    (typeof providerStatus.message === "string" &&
+      providerStatus.message.startsWith("Spotify rate-limited"))
+  );
+}
+
 function normalizeLyricsQueryValue(value) {
   return typeof value === "string" ? value.trim().slice(0, 180) : "";
 }
@@ -1307,7 +1394,7 @@ async function fetchLyricsFromLrclib({
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
     controller.abort();
-  }, 5000);
+  }, 12000);
 
   try {
     const response = await fetch(url, {
@@ -1412,6 +1499,16 @@ async function pollNowPlayingProviders() {
     spotifyResult = {
       media: null,
       providerStatus: buildProviderErrorStatus("Spotify polling mislukt."),
+    };
+  }
+
+  if (
+    !spotifyResult.media &&
+    shouldKeepPreviousSpotifyMedia(spotifyResult.providerStatus)
+  ) {
+    spotifyResult = {
+      ...spotifyResult,
+      media: createCurrentMediaFallback("spotify"),
     };
   }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MediaState } from "../../types/media";
 import { getWebSocketUrl } from "../../utils/getWebSocketUrl";
 
@@ -36,6 +36,7 @@ type LyricLine = {
 };
 
 const PAUSED_RECENTLY_PLAYED_AFTER_MS = 45 * 1000;
+const LYRICS_AUTO_HIDE_AFTER_MS = 3500;
 
 function getApiBaseUrl() {
   const url = new URL(getWebSocketUrl());
@@ -74,6 +75,25 @@ function getLiveProgressMs(media: MediaState, nowMs: number) {
   }
 
   return nextProgressMs;
+}
+
+function getAnchoredProgressMs(
+  anchor: { progressMs: number | null; capturedAt: number; status: string },
+  durationMs: number | null,
+  nowMs: number,
+) {
+  if (anchor.progressMs === null) {
+    return null;
+  }
+
+  if (anchor.status !== "playing") {
+    return anchor.progressMs;
+  }
+
+  const elapsedMs = Math.max(0, nowMs - anchor.capturedAt);
+  const nextProgressMs = anchor.progressMs + elapsedMs;
+
+  return durationMs !== null ? Math.min(nextProgressMs, durationMs) : nextProgressMs;
 }
 
 function formatClockTime(timestampMs: number) {
@@ -260,6 +280,15 @@ export function MirrorMediaDock({
     lyrics: null,
     message: null,
   });
+  const [lyricsSuppressedKey, setLyricsSuppressedKey] = useState<string | null>(
+    null,
+  );
+  const progressAnchorRef = useRef<{
+    key: string;
+    progressMs: number | null;
+    capturedAt: number;
+    status: string;
+  } | null>(null);
 
   const hasLiveMedia =
     media.source !== null &&
@@ -285,6 +314,13 @@ export function MirrorMediaDock({
   const displayMedia = hasLiveMedia
     ? currentMedia
     : (media.lastPlayed ?? currentMedia);
+  const mediaProgressKey = [
+    displayMedia.source,
+    displayMedia.kind,
+    displayMedia.title,
+    displayMedia.subtitle,
+    displayMedia.durationMs ?? "",
+  ].join("\n");
 
   const pausedDurationMs =
     media.status === "paused" && media.statusChangedAt !== null
@@ -313,12 +349,61 @@ export function MirrorMediaDock({
     };
   }, [hasLiveMedia, media.progressMs, media.lastUpdatedAt, media.status]);
 
+  useEffect(() => {
+    const incomingProgressMs = media.progressMs;
+    const now = Date.now();
+    const previousAnchor = progressAnchorRef.current;
+    const previousProgressMs = previousAnchor
+      ? getAnchoredProgressMs(previousAnchor, media.durationMs, now)
+      : null;
+
+    if (!hasLiveMedia || incomingProgressMs === null) {
+      progressAnchorRef.current = {
+        key: mediaProgressKey,
+        progressMs: incomingProgressMs,
+        capturedAt: media.lastUpdatedAt ?? now,
+        status: media.status,
+      };
+      return;
+    }
+
+    const isSameMedia = previousAnchor?.key === mediaProgressKey;
+    const shouldKeepPredictedProgress =
+      isSameMedia &&
+      media.status === "playing" &&
+      previousProgressMs !== null &&
+      incomingProgressMs < previousProgressMs &&
+      previousProgressMs - incomingProgressMs < 4500;
+
+    progressAnchorRef.current = {
+      key: mediaProgressKey,
+      progressMs: shouldKeepPredictedProgress
+        ? previousProgressMs
+        : incomingProgressMs,
+      capturedAt: shouldKeepPredictedProgress ? now : (media.lastUpdatedAt ?? now),
+      status: media.status,
+    };
+  }, [
+    hasLiveMedia,
+    media.progressMs,
+    media.lastUpdatedAt,
+    media.status,
+    media.durationMs,
+    mediaProgressKey,
+  ]);
+
   const liveProgressMs = useMemo(() => {
     if (!hasLiveMedia) {
       return null;
     }
 
-    return getLiveProgressMs(media, nowMs);
+    const anchor = progressAnchorRef.current;
+
+    if (!anchor) {
+      return getLiveProgressMs(media, nowMs);
+    }
+
+    return getAnchoredProgressMs(anchor, media.durationMs, nowMs);
   }, [hasLiveMedia, media, nowMs]);
 
   const progressPercentage =
@@ -386,7 +471,7 @@ export function MirrorMediaDock({
   );
   const detailPills = isVideo ? videoDetailPills : [];
   const showStatusRow = variant !== "focus" && stateLabel !== null;
-  const lyricsEnabled =
+  const requestedLyricsEnabled =
     variant === "focus" &&
     showLyrics &&
     displayMedia.kind === "track" &&
@@ -397,6 +482,23 @@ export function MirrorMediaDock({
     displayMedia.secondaryText,
     displayMedia.durationMs ?? "",
   ].join("\n");
+  const lyricsEnabled =
+    requestedLyricsEnabled && lyricsSuppressedKey !== lyricsQueryKey;
+  const showLikedState =
+    displayMedia.source === "spotify" &&
+    displayMedia.kind === "track" &&
+    displayMedia.isLiked !== null;
+
+  useEffect(() => {
+    if (!requestedLyricsEnabled) {
+      setLyricsSuppressedKey(null);
+      return;
+    }
+
+    setLyricsSuppressedKey((currentKey) =>
+      currentKey !== null && currentKey !== lyricsQueryKey ? null : currentKey,
+    );
+  }, [requestedLyricsEnabled, lyricsQueryKey]);
 
   useEffect(() => {
     if (!lyricsEnabled) {
@@ -490,6 +592,37 @@ export function MirrorMediaDock({
     [lyricLines, activeLyricIndex],
   );
 
+  useEffect(() => {
+    if (!requestedLyricsEnabled || !lyricsEnabled) {
+      return;
+    }
+
+    const lyricsUnavailable =
+      lyricsState.status === "error" ||
+      (lyricsState.status === "ready" &&
+        (lyricsState.lyrics?.instrumental === true ||
+          visibleLyricLines.length === 0));
+
+    if (!lyricsUnavailable) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setLyricsSuppressedKey(lyricsQueryKey);
+    }, LYRICS_AUTO_HIDE_AFTER_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [
+    requestedLyricsEnabled,
+    lyricsEnabled,
+    lyricsQueryKey,
+    lyricsState.status,
+    lyricsState.lyrics,
+    visibleLyricLines.length,
+  ]);
+
   const className = [
     "mirror-main-media",
     `mirror-main-media--${variant}`,
@@ -553,6 +686,18 @@ export function MirrorMediaDock({
         {displayMedia.secondaryText ? (
           <p className="mirror-main-media__album">
             {displayMedia.secondaryText}
+          </p>
+        ) : null}
+
+        {showLikedState ? (
+          <p
+            className={`mirror-main-media__liked-state ${
+              displayMedia.isLiked
+                ? "mirror-main-media__liked-state--active"
+                : ""
+            }`}
+          >
+            {displayMedia.isLiked ? "Geliked in Spotify" : "Niet geliked"}
           </p>
         ) : null}
 

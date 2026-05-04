@@ -3,8 +3,8 @@ const { getSpotifySecrets } = require("../secretsStore");
 const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
 const SPOTIFY_CURRENTLY_PLAYING_URL =
   "https://api.spotify.com/v1/me/player/currently-playing";
-const SPOTIFY_SAVED_TRACKS_CONTAINS_URL =
-  "https://api.spotify.com/v1/me/tracks/contains";
+const SPOTIFY_LIBRARY_CONTAINS_URL =
+  "https://api.spotify.com/v1/me/library/contains";
 
 let cachedAccessToken = null;
 let cachedAccessTokenExpiresAt = 0;
@@ -253,8 +253,8 @@ async function fetchSpotifyTrackLikedState(accessToken, trackId) {
     return cachedLikedState.value;
   }
 
-  const url = new URL(SPOTIFY_SAVED_TRACKS_CONTAINS_URL);
-  url.searchParams.set("ids", trackId);
+  const url = new URL(SPOTIFY_LIBRARY_CONTAINS_URL);
+  url.searchParams.set("uris", `spotify:track:${trackId}`);
 
   const response = await fetch(url, {
     headers: {

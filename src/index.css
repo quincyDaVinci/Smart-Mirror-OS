@@ -129,6 +129,10 @@ label {
   --mirror-height: 100vh;
   --mirror-rotation: rotate(0deg);
   --mirror-padding: 32px;
+  --mirror-padding-top: var(--mirror-padding);
+  --mirror-padding-right: var(--mirror-padding);
+  --mirror-padding-bottom: var(--mirror-padding);
+  --mirror-padding-left: var(--mirror-padding);
   --mirror-gap: 16px;
   --mirror-scale: 1;
 
@@ -1140,7 +1144,8 @@ button:disabled {
   width: calc(100% / var(--mirror-scale));
   height: calc(100% / var(--mirror-scale));
   min-height: calc(100% / var(--mirror-scale));
-  padding: var(--mirror-padding);
+  padding: var(--mirror-padding-top) var(--mirror-padding-right)
+    var(--mirror-padding-bottom) var(--mirror-padding-left);
   transform-origin: top left;
   transform: scale(var(--mirror-scale));
 }
@@ -1164,8 +1169,8 @@ button:disabled {
 
 .mirror-compact-weather {
   position: absolute;
-  top: max(36px, var(--mirror-padding));
-  left: max(36px, var(--mirror-padding));
+  top: max(36px, var(--mirror-padding-top));
+  left: max(36px, var(--mirror-padding-left));
   width: min(34vw, 390px);
   min-height: var(--mirror-main-column-height);
   display: flex;
@@ -1399,8 +1404,8 @@ button:disabled {
 
 .mirror-compact-time-stack {
   position: absolute;
-  top: max(36px, var(--mirror-padding));
-  right: max(36px, var(--mirror-padding));
+  top: max(36px, var(--mirror-padding-top));
+  right: max(36px, var(--mirror-padding-right));
   width: min(35vw, 390px);
   min-height: var(--mirror-main-column-height);
   display: flex;
@@ -1510,9 +1515,10 @@ button:disabled {
   position: absolute;
   z-index: 2;
   inset: 0;
-  padding: max(16px, calc(var(--mirror-padding) * 0.5))
-    max(18px, var(--mirror-padding))
-    max(18px, var(--mirror-padding));
+  padding: max(16px, calc(var(--mirror-padding-top) * 0.5))
+    max(18px, var(--mirror-padding-right))
+    max(18px, var(--mirror-padding-bottom))
+    max(18px, var(--mirror-padding-left));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1766,6 +1772,22 @@ button:disabled {
 
 .mirror-main-media__liked--active {
   color: var(--accent-red);
+}
+
+.mirror-main-media__liked-state {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 0.82rem;
+  font-weight: 650;
+  line-height: 1.15;
+}
+
+.mirror-main-media__liked-state--active {
+  color: var(--accent-red);
+}
+
+.mirror-main-media--focus .mirror-main-media__liked-state {
+  font-size: clamp(0.98rem, 1.35vw, 1.18rem);
 }
 
 .mirror-main-media__artist {
@@ -2072,9 +2094,10 @@ button:disabled {
 
 @media (max-width: 900px) {
   .mirror-media-focus-zone {
-    padding: max(12px, calc(var(--mirror-padding) * 0.5))
-      max(14px, var(--mirror-padding))
-      max(14px, var(--mirror-padding));
+    padding: max(12px, calc(var(--mirror-padding-top) * 0.5))
+      max(14px, var(--mirror-padding-right))
+      max(14px, var(--mirror-padding-bottom))
+      max(14px, var(--mirror-padding-left));
   }
 
   .mirror-main-media--focus,

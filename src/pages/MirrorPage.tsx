@@ -76,12 +76,51 @@ function getMeteoconIconName(iconKey: WeatherIconKey) {
   }
 }
 
-function renderWeatherIcon(iconKey: WeatherIconKey, iconUrl?: string) {
+function getStaticWeatherIconName(iconKey: WeatherIconKey) {
+  switch (iconKey) {
+    case "clear-day":
+      return "clearsky_day";
+    case "clear-night":
+      return "clearsky_night";
+    case "partly-cloudy-day":
+      return "partlycloudy_day";
+    case "partly-cloudy-night":
+      return "partlycloudy_night";
+    case "fog":
+      return "fog";
+    case "drizzle":
+      return "lightrain";
+    case "rain":
+      return "rain";
+    case "freezing-rain":
+      return "sleet";
+    case "snow":
+      return "snow";
+    case "thunderstorm":
+      return "rainandthunder";
+    case "hail":
+      return "heavysleet";
+    case "cloudy":
+    default:
+      return "cloudy";
+  }
+}
+
+function renderWeatherIcon(
+  iconKey: WeatherIconKey,
+  iconUrl?: string,
+  variant: "animated" | "static" = "static",
+) {
   const iconName = getMeteoconIconName(iconKey);
+  const staticIconName = getStaticWeatherIconName(iconKey);
 
   return (
     <img
-      src={`https://cdn.jsdelivr.net/gh/basmilius/weather-icons@2.0.0/production/fill/all/${iconName}.svg`}
+      src={
+        variant === "animated"
+          ? `https://cdn.jsdelivr.net/gh/basmilius/weather-icons@2.0.0/production/fill/all/${iconName}.svg`
+          : `https://cdn.jsdelivr.net/gh/metno/weathericons/weather/svg/${staticIconName}.svg`
+      }
       alt=""
       aria-hidden
       width={64}
@@ -89,6 +128,7 @@ function renderWeatherIcon(iconKey: WeatherIconKey, iconUrl?: string) {
       decoding="async"
       data-weather-api-icon={iconUrl ? "available" : "missing"}
       data-fallback={getWeatherGlyph(iconKey)}
+      data-weather-icon-variant={variant}
     />
   );
 }
@@ -229,6 +269,10 @@ export function MirrorPage({
 
   const mirrorStyle = {
     "--mirror-padding": `${settings.layoutPaddingPx}px`,
+    "--mirror-padding-top": `${settings.layoutPaddingTopPx}px`,
+    "--mirror-padding-right": `${settings.layoutPaddingRightPx}px`,
+    "--mirror-padding-bottom": `${settings.layoutPaddingBottomPx}px`,
+    "--mirror-padding-left": `${settings.layoutPaddingLeftPx}px`,
     "--mirror-gap": `${settings.widgetGapPx}px`,
     "--mirror-scale": `${settings.zoomPercent / 100}`,
   } as CSSProperties;
@@ -293,6 +337,7 @@ export function MirrorPage({
                   {renderWeatherIcon(
                     dashboardData.weather.iconKey,
                     dashboardData.weather.iconUrl,
+                    "animated",
                   )}
                 </div>
 
@@ -338,7 +383,7 @@ export function MirrorPage({
                       {item.time}
                     </span>
                     <span className="mirror-compact-weather__hourly-icon">
-                      {renderWeatherIcon(item.iconKey, item.iconUrl)}
+                      {renderWeatherIcon(item.iconKey, item.iconUrl, "static")}
                     </span>
                     <span className="mirror-compact-weather__hourly-temp">
                       {item.temperature}
@@ -376,7 +421,7 @@ export function MirrorPage({
                       {item.day}
                     </span>
                     <span className="mirror-compact-weather__forecast-icon">
-                      {renderWeatherIcon(item.iconKey, item.iconUrl)}
+                      {renderWeatherIcon(item.iconKey, item.iconUrl, "static")}
                     </span>
                     <span className="mirror-compact-weather__forecast-high">
                       {formatDegreeLabel(item.highTemperature)}

@@ -7,6 +7,10 @@ export type MirrorSettings = {
   sleepTimeoutSeconds: number;
   showStatusBar: boolean;
   layoutPaddingPx: number;
+  layoutPaddingTopPx: number;
+  layoutPaddingRightPx: number;
+  layoutPaddingBottomPx: number;
+  layoutPaddingLeftPx: number;
   widgetGapPx: number;
   zoomPercent: number;
   focusIdleTimeoutSeconds: number;
@@ -20,6 +24,10 @@ export const defaultMirrorSettings: MirrorSettings = {
   sleepTimeoutSeconds: 180,
   showStatusBar: true,
   layoutPaddingPx: 32,
+  layoutPaddingTopPx: 32,
+  layoutPaddingRightPx: 32,
+  layoutPaddingBottomPx: 32,
+  layoutPaddingLeftPx: 32,
   widgetGapPx: 16,
   zoomPercent: 100,
   focusIdleTimeoutSeconds: 45,
