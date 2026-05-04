@@ -33,6 +33,14 @@ type LyricsState =
 type LyricLine = {
   text: string;
   startMs: number | null;
+  weight: number;
+};
+
+type ProgressAnchor = {
+  key: string;
+  progressMs: number | null;
+  capturedAt: number;
+  status: string;
 };
 
 const PAUSED_RECENTLY_PLAYED_AFTER_MS = 45 * 1000;
@@ -129,6 +137,7 @@ function parseSyncedLyrics(value: string) {
     lines.push({
       text: match[4]?.trim() ?? "",
       startMs: minutes * 60 * 1000 + seconds * 1000 + milliseconds,
+      weight: 1,
     });
   }
 
@@ -138,8 +147,22 @@ function parseSyncedLyrics(value: string) {
 function parsePlainLyrics(value: string) {
   return value
     .split("\n")
-    .map((line) => ({ text: line.trim(), startMs: null }))
+    .map((line) => {
+      const text = line.trim();
+
+      return {
+        text,
+        startMs: null,
+        weight: getPlainLyricLineWeight(text),
+      };
+    })
     .filter((line) => line.text.length > 0);
+}
+
+function getPlainLyricLineWeight(text: string) {
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+
+  return Math.min(2.4, Math.max(0.85, wordCount / 5));
 }
 
 function parseLyrics(lyrics: LyricsPayload | null) {
@@ -162,9 +185,58 @@ function parseLyrics(lyrics: LyricsPayload | null) {
   return [];
 }
 
-function getActiveLyricIndex(lines: LyricLine[], progressMs: number | null) {
+function hasSyncedLyricTiming(lines: LyricLine[]) {
+  return lines.some((line) => line.startMs !== null);
+}
+
+function getEstimatedPlainLyricIndex(
+  lines: LyricLine[],
+  progressMs: number | null,
+  durationMs: number | null,
+) {
+  if (lines.length === 0 || progressMs === null) {
+    return -1;
+  }
+
+  const fallbackDurationMs = Math.max(lines.length * 3600, 90 * 1000);
+  const trackDurationMs =
+    durationMs !== null && durationMs > 0 ? durationMs : fallbackDurationMs;
+  const introMs = Math.min(12 * 1000, trackDurationMs * 0.08);
+  const outroMs = Math.min(8 * 1000, trackDurationMs * 0.05);
+  const lyricDurationMs = Math.max(
+    trackDurationMs - introMs - outroMs,
+    lines.length * 1400,
+  );
+  const lyricProgress = Math.min(
+    0.999,
+    Math.max(0, (progressMs - introMs) / lyricDurationMs),
+  );
+  const totalWeight = lines.reduce((sum, line) => sum + line.weight, 0);
+  const targetWeight = lyricProgress * totalWeight;
+  let cumulativeWeight = 0;
+
+  for (let index = 0; index < lines.length; index += 1) {
+    cumulativeWeight += lines[index]?.weight ?? 1;
+
+    if (cumulativeWeight > targetWeight) {
+      return index;
+    }
+  }
+
+  return lines.length - 1;
+}
+
+function getActiveLyricIndex(
+  lines: LyricLine[],
+  progressMs: number | null,
+  durationMs: number | null,
+) {
   if (progressMs === null) {
     return -1;
+  }
+
+  if (!hasSyncedLyricTiming(lines)) {
+    return getEstimatedPlainLyricIndex(lines, progressMs, durationMs);
   }
 
   let activeIndex = -1;
@@ -184,23 +256,6 @@ function getActiveLyricIndex(lines: LyricLine[], progressMs: number | null) {
   }
 
   return activeIndex;
-}
-
-function getVisibleLyricLines(lines: LyricLine[], activeIndex: number) {
-  if (activeIndex < 0) {
-    return lines.slice(0, 10).map((line, index) => ({
-      ...line,
-      originalIndex: index,
-    }));
-  }
-
-  const startIndex = Math.max(0, activeIndex - 3);
-  const endIndex = Math.min(lines.length, activeIndex + 7);
-
-  return lines.slice(startIndex, endIndex).map((line, index) => ({
-    ...line,
-    originalIndex: startIndex + index,
-  }));
 }
 
 function getProviderMessage(media: MediaState, source: MediaState["source"]) {
@@ -269,12 +324,41 @@ function DetailIcon({ name }: { name: DetailIconName }) {
   }
 }
 
+function HeartIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden focusable="false">
+      <path
+        d="M12 20.4 4.6 13C2.5 10.9 2.5 7.5 4.6 5.4a5.1 5.1 0 0 1 7.2 0l.2.2.2-.2a5.1 5.1 0 0 1 7.2 7.2L12 20.4Z"
+      />
+    </svg>
+  );
+}
+
+function ArtistIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden focusable="false">
+      <circle cx="12" cy="7.5" r="3.5" />
+      <path d="M5.5 20a6.5 6.5 0 0 1 13 0" />
+    </svg>
+  );
+}
+
+function AlbumIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden focusable="false">
+      <rect x="4" y="4" width="16" height="16" rx="3" />
+      <circle cx="12" cy="12" r="3" />
+      <circle cx="12" cy="12" r="0.6" />
+    </svg>
+  );
+}
+
 export function MirrorMediaDock({
   media,
   showLyrics = false,
   variant = "compact",
 }: MirrorMediaDockProps) {
-  const [nowMs, setNowMs] = useState(Date.now());
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [lyricsState, setLyricsState] = useState<LyricsState>({
     status: "idle",
     lyrics: null,
@@ -283,12 +367,11 @@ export function MirrorMediaDock({
   const [lyricsSuppressedKey, setLyricsSuppressedKey] = useState<string | null>(
     null,
   );
-  const progressAnchorRef = useRef<{
-    key: string;
-    progressMs: number | null;
-    capturedAt: number;
-    status: string;
-  } | null>(null);
+  const [progressAnchor, setProgressAnchor] = useState<ProgressAnchor | null>(
+    null,
+  );
+  const lyricViewportRef = useRef<HTMLDivElement | null>(null);
+  const lyricLineRefs = useRef<Array<HTMLParagraphElement | null>>([]);
 
   const hasLiveMedia =
     media.source !== null &&
@@ -308,7 +391,7 @@ export function MirrorMediaDock({
     deviceName: media.deviceName,
     userName: media.userName,
     isLiked: media.isLiked,
-    capturedAt: media.lastUpdatedAt ?? Date.now(),
+    capturedAt: media.lastUpdatedAt ?? nowMs,
   };
 
   const displayMedia = hasLiveMedia
@@ -338,6 +421,7 @@ export function MirrorMediaDock({
       return;
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setNowMs(Date.now());
 
     const intervalId = window.setInterval(() => {
@@ -352,37 +436,41 @@ export function MirrorMediaDock({
   useEffect(() => {
     const incomingProgressMs = media.progressMs;
     const now = Date.now();
-    const previousAnchor = progressAnchorRef.current;
-    const previousProgressMs = previousAnchor
-      ? getAnchoredProgressMs(previousAnchor, media.durationMs, now)
-      : null;
 
-    if (!hasLiveMedia || incomingProgressMs === null) {
-      progressAnchorRef.current = {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setProgressAnchor((previousAnchor) => {
+      const previousProgressMs = previousAnchor
+        ? getAnchoredProgressMs(previousAnchor, media.durationMs, now)
+        : null;
+
+      if (!hasLiveMedia || incomingProgressMs === null) {
+        return {
+          key: mediaProgressKey,
+          progressMs: incomingProgressMs,
+          capturedAt: media.lastUpdatedAt ?? now,
+          status: media.status,
+        };
+      }
+
+      const isSameMedia = previousAnchor?.key === mediaProgressKey;
+      const shouldKeepPredictedProgress =
+        isSameMedia &&
+        media.status === "playing" &&
+        previousProgressMs !== null &&
+        incomingProgressMs < previousProgressMs &&
+        previousProgressMs - incomingProgressMs < 4500;
+
+      return {
         key: mediaProgressKey,
-        progressMs: incomingProgressMs,
-        capturedAt: media.lastUpdatedAt ?? now,
+        progressMs: shouldKeepPredictedProgress
+          ? previousProgressMs
+          : incomingProgressMs,
+        capturedAt: shouldKeepPredictedProgress
+          ? now
+          : (media.lastUpdatedAt ?? now),
         status: media.status,
       };
-      return;
-    }
-
-    const isSameMedia = previousAnchor?.key === mediaProgressKey;
-    const shouldKeepPredictedProgress =
-      isSameMedia &&
-      media.status === "playing" &&
-      previousProgressMs !== null &&
-      incomingProgressMs < previousProgressMs &&
-      previousProgressMs - incomingProgressMs < 4500;
-
-    progressAnchorRef.current = {
-      key: mediaProgressKey,
-      progressMs: shouldKeepPredictedProgress
-        ? previousProgressMs
-        : incomingProgressMs,
-      capturedAt: shouldKeepPredictedProgress ? now : (media.lastUpdatedAt ?? now),
-      status: media.status,
-    };
+    });
   }, [
     hasLiveMedia,
     media.progressMs,
@@ -397,14 +485,12 @@ export function MirrorMediaDock({
       return null;
     }
 
-    const anchor = progressAnchorRef.current;
-
-    if (!anchor) {
+    if (!progressAnchor) {
       return getLiveProgressMs(media, nowMs);
     }
 
-    return getAnchoredProgressMs(anchor, media.durationMs, nowMs);
-  }, [hasLiveMedia, media, nowMs]);
+    return getAnchoredProgressMs(progressAnchor, media.durationMs, nowMs);
+  }, [hasLiveMedia, media, nowMs, progressAnchor]);
 
   const progressPercentage =
     liveProgressMs !== null &&
@@ -484,13 +570,11 @@ export function MirrorMediaDock({
   ].join("\n");
   const lyricsEnabled =
     requestedLyricsEnabled && lyricsSuppressedKey !== lyricsQueryKey;
-  const showLikedState =
-    displayMedia.source === "spotify" &&
-    displayMedia.kind === "track" &&
-    displayMedia.isLiked !== null;
-
+  const showSpotifyLikedIcon =
+    displayMedia.source === "spotify" && displayMedia.kind === "track";
   useEffect(() => {
     if (!requestedLyricsEnabled) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLyricsSuppressedKey(null);
       return;
     }
@@ -502,6 +586,7 @@ export function MirrorMediaDock({
 
   useEffect(() => {
     if (!lyricsEnabled) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLyricsState({ status: "idle", lyrics: null, message: null });
       return;
     }
@@ -584,13 +669,37 @@ export function MirrorMediaDock({
     [lyricsState.lyrics],
   );
   const activeLyricIndex = useMemo(
-    () => getActiveLyricIndex(lyricLines, liveProgressMs),
-    [lyricLines, liveProgressMs],
+    () =>
+      getActiveLyricIndex(lyricLines, liveProgressMs, displayMedia.durationMs),
+    [lyricLines, liveProgressMs, displayMedia.durationMs],
   );
-  const visibleLyricLines = useMemo(
-    () => getVisibleLyricLines(lyricLines, activeLyricIndex),
-    [lyricLines, activeLyricIndex],
+  const lyricsAreSynced = useMemo(
+    () => hasSyncedLyricTiming(lyricLines),
+    [lyricLines],
   );
+  const hasLyricLines = lyricLines.length > 0;
+
+  useEffect(() => {
+    lyricLineRefs.current.length = lyricLines.length;
+  }, [lyricLines.length]);
+
+  useEffect(() => {
+    const viewport = lyricViewportRef.current;
+    const activeLine =
+      activeLyricIndex >= 0 ? lyricLineRefs.current[activeLyricIndex] : null;
+
+    if (!viewport || !activeLine) {
+      return;
+    }
+
+    const nextScrollTop =
+      activeLine.offsetTop - viewport.clientHeight / 2 + activeLine.clientHeight / 2;
+
+    viewport.scrollTo({
+      top: Math.max(0, nextScrollTop),
+      behavior: "smooth",
+    });
+  }, [activeLyricIndex, lyricLines.length]);
 
   useEffect(() => {
     if (!requestedLyricsEnabled || !lyricsEnabled) {
@@ -601,7 +710,7 @@ export function MirrorMediaDock({
       lyricsState.status === "error" ||
       (lyricsState.status === "ready" &&
         (lyricsState.lyrics?.instrumental === true ||
-          visibleLyricLines.length === 0));
+          !hasLyricLines));
 
     if (!lyricsUnavailable) {
       return;
@@ -620,7 +729,7 @@ export function MirrorMediaDock({
     lyricsQueryKey,
     lyricsState.status,
     lyricsState.lyrics,
-    visibleLyricLines.length,
+    hasLyricLines,
   ]);
 
   const className = [
@@ -667,37 +776,36 @@ export function MirrorMediaDock({
 
         <div className="mirror-main-media__title-row">
           <h2 className="mirror-main-media__title">{displayMedia.title}</h2>
-
-          {displayMedia.isLiked !== null ? (
-            <span
-              className={`mirror-main-media__liked ${
-                displayMedia.isLiked ? "mirror-main-media__liked--active" : ""
-              }`}
-              aria-label={displayMedia.isLiked ? "Geliked" : "Niet geliked"}
-              title={displayMedia.isLiked ? "Geliked" : "Niet geliked"}
-            >
-              {displayMedia.isLiked ? "♥" : "♡"}
-            </span>
-          ) : null}
         </div>
 
-        <p className="mirror-main-media__artist">{displayMedia.subtitle}</p>
-
-        {displayMedia.secondaryText ? (
-          <p className="mirror-main-media__album">
-            {displayMedia.secondaryText}
-          </p>
+        {showSpotifyLikedIcon ? (
+          <span
+            className={[
+              "mirror-main-media__liked",
+              displayMedia.isLiked === true
+                ? "mirror-main-media__liked--filled"
+                : "mirror-main-media__liked--outline",
+            ].join(" ")}
+            aria-label={displayMedia.isLiked ? "Geliked" : "Niet geliked"}
+            title={displayMedia.isLiked ? "Geliked" : "Niet geliked"}
+          >
+            <HeartIcon />
+          </span>
         ) : null}
 
-        {showLikedState ? (
-          <p
-            className={`mirror-main-media__liked-state ${
-              displayMedia.isLiked
-                ? "mirror-main-media__liked-state--active"
-                : ""
-            }`}
-          >
-            {displayMedia.isLiked ? "Geliked in Spotify" : "Niet geliked"}
+        <p className="mirror-main-media__artist mirror-main-media__metadata-line">
+          <span className="mirror-main-media__metadata-icon">
+            <ArtistIcon />
+          </span>
+          <span>{displayMedia.subtitle}</span>
+        </p>
+
+        {displayMedia.secondaryText ? (
+          <p className="mirror-main-media__album mirror-main-media__metadata-line">
+            <span className="mirror-main-media__metadata-icon">
+              <AlbumIcon />
+            </span>
+            <span>{displayMedia.secondaryText}</span>
           </p>
         ) : null}
 
@@ -742,9 +850,12 @@ export function MirrorMediaDock({
       </div>
 
       {lyricsEnabled ? (
-        <aside className="mirror-main-media__lyrics" aria-live="polite">
-          <p className="mirror-main-media__lyrics-label">Lyrics</p>
-
+        <aside
+          className={`mirror-main-media__lyrics ${
+            lyricsAreSynced ? "" : "mirror-main-media__lyrics--estimated"
+          }`}
+          aria-live="polite"
+        >
           {lyricsState.status === "loading" ? (
             <p className="mirror-main-media__lyrics-message">Lyrics laden</p>
           ) : null}
@@ -762,32 +873,56 @@ export function MirrorMediaDock({
 
           {lyricsState.status === "ready" &&
           !lyricsState.lyrics?.instrumental &&
-          visibleLyricLines.length === 0 ? (
+          !hasLyricLines ? (
             <p className="mirror-main-media__lyrics-message">
               {lyricsState.message ?? "Geen lyrics gevonden"}
             </p>
           ) : null}
 
-          {visibleLyricLines.length > 0 ? (
-            <div className="mirror-main-media__lyrics-lines">
-              {visibleLyricLines.map((line) => (
-                <p
-                  className={[
-                    "mirror-main-media__lyrics-line",
-                    line.originalIndex === activeLyricIndex
-                      ? "mirror-main-media__lyrics-line--active"
-                      : "",
-                    line.originalIndex < activeLyricIndex
-                      ? "mirror-main-media__lyrics-line--past"
-                      : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                  key={`${line.originalIndex}-${line.text}`}
-                >
-                  {line.text}
-                </p>
-              ))}
+          {hasLyricLines ? (
+            <div
+              className="mirror-main-media__lyrics-viewport"
+              ref={lyricViewportRef}
+            >
+              <div className="mirror-main-media__lyrics-lines">
+                {lyricLines.map((line, index) => {
+                  const distance =
+                    activeLyricIndex >= 0
+                      ? Math.abs(index - activeLyricIndex)
+                      : index;
+
+                  return (
+                    <p
+                      className={[
+                        "mirror-main-media__lyrics-line",
+                        index === activeLyricIndex
+                          ? "mirror-main-media__lyrics-line--active"
+                          : "",
+                        index < activeLyricIndex
+                          ? "mirror-main-media__lyrics-line--past"
+                          : "",
+                        distance === 1
+                          ? "mirror-main-media__lyrics-line--near"
+                          : "",
+                        distance === 2
+                          ? "mirror-main-media__lyrics-line--edge"
+                          : "",
+                        distance > 2
+                          ? "mirror-main-media__lyrics-line--far"
+                          : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      key={`${index}-${line.text}`}
+                      ref={(element) => {
+                        lyricLineRefs.current[index] = element;
+                      }}
+                    >
+                      {line.text}
+                    </p>
+                  );
+                })}
+              </div>
             </div>
           ) : null}
         </aside>

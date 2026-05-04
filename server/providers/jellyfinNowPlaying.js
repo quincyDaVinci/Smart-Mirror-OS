@@ -127,6 +127,12 @@ function pickBestSession(sessions, preferredUserName, preferredDeviceName) {
   return (
     sessions
       .filter((session) => Boolean(session.NowPlayingItem))
+      .filter((session) =>
+        preferredUserName ? session.UserName === preferredUserName : true,
+      )
+      .filter((session) =>
+        preferredDeviceName ? session.DeviceName === preferredDeviceName : true,
+      )
       .sort(
         (a, b) =>
           getSessionScore(b, preferredUserName, preferredDeviceName) -

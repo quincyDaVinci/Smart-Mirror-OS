@@ -68,12 +68,16 @@ const FIXED_PROVIDER_DEFINITIONS: Record<
         inputType: "password",
       },
       userName: {
-        title: "Preferred user",
-        placeholder: "Bijvoorbeeld admin",
+        title: "User filter",
+        placeholder: "Exacte Jellyfin username, bijvoorbeeld admin",
+        helperText:
+          "Als dit veld gevuld is, worden alleen Jellyfin sessies van deze user meegenomen.",
       },
       deviceName: {
-        title: "Preferred device",
-        placeholder: "Bijvoorbeeld LG_C9_Quincy",
+        title: "Device filter",
+        placeholder: "Exacte Jellyfin device name, bijvoorbeeld LG_C9_Quincy",
+        helperText:
+          "Als dit veld gevuld is, worden alleen Jellyfin sessies van dit device meegenomen.",
       },
     },
   },

@@ -93,8 +93,8 @@ export const defaultProviderConfigStatus: ProviderConfigStatus = {
   jellyfin: {
     baseUrl: createDefaultField("Jellyfin Base URL"),
     apiKey: createDefaultField("Jellyfin API Key"),
-    userName: createDefaultField("Preferred Jellyfin User"),
-    deviceName: createDefaultField("Preferred Jellyfin Device"),
+    userName: createDefaultField("Jellyfin User Filter"),
+    deviceName: createDefaultField("Jellyfin Device Filter"),
   },
   spotify: {
     clientId: createDefaultField("Spotify Client ID"),

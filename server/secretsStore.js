@@ -3,14 +3,13 @@ const path = require("path");
 const crypto = require("crypto");
 
 const SECRETS_FILE = path.join(__dirname, "secrets.local.json");
-const PROJECT_ENV_FILE = path.join(__dirname, "..", ".env.local");
 
 const PROVIDER_FIELD_LABELS = {
   jellyfin: {
     baseUrl: "Jellyfin Base URL",
     apiKey: "Jellyfin API Key",
-    userName: "Preferred Jellyfin User",
-    deviceName: "Preferred Jellyfin Device",
+    userName: "Jellyfin User Filter",
+    deviceName: "Jellyfin Device Filter",
   },
   spotify: {
     clientId: "Spotify Client ID",
@@ -27,28 +26,6 @@ const PROVIDER_FIELD_LABELS = {
   },
 };
 
-const PROVIDER_ENV_KEYS = {
-  jellyfin: {
-    baseUrl: "JELLYFIN_BASE_URL",
-    apiKey: "JELLYFIN_API_KEY",
-    userName: "JELLYFIN_USER_NAME",
-    deviceName: "JELLYFIN_DEVICE_NAME",
-  },
-  spotify: {
-    clientId: "SPOTIFY_CLIENT_ID",
-    clientSecret: "SPOTIFY_CLIENT_SECRET",
-    refreshToken: "SPOTIFY_REFRESH_TOKEN",
-    redirectUri: "SPOTIFY_REDIRECT_URI",
-  },
-  weather: {
-    locationQuery: "WEATHER_LOCATION_QUERY",
-    countryCode: "WEATHER_COUNTRY_CODE",
-    apiKey: "WEATHER_API_KEY",
-    latitude: "WEATHER_LATITUDE",
-    longitude: "WEATHER_LONGITUDE",
-  },
-};
-
 const FIXED_PROVIDERS = ["jellyfin", "spotify", "weather"];
 const CALENDAR_DEFAULT_ENTRY_LABEL = "Calendar feed";
 
@@ -62,57 +39,6 @@ function readSecretsFile() {
     return JSON.parse(raw);
   } catch (error) {
     console.error("failed to read secrets file", error);
-    return {};
-  }
-}
-
-function stripEnvValueQuotes(value) {
-  const trimmedValue = value.trim();
-
-  if (
-    (trimmedValue.startsWith('"') && trimmedValue.endsWith('"')) ||
-    (trimmedValue.startsWith("'") && trimmedValue.endsWith("'"))
-  ) {
-    return trimmedValue.slice(1, -1);
-  }
-
-  return trimmedValue;
-}
-
-function readProjectEnvFile() {
-  try {
-    if (!fs.existsSync(PROJECT_ENV_FILE)) {
-      return {};
-    }
-
-    const entries = {};
-    const raw = fs.readFileSync(PROJECT_ENV_FILE, "utf-8");
-
-    for (const line of raw.split(/\r?\n/)) {
-      const trimmedLine = line.trim();
-
-      if (!trimmedLine || trimmedLine.startsWith("#")) {
-        continue;
-      }
-
-      const powershellMatch = trimmedLine.match(
-        /^\$env:([A-Za-z_][A-Za-z0-9_]*)=(.*)$/,
-      );
-      const dotenvMatch = trimmedLine.match(
-        /^(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$/,
-      );
-      const match = powershellMatch ?? dotenvMatch;
-
-      if (!match) {
-        continue;
-      }
-
-      entries[match[1]] = stripEnvValueQuotes(match[2]);
-    }
-
-    return entries;
-  } catch (error) {
-    console.error("failed to read project env file", error);
     return {};
   }
 }
@@ -189,26 +115,14 @@ function getProviderSectionState(sectionName) {
   }
 
   const fileSecrets = readSecretsFile();
-  const localEnv = readProjectEnvFile();
   const storedSection = fileSecrets[sectionName] ?? {};
   const fieldLabels = PROVIDER_FIELD_LABELS[sectionName];
-  const envKeys = PROVIDER_ENV_KEYS[sectionName];
 
   return Object.fromEntries(
     Object.entries(fieldLabels).map(([fieldKey, defaultLabel]) => {
-      const envKey = envKeys[fieldKey];
-      const fallbackValue =
-        typeof envKey === "string"
-          ? (process.env[envKey] ?? localEnv[envKey] ?? "")
-          : "";
-
       return [
         fieldKey,
-        normalizeStoredField(
-          storedSection[fieldKey],
-          fallbackValue,
-          defaultLabel,
-        ),
+        normalizeStoredField(storedSection[fieldKey], "", defaultLabel),
       ];
     }),
   );

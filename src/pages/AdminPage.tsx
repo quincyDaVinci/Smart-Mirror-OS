@@ -303,27 +303,6 @@ export function AdminPage({
             />
           </label>
 
-          <label style={{ display: "block", marginBottom: "1rem" }}>
-            Padding ({settings.layoutPaddingPx}px)
-            <input
-              type="range"
-              min={0}
-              max={96}
-              step={4}
-              value={settings.layoutPaddingPx}
-              onChange={(event) => {
-                onUpdateSettings({
-                  layoutPaddingPx: Number(event.target.value),
-                });
-              }}
-              style={{
-                display: "block",
-                marginTop: "0.5rem",
-                width: "100%",
-              }}
-            />
-          </label>
-
           <div
             style={{
               display: "grid",

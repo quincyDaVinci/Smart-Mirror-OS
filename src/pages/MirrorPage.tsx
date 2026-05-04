@@ -268,7 +268,6 @@ export function MirrorPage({
   }, []);
 
   const mirrorStyle = {
-    "--mirror-padding": `${settings.layoutPaddingPx}px`,
     "--mirror-padding-top": `${settings.layoutPaddingTopPx}px`,
     "--mirror-padding-right": `${settings.layoutPaddingRightPx}px`,
     "--mirror-padding-bottom": `${settings.layoutPaddingBottomPx}px`,

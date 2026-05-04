@@ -4,13 +4,15 @@ const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
 const SPOTIFY_CURRENTLY_PLAYING_URL =
   "https://api.spotify.com/v1/me/player/currently-playing";
 const SPOTIFY_LIBRARY_CONTAINS_URL =
-  "https://api.spotify.com/v1/me/library/contains";
+  "https://api.spotify.com/v1/me/tracks/contains";
 
 let cachedAccessToken = null;
 let cachedAccessTokenExpiresAt = 0;
 let spotifyRateLimitedUntil = 0;
+let spotifyLikedStateRateLimitedUntil = 0;
 const likedStateCache = new Map();
 const LIKED_STATE_CACHE_TTL_MS = 5 * 60 * 1000;
+const LIKED_STATE_RETRY_CACHE_TTL_MS = 60 * 1000;
 
 const DEBUG_SPOTIFY = false;
 
@@ -56,9 +58,16 @@ function formatRateLimitWaitMessage(msRemaining) {
   return `Spotify rate-limited, opnieuw proberen over ${secondsRemaining}s.`;
 }
 
+function getBoundedRetryAfterMs(retryAfterHeader, fallbackMs, minMs, maxMs) {
+  const retryAfterMs = parseRetryAfterToMs(retryAfterHeader);
+  return Math.min(Math.max(retryAfterMs ?? fallbackMs, minMs), maxMs);
+}
+
 function resetSpotifyAccessTokenCache() {
   cachedAccessToken = null;
   cachedAccessTokenExpiresAt = 0;
+  spotifyRateLimitedUntil = 0;
+  spotifyLikedStateRateLimitedUntil = 0;
   likedStateCache.clear();
 }
 
@@ -247,14 +256,24 @@ async function fetchSpotifyTrackLikedState(accessToken, trackId) {
     return null;
   }
 
+  const checkedAt = Date.now();
   const cachedLikedState = likedStateCache.get(trackId);
 
-  if (cachedLikedState && cachedLikedState.expiresAt > Date.now()) {
+  if (cachedLikedState && cachedLikedState.expiresAt > checkedAt) {
     return cachedLikedState.value;
   }
 
+  if (spotifyLikedStateRateLimitedUntil > checkedAt) {
+    logSpotifyDebug("fetchSpotifyTrackLikedState:rate-limited-short-circuit", {
+      trackId,
+      msRemaining: spotifyLikedStateRateLimitedUntil - checkedAt,
+    });
+
+    return cachedLikedState?.value ?? null;
+  }
+
   const url = new URL(SPOTIFY_LIBRARY_CONTAINS_URL);
-  url.searchParams.set("uris", `spotify:track:${trackId}`);
+  url.searchParams.set("ids", trackId);
 
   const response = await fetch(url, {
     headers: {
@@ -264,18 +283,53 @@ async function fetchSpotifyTrackLikedState(accessToken, trackId) {
   });
 
   if (!response.ok) {
+    if (response.status === 429) {
+      const boundedRetryAfterMs = getBoundedRetryAfterMs(
+        response.headers.get("retry-after"),
+        2 * 60 * 1000,
+        60 * 1000,
+        15 * 60 * 1000,
+      );
+
+      spotifyLikedStateRateLimitedUntil = checkedAt + boundedRetryAfterMs;
+      likedStateCache.set(trackId, {
+        value: cachedLikedState?.value ?? null,
+        expiresAt: spotifyLikedStateRateLimitedUntil,
+      });
+
+      console.warn(
+        `Spotify liked-state lookup gaf status 429 voor track ${trackId}; lookup gepauzeerd voor ${Math.ceil(
+          boundedRetryAfterMs / 1000,
+        )}s`,
+      );
+      return cachedLikedState?.value ?? null;
+    }
+
+    likedStateCache.set(trackId, {
+      value: cachedLikedState?.value ?? null,
+      expiresAt: checkedAt + LIKED_STATE_RETRY_CACHE_TTL_MS,
+    });
+
+    console.warn(
+      `Spotify liked-state lookup gaf status ${response.status} voor track ${trackId}`,
+    );
     return null;
   }
 
   const payload = await response.json();
 
   if (!Array.isArray(payload) || typeof payload[0] !== "boolean") {
+    likedStateCache.set(trackId, {
+      value: cachedLikedState?.value ?? null,
+      expiresAt: checkedAt + LIKED_STATE_RETRY_CACHE_TTL_MS,
+    });
+
     return null;
   }
 
   likedStateCache.set(trackId, {
     value: payload[0],
-    expiresAt: Date.now() + LIKED_STATE_CACHE_TTL_MS,
+    expiresAt: checkedAt + LIKED_STATE_CACHE_TTL_MS,
   });
 
   return payload[0];
@@ -393,18 +447,19 @@ async function fetchSpotifyNowPlaying() {
   }
 
   if (response.status === 429) {
-    const retryAfterMs = parseRetryAfterToMs(
-      response.headers.get("retry-after"),
-    );
-    const boundedRetryAfterMs = Math.min(
-      Math.max(retryAfterMs ?? 30000, 15000),
+    const retryAfterHeader = response.headers.get("retry-after");
+    const boundedRetryAfterMs = getBoundedRetryAfterMs(
+      retryAfterHeader,
+      30000,
+      15000,
       5 * 60 * 1000,
     );
+    const retryAfterMs = parseRetryAfterToMs(retryAfterHeader);
 
     spotifyRateLimitedUntil = checkedAt + boundedRetryAfterMs;
 
     logSpotifyDebug("fetchSpotifyNowPlaying:rate-limited-429", {
-      retryAfterHeader: response.headers.get("retry-after"),
+      retryAfterHeader,
       retryAfterMs,
       boundedRetryAfterMs,
     });
