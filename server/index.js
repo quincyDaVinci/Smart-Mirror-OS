@@ -1452,7 +1452,7 @@ async function fetchLyricsFromLrclib({
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
       controller.abort();
-    }, 12000);
+    }, 30000);
 
     try {
       const response = await fetch(url, {
@@ -1538,7 +1538,7 @@ async function fetchLyricsFromLrclib({
           ok: false,
           error:
             error?.name === "AbortError"
-              ? "Lyrics ophalen duurde te lang."
+              ? "Lyrics ophalen duurde langer dan 30 seconden."
               : "Lyrics ophalen mislukt.",
         },
       };
