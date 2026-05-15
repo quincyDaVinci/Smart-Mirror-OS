@@ -2132,7 +2132,7 @@ button:disabled {
   --lyric-edge-padding: clamp(96px, 22vh, 240px);
   height: 100%;
   overflow: hidden;
-  scroll-behavior: auto;
+  scroll-behavior: smooth;
 }
 
 .mirror-main-media__lyrics-lines {
