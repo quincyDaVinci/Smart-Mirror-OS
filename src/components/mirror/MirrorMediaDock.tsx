@@ -793,7 +793,22 @@ export function MirrorMediaDock({
   );
   const hasLyricLines = lyricLines.length > 0;
 
+  const visibleLyricLines = useMemo(() => {
+  if (!hasLyricLines || activeLyricIndex < 0) {
+    return lyricLines.map((line, index) => ({ line, index }));
+  }
 
+  const windowSize = 2;
+  const startIndex = Math.max(0, activeLyricIndex - windowSize);
+  const endIndex = Math.min(lyricLines.length, activeLyricIndex + windowSize + 1);
+
+  return lyricLines
+    .slice(startIndex, endIndex)
+    .map((line, offset) => ({
+      line,
+      index: startIndex + offset,
+    }));
+}, [hasLyricLines, lyricLines, activeLyricIndex]);
 
   useFpsPerfLogger(lyricsEnabled);
 
@@ -826,45 +841,45 @@ export function MirrorMediaDock({
     lyricLineRefs.current.length = lyricLines.length;
   }, [lyricLines.length]);
 
-  
-  
-
   useEffect(() => {
-  const startedAt = performance.now();
+  
+   // Tijdelijke performance-test:
+  // scrollTo staat uit, omdat we nu alleen een klein lyrics-window renderen.
+ // const startedAt = performance.now();
 
-  const viewport = lyricViewportRef.current;
-  const activeLine =
-    activeLyricIndex >= 0 ? lyricLineRefs.current[activeLyricIndex] : null;
+ // const viewport = lyricViewportRef.current;
+ // const activeLine =
+ //   activeLyricIndex >= 0 ? lyricLineRefs.current[activeLyricIndex] : null;
 
-  if (!viewport || !activeLine) {
-    return;
-  }
+ // if (!viewport || !activeLine) {
+ //   return;
+ // }
 
-  const beforeMeasure = performance.now();
+ // const beforeMeasure = performance.now();
 
-  const activeOffsetTop = activeLine.offsetTop;
-  const viewportHeight = viewport.clientHeight;
-  const activeLineHeight = activeLine.clientHeight;
+ // const activeOffsetTop = activeLine.offsetTop;
+ // const viewportHeight = viewport.clientHeight;
+ // const activeLineHeight = activeLine.clientHeight;
 
-  const afterMeasure = performance.now();
+ // const afterMeasure = performance.now();
 
-  const nextScrollTop =
-    activeOffsetTop - viewportHeight / 2 + activeLineHeight / 2;
+ // const nextScrollTop =
+ //   activeOffsetTop - viewportHeight / 2 + activeLineHeight / 2;
 
-  viewport.scrollTo({
-    top: Math.max(0, nextScrollTop),
-    behavior: "auto",
-  });
+ // viewport.scrollTo({
+ //   top: Math.max(0, nextScrollTop),
+ //   behavior: "auto",
+ // });
 
-  const finishedAt = performance.now();
+ // const finishedAt = performance.now();
 
-  sendLyricsPerf("lyrics-scroll", {
-    activeLyricIndex,
-    lineCount: lyricLines.length,
-    measureMs: Number((afterMeasure - beforeMeasure).toFixed(2)),
-    totalMs: Number((finishedAt - startedAt).toFixed(2)),
-    nextScrollTop: Math.round(nextScrollTop),
-  });
+ // sendLyricsPerf("lyrics-scroll", {
+ //   activeLyricIndex,
+ //   lineCount: lyricLines.length,
+ //   measureMs: Number((afterMeasure - beforeMeasure).toFixed(2)),
+ //   totalMs: Number((finishedAt - startedAt).toFixed(2)),
+ //   nextScrollTop: Math.round(nextScrollTop),
+ // });
 }, [activeLyricIndex, lyricLines.length]);
 
 
@@ -1055,7 +1070,7 @@ export function MirrorMediaDock({
               ref={lyricViewportRef}
             >
               <div className="mirror-main-media__lyrics-lines">
-                {lyricLines.map((line, index) => {
+                {visibleLyricLines.map(({ line, index }) => {
                   const distance =
                     activeLyricIndex >= 0
                       ? Math.abs(index - activeLyricIndex)
