@@ -94,6 +94,23 @@ process.on("unhandledRejection", (reason) => {
 
 console.log("[boot] backend process starting");
 
+
+
+const PERF_LOG_ENABLED = process.env.PERF_LOG_ENABLED === "1";
+
+app.post("/debug/perf", (req, res) => {
+  if (!PERF_LOG_ENABLED) {
+    res.sendStatus(204);
+    return;
+  }
+
+  console.log("[perf]", JSON.stringify(req.body));
+  res.sendStatus(204);
+});
+
+
+
+
 const HEARTBEAT_INTERVAL_MS = 25000;
 const NOW_PLAYING_IDLE_POLL_INTERVAL_MS = 10000;
 const NOW_PLAYING_ACTIVE_POLL_INTERVAL_MS = 2500;

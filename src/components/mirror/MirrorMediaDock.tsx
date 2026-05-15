@@ -46,6 +46,90 @@ type ProgressAnchor = {
 const PAUSED_RECENTLY_PLAYED_AFTER_MS = 45 * 1000;
 const LYRICS_AUTO_HIDE_AFTER_MS = 3500;
 
+
+
+const DEBUG_LYRICS_PERF = true;
+
+function sendLyricsPerf(label: string, data: Record<string, unknown>) {
+  if (!DEBUG_LYRICS_PERF) {
+    return;
+  }
+
+  const payload = {
+    label,
+    at: Math.round(performance.now()),
+    ...data,
+  };
+
+  fetch(`${getApiBaseUrl()}/debug/perf`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    keepalive: true,
+  }).catch(() => {
+    // Debug logging mag de mirror nooit breken.
+  });
+}
+
+function useFpsPerfLogger(enabled: boolean) {
+  useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
+    let animationFrameId = 0;
+    let lastFrameAt = performance.now();
+    let windowStartedAt = performance.now();
+
+    let frameCount = 0;
+    let maxFrameGapMs = 0;
+    let over50ms = 0;
+    let over100ms = 0;
+
+    function tick(now: number) {
+      const gap = now - lastFrameAt;
+
+      frameCount += 1;
+      maxFrameGapMs = Math.max(maxFrameGapMs, gap);
+
+      if (gap > 50) over50ms += 1;
+      if (gap > 100) over100ms += 1;
+
+      lastFrameAt = now;
+
+      const elapsed = now - windowStartedAt;
+
+      if (elapsed >= 5000) {
+        sendLyricsPerf("fps-window", {
+          fps: Number(((frameCount / elapsed) * 1000).toFixed(1)),
+          maxFrameGapMs: Number(maxFrameGapMs.toFixed(1)),
+          over50ms,
+          over100ms,
+        });
+
+        windowStartedAt = now;
+        frameCount = 0;
+        maxFrameGapMs = 0;
+        over50ms = 0;
+        over100ms = 0;
+      }
+
+      animationFrameId = requestAnimationFrame(tick);
+    }
+
+    animationFrameId = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, [enabled]);
+}
+
+
+
+
+
+
 function getApiBaseUrl() {
   const url = new URL(getWebSocketUrl());
   url.protocol = url.protocol === "wss:" ? "https:" : "http:";
@@ -373,6 +457,13 @@ export function MirrorMediaDock({
   const lyricViewportRef = useRef<HTMLDivElement | null>(null);
   const lyricLineRefs = useRef<Array<HTMLParagraphElement | null>>([]);
 
+
+
+  const previousActiveLyricIndexRef = useRef<number | null>(null);
+
+
+
+
   const hasLiveMedia =
     media.source !== null &&
     (media.status === "playing" || media.status === "paused");
@@ -668,38 +759,117 @@ export function MirrorMediaDock({
     () => parseLyrics(lyricsState.lyrics),
     [lyricsState.lyrics],
   );
-  const activeLyricIndex = useMemo(
-    () =>
-      getActiveLyricIndex(lyricLines, liveProgressMs, displayMedia.durationMs),
-    [lyricLines, liveProgressMs, displayMedia.durationMs],
+  
+  
+
+  const activeLyricIndex = useMemo(() => {
+  const startedAt = performance.now();
+
+  const result = getActiveLyricIndex(
+    lyricLines,
+    liveProgressMs,
+    displayMedia.durationMs,
   );
+
+  const durationMs = performance.now() - startedAt;
+
+  if (lyricsEnabled && durationMs > 1) {
+    sendLyricsPerf("active-index-calc", {
+      durationMs: Number(durationMs.toFixed(2)),
+      lineCount: lyricLines.length,
+      activeLyricIndex: result,
+      progressMs: liveProgressMs,
+    });
+  }
+
+  return result;
+}, [lyricLines, liveProgressMs, displayMedia.durationMs, lyricsEnabled]);
+
+
+
   const lyricsAreSynced = useMemo(
     () => hasSyncedLyricTiming(lyricLines),
     [lyricLines],
   );
   const hasLyricLines = lyricLines.length > 0;
 
+
+
+  useFpsPerfLogger(lyricsEnabled);
+
+  useEffect(() => {
+  if (!lyricsEnabled || activeLyricIndex < 0) {
+    return;
+  }
+
+  const previousIndex = previousActiveLyricIndexRef.current;
+
+  if (previousIndex === activeLyricIndex) {
+    return;
+  }
+
+  previousActiveLyricIndexRef.current = activeLyricIndex;
+
+  sendLyricsPerf("active-line-change", {
+    from: previousIndex,
+    to: activeLyricIndex,
+    lineCount: lyricLines.length,
+    progressMs: liveProgressMs,
+  });
+}, [lyricsEnabled, activeLyricIndex, lyricLines.length, liveProgressMs]);
+
+
+
+
+
   useEffect(() => {
     lyricLineRefs.current.length = lyricLines.length;
   }, [lyricLines.length]);
 
+  
+  
+
   useEffect(() => {
-    const viewport = lyricViewportRef.current;
-    const activeLine =
-      activeLyricIndex >= 0 ? lyricLineRefs.current[activeLyricIndex] : null;
+  const startedAt = performance.now();
 
-    if (!viewport || !activeLine) {
-      return;
-    }
+  const viewport = lyricViewportRef.current;
+  const activeLine =
+    activeLyricIndex >= 0 ? lyricLineRefs.current[activeLyricIndex] : null;
 
-    const nextScrollTop =
-      activeLine.offsetTop - viewport.clientHeight / 2 + activeLine.clientHeight / 2;
+  if (!viewport || !activeLine) {
+    return;
+  }
 
-    viewport.scrollTo({
-      top: Math.max(0, nextScrollTop),
-      behavior: "smooth",
-    });
-  }, [activeLyricIndex, lyricLines.length]);
+  const beforeMeasure = performance.now();
+
+  const activeOffsetTop = activeLine.offsetTop;
+  const viewportHeight = viewport.clientHeight;
+  const activeLineHeight = activeLine.clientHeight;
+
+  const afterMeasure = performance.now();
+
+  const nextScrollTop =
+    activeOffsetTop - viewportHeight / 2 + activeLineHeight / 2;
+
+  viewport.scrollTo({
+    top: Math.max(0, nextScrollTop),
+    behavior: "smooth",
+  });
+
+  const finishedAt = performance.now();
+
+  sendLyricsPerf("lyrics-scroll", {
+    activeLyricIndex,
+    lineCount: lyricLines.length,
+    measureMs: Number((afterMeasure - beforeMeasure).toFixed(2)),
+    totalMs: Number((finishedAt - startedAt).toFixed(2)),
+    nextScrollTop: Math.round(nextScrollTop),
+  });
+}, [activeLyricIndex, lyricLines.length]);
+
+
+
+
 
   useEffect(() => {
     if (!requestedLyricsEnabled || !lyricsEnabled) {
