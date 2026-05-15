@@ -853,7 +853,7 @@ export function MirrorMediaDock({
 
   viewport.scrollTo({
     top: Math.max(0, nextScrollTop),
-    behavior: "auto",
+    behavior: "smooth",
   });
 
   const finishedAt = performance.now();
