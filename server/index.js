@@ -124,6 +124,7 @@ const SPOTIFY_STATE_TTL_MS = 10 * 60 * 1000;
 
 const pendingSpotifyStates = new Map();
 const lyricsCache = new Map();
+const lyricsPendingRequests = new Map();
 
 function cleanupPendingSpotifyStates() {
   const now = Date.now();
@@ -1406,119 +1407,150 @@ async function fetchLyricsFromLrclib({
     };
   }
 
-  const url = new URL(LRCLIB_GET_URL);
-  url.searchParams.set("track_name", normalizedTrackName);
-  url.searchParams.set("artist_name", normalizedArtistName);
+  const pendingRequest = lyricsPendingRequests.get(cacheKey);
 
-  if (normalizedAlbumName) {
-    url.searchParams.set("album_name", normalizedAlbumName);
-  }
-
-  if (durationSeconds !== null) {
-    url.searchParams.set("duration", String(durationSeconds));
-  }
-
-  console.log("[lyrics:fetch]", {
-    trackName: normalizedTrackName,
-    artistName: normalizedArtistName,
-    albumName: normalizedAlbumName,
-    durationSeconds,
-  });
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, 12000);
-
-  try {
-    const response = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "Smart-Mirror-OS/0.0.0 (lyrics lookup)",
-      },
-      signal: controller.signal,
-    });
-
-    if (response.status === 404) {
-      const body = {
-        ok: true,
-        lyrics: null,
-        message: "Geen lyrics gevonden.",
-      };
-
-      lyricsCache.set(cacheKey, {
-        body,
-        expiresAt: Date.now() + LYRICS_NOT_FOUND_CACHE_TTL_MS,
-      });
-
-      return { status: 200, body };
-    }
-
-    if (!response.ok) {
-      return {
-        status: response.status,
-        body: {
-          ok: false,
-          error: `LRCLIB gaf status ${response.status}.`,
-        },
-      };
-    }
-
-    const payload = await response.json();
-    const body = {
-      ok: true,
-      lyrics: {
-        trackName:
-          typeof payload.trackName === "string"
-            ? payload.trackName
-            : normalizedTrackName,
-        artistName:
-          typeof payload.artistName === "string"
-            ? payload.artistName
-            : normalizedArtistName,
-        albumName:
-          typeof payload.albumName === "string"
-            ? payload.albumName
-            : normalizedAlbumName,
-        instrumental: payload.instrumental === true,
-        plainLyrics:
-          typeof payload.plainLyrics === "string" ? payload.plainLyrics : null,
-        syncedLyrics:
-          typeof payload.syncedLyrics === "string"
-            ? payload.syncedLyrics
-            : null,
-      },
-    };
-
-    lyricsCache.set(cacheKey, {
-      body,
-      expiresAt: Date.now() + LYRICS_CACHE_TTL_MS,
-    });
-
-    return { status: 200, body };
-  } catch (error) {
-    console.log("[lyrics:error]", {
+  if (pendingRequest) {
+    console.log("[lyrics:pending-hit]", {
       trackName: normalizedTrackName,
       artistName: normalizedArtistName,
       albumName: normalizedAlbumName,
       durationSeconds,
-      errorName: error?.name,
-      errorMessage: error instanceof Error ? error.message : String(error),
+      cacheKey,
     });
 
-    return {
-      status: error?.name === "AbortError" ? 504 : 500,
-      body: {
-        ok: false,
-        error:
-          error?.name === "AbortError"
-            ? "Lyrics ophalen duurde te lang."
-            : "Lyrics ophalen mislukt.",
-      },
-    };
-  } finally {
-    clearTimeout(timeoutId);
+    return pendingRequest;
   }
+
+  const requestPromise = (async () => {
+    const url = new URL(LRCLIB_GET_URL);
+    url.searchParams.set("track_name", normalizedTrackName);
+    url.searchParams.set("artist_name", normalizedArtistName);
+
+    if (normalizedAlbumName) {
+      url.searchParams.set("album_name", normalizedAlbumName);
+    }
+
+    if (durationSeconds !== null) {
+      url.searchParams.set("duration", String(durationSeconds));
+    }
+
+    console.log("[lyrics:pending-store]", {
+      trackName: normalizedTrackName,
+      artistName: normalizedArtistName,
+      albumName: normalizedAlbumName,
+      durationSeconds,
+      cacheKey,
+    });
+
+    console.log("[lyrics:fetch]", {
+      trackName: normalizedTrackName,
+      artistName: normalizedArtistName,
+      albumName: normalizedAlbumName,
+      durationSeconds,
+    });
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 12000);
+
+    try {
+      const response = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "Smart-Mirror-OS/0.0.0 (lyrics lookup)",
+        },
+        signal: controller.signal,
+      });
+
+      if (response.status === 404) {
+        const body = {
+          ok: true,
+          lyrics: null,
+          message: "Geen lyrics gevonden.",
+        };
+
+        lyricsCache.set(cacheKey, {
+          body,
+          expiresAt: Date.now() + LYRICS_NOT_FOUND_CACHE_TTL_MS,
+        });
+
+        return { status: 200, body };
+      }
+
+      if (!response.ok) {
+        return {
+          status: response.status,
+          body: {
+            ok: false,
+            error: `LRCLIB gaf status ${response.status}.`,
+          },
+        };
+      }
+
+      const payload = await response.json();
+      const body = {
+        ok: true,
+        lyrics: {
+          trackName:
+            typeof payload.trackName === "string"
+              ? payload.trackName
+              : normalizedTrackName,
+          artistName:
+            typeof payload.artistName === "string"
+              ? payload.artistName
+              : normalizedArtistName,
+          albumName:
+            typeof payload.albumName === "string"
+              ? payload.albumName
+              : normalizedAlbumName,
+          instrumental: payload.instrumental === true,
+          plainLyrics:
+            typeof payload.plainLyrics === "string"
+              ? payload.plainLyrics
+              : null,
+          syncedLyrics:
+            typeof payload.syncedLyrics === "string"
+              ? payload.syncedLyrics
+              : null,
+        },
+      };
+
+      lyricsCache.set(cacheKey, {
+        body,
+        expiresAt: Date.now() + LYRICS_CACHE_TTL_MS,
+      });
+
+      return { status: 200, body };
+    } catch (error) {
+      console.log("[lyrics:error]", {
+        trackName: normalizedTrackName,
+        artistName: normalizedArtistName,
+        albumName: normalizedAlbumName,
+        durationSeconds,
+        errorName: error?.name,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+
+      return {
+        status: error?.name === "AbortError" ? 504 : 500,
+        body: {
+          ok: false,
+          error:
+            error?.name === "AbortError"
+              ? "Lyrics ophalen duurde te lang."
+              : "Lyrics ophalen mislukt.",
+        },
+      };
+    } finally {
+      clearTimeout(timeoutId);
+      lyricsPendingRequests.delete(cacheKey);
+    }
+  })();
+
+  lyricsPendingRequests.set(cacheKey, requestPromise);
+
+  return requestPromise;
 }
 
 async function pollNowPlayingProviders() {
