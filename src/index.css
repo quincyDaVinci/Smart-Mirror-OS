@@ -2374,7 +2374,7 @@ button:disabled {
 
 
 
-/* TEMP ODROID LYRIC PERFORMANCE TEST */
+/* TEMP ODROID LYRIC PERFORMANCE TEST V2 */
 .mirror-main-media__lyrics {
   mask-image: none !important;
 }
@@ -2382,23 +2382,41 @@ button:disabled {
 .mirror-main-media__lyrics-line {
   filter: none !important;
   font-size: clamp(1.8rem, 4vw, 4.8rem) !important;
-  padding-block: 12px !important;
+  padding-block: 14px !important;
   text-wrap: normal !important;
+
+  transform: scale(0.9);
+  transform-origin: center center;
+
   transition:
-    opacity 120ms linear,
-    color 120ms linear,
-    transform 120ms linear !important;
-  will-change: opacity, transform;
+    opacity 140ms linear,
+    color 140ms linear,
+    transform 160ms ease-out !important;
+
+  will-change: transform, opacity;
 }
 
-.mirror-main-media__lyrics-line--near,
-.mirror-main-media__lyrics-line--edge,
-.mirror-main-media__lyrics-line--active {
-  filter: none !important;
-  font-size: clamp(1.8rem, 4vw, 4.8rem) !important;
+.mirror-main-media__lyrics-line--past {
+  opacity: 0.18 !important;
+  transform: scale(0.86);
+}
+
+.mirror-main-media__lyrics-line--far {
+  opacity: 0.1 !important;
+  transform: scale(0.84);
+}
+
+.mirror-main-media__lyrics-line--edge {
+  opacity: 0.35 !important;
+  transform: scale(0.9);
+}
+
+.mirror-main-media__lyrics-line--near {
+  opacity: 0.68 !important;
+  transform: scale(1);
 }
 
 .mirror-main-media__lyrics-line--active {
-  padding-block: 12px !important;
-  transform: scale(1.08);
+  opacity: 1 !important;
+  transform: scale(1.22);
 }
