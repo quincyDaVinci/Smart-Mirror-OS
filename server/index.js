@@ -94,8 +94,6 @@ process.on("unhandledRejection", (reason) => {
 
 console.log("[boot] backend process starting");
 
-
-
 const PERF_LOG_ENABLED = process.env.PERF_LOG_ENABLED === "1";
 
 app.post("/debug/perf", (req, res) => {
@@ -107,9 +105,6 @@ app.post("/debug/perf", (req, res) => {
   console.log("[perf]", JSON.stringify(req.body));
   res.sendStatus(204);
 });
-
-
-
 
 const HEARTBEAT_INTERVAL_MS = 25000;
 const NOW_PLAYING_IDLE_POLL_INTERVAL_MS = 10000;
@@ -981,8 +976,7 @@ function clearFocusedWidget(reason = "focus:clear", options = {}) {
     (state.media.status === "playing" || state.media.status === "paused") &&
     isMediaPlayableSource(state.media);
   const shouldSuppressMediaAutoFocus =
-    options.suppressMediaAutoFocus === true &&
-    previousWidgetId === "media";
+    options.suppressMediaAutoFocus === true && previousWidgetId === "media";
 
   state.display = {
     ...state.display,
@@ -1335,7 +1329,12 @@ function normalizeLyricsQueryValue(value) {
   return typeof value === "string" ? value.trim().slice(0, 180) : "";
 }
 
-function getLyricsCacheKey({ trackName, artistName, albumName, durationSeconds }) {
+function getLyricsCacheKey({
+  trackName,
+  artistName,
+  albumName,
+  durationSeconds,
+}) {
   return JSON.stringify({
     trackName: trackName.toLowerCase(),
     artistName: artistName.toLowerCase(),
@@ -1387,9 +1386,20 @@ async function fetchLyricsFromLrclib({
     albumName: normalizedAlbumName,
     durationSeconds,
   });
-  const cachedEntry = lyricsCache.get(cacheKey);
 
-  if (cachedEntry && cachedEntry.expiresAt > Date.now()) {
+  const cachedEntry = lyricsCache.get(cacheKey);
+  const cacheHit = Boolean(cachedEntry && cachedEntry.expiresAt > Date.now());
+
+  console.log("[lyrics:cache]", {
+    hit: cacheHit,
+    trackName: normalizedTrackName,
+    artistName: normalizedArtistName,
+    albumName: normalizedAlbumName,
+    durationSeconds,
+    cacheKey,
+  });
+
+  if (cacheHit) {
     return {
       status: 200,
       body: cachedEntry.body,
@@ -1407,6 +1417,13 @@ async function fetchLyricsFromLrclib({
   if (durationSeconds !== null) {
     url.searchParams.set("duration", String(durationSeconds));
   }
+
+  console.log("[lyrics:fetch]", {
+    trackName: normalizedTrackName,
+    artistName: normalizedArtistName,
+    albumName: normalizedAlbumName,
+    durationSeconds,
+  });
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
@@ -1467,7 +1484,9 @@ async function fetchLyricsFromLrclib({
         plainLyrics:
           typeof payload.plainLyrics === "string" ? payload.plainLyrics : null,
         syncedLyrics:
-          typeof payload.syncedLyrics === "string" ? payload.syncedLyrics : null,
+          typeof payload.syncedLyrics === "string"
+            ? payload.syncedLyrics
+            : null,
       },
     };
 
@@ -1478,6 +1497,15 @@ async function fetchLyricsFromLrclib({
 
     return { status: 200, body };
   } catch (error) {
+    console.log("[lyrics:error]", {
+      trackName: normalizedTrackName,
+      artistName: normalizedArtistName,
+      albumName: normalizedAlbumName,
+      durationSeconds,
+      errorName: error?.name,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
+
     return {
       status: error?.name === "AbortError" ? 504 : 500,
       body: {
@@ -2515,11 +2543,28 @@ app.get("/state", (_req, res) => {
 });
 
 app.get("/media/lyrics", async (req, res) => {
+  console.log("[lyrics:req]", {
+    ip: req.socket.remoteAddress,
+    userAgent: req.headers["user-agent"],
+    trackName: req.query.trackName,
+    artistName: req.query.artistName,
+    albumName: req.query.albumName,
+    durationMs: req.query.durationMs,
+  });
+
   const result = await fetchLyricsFromLrclib({
     trackName: req.query.trackName,
     artistName: req.query.artistName,
     albumName: req.query.albumName,
     durationMs: req.query.durationMs,
+  });
+
+  console.log("[lyrics:res]", {
+    ip: req.socket.remoteAddress,
+    status: result.status,
+    ok: result.body?.ok,
+    hasLyrics: Boolean(result.body?.lyrics),
+    message: result.body?.message ?? result.body?.error ?? null,
   });
 
   res.status(result.status).json(result.body);
