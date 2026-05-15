@@ -517,7 +517,7 @@ export function MirrorMediaDock({
 
     const intervalId = window.setInterval(() => {
       setNowMs(Date.now());
-    }, 250);
+    }, 1000);
 
     return () => {
       window.clearInterval(intervalId);
