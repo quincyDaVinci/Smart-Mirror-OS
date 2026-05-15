@@ -48,7 +48,7 @@ const LYRICS_AUTO_HIDE_AFTER_MS = 3500;
 
 
 
-const DEBUG_LYRICS_PERF = true;
+const DEBUG_LYRICS_PERF = false;
 
 function sendLyricsPerf(label: string, data: Record<string, unknown>) {
   if (!DEBUG_LYRICS_PERF) {
