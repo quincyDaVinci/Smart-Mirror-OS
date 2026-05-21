@@ -38,6 +38,8 @@ const ALLOWED_ORIGINS = [
   "http://127.0.0.1:4173",
 ].filter(Boolean);
 
+const { startLightSensor, readLightSensor } = require("./sensors/veml7700");
+
 function isAllowedOrigin(origin) {
   if (!origin) {
     return false;
@@ -283,6 +285,15 @@ const defaultState = {
   presence: {
     mode: "idle",
     lastMotionAt: null,
+  },
+  light: {
+    enabled: true,
+    status: "unknown",
+    raw: null,
+    lux: null,
+    roomLightOn: false,
+    updatedAt: null,
+    error: null,
   },
   display: {
     mode: "dimmed",
@@ -797,6 +808,10 @@ function loadState() {
         ...baseState.presence,
         ...parsedState.presence,
       },
+      light: {
+        ...baseState.light,
+        ...parsedState.light,
+      },
       display: normalizeDisplay(parsedState.display ?? {}),
       deployment: {
         ...baseState.deployment,
@@ -826,6 +841,48 @@ function saveState(nextState) {
 
 const state = loadState();
 console.log("[boot] state loaded");
+
+const lightSensorStartup = startLightSensor();
+
+state.light = {
+  ...state.light,
+  enabled: true,
+  status: lightSensorStartup.ok ? "ok" : "error",
+  error: lightSensorStartup.ok ? null : lightSensorStartup.error,
+  updatedAt: Date.now(),
+};
+
+function pollLightSensor() {
+  try {
+    const reading = readLightSensor();
+
+    state.light = {
+      ...state.light,
+      enabled: true,
+      status: "ok",
+      raw: reading.raw,
+      lux: reading.lux,
+      roomLightOn: reading.lux > 80,
+      updatedAt: reading.updatedAt,
+      error: null,
+    };
+
+    saveState(state);
+    broadcastState();
+  } catch (error) {
+    state.light = {
+      ...state.light,
+      status: "error",
+      error: error.message,
+      updatedAt: Date.now(),
+    };
+
+    saveState(state);
+    broadcastState();
+  }
+}
+
+setInterval(pollLightSensor, 5000);
 
 state.logs = [];
 

@@ -763,24 +763,13 @@ export function MirrorMediaDock({
   
 
   const activeLyricIndex = useMemo(() => {
-  const startedAt = performance.now();
+  
 
   const result = getActiveLyricIndex(
     lyricLines,
     liveProgressMs,
     displayMedia.durationMs,
   );
-
-  const durationMs = performance.now() - startedAt;
-
-  if (lyricsEnabled && durationMs > 1) {
-    sendLyricsPerf("active-index-calc", {
-      durationMs: Number(durationMs.toFixed(2)),
-      lineCount: lyricLines.length,
-      activeLyricIndex: result,
-      progressMs: liveProgressMs,
-    });
-  }
 
   return result;
 }, [lyricLines, liveProgressMs, displayMedia.durationMs, lyricsEnabled]);
