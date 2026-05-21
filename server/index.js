@@ -38,11 +38,7 @@ const ALLOWED_ORIGINS = [
   "http://127.0.0.1:4173",
 ].filter(Boolean);
 
-
-const {
-  startLightSensor,
-  readLightSensor,
-} = require("./sensors/veml7700");
+const { startLightSensor, readLightSensor } = require("./sensors/veml7700");
 
 function isAllowedOrigin(origin) {
   if (!origin) {
@@ -285,6 +281,9 @@ const defaultState = {
     zoomPercent: 100,
     focusIdleTimeoutSeconds: 45,
     mediaFocusExitDelaySeconds: 10,
+    lightSensorEnabled: true,
+    lightOnLuxThreshold: 80,
+    lightOffLuxThreshold: 40,
   },
   presence: {
     mode: "idle",
@@ -470,6 +469,20 @@ function normalizeSettings(input = {}) {
       600,
       defaultState.settings.mediaFocusExitDelaySeconds,
     ),
+    lightSensorEnabled:
+      typeof input.lightSensorEnabled === "boolean"
+        ? input.lightSensorEnabled
+        : defaultState.settings.lightSensorEnabled,
+
+    lightOnLuxThreshold:
+      typeof input.lightOnLuxThreshold === "number"
+        ? input.lightOnLuxThreshold
+        : defaultState.settings.lightOnLuxThreshold,
+
+    lightOffLuxThreshold:
+      typeof input.lightOffLuxThreshold === "number"
+        ? input.lightOffLuxThreshold
+        : defaultState.settings.lightOffLuxThreshold,
   };
 }
 
@@ -857,8 +870,32 @@ state.light = {
 };
 
 function pollLightSensor() {
+  if (!state.settings.lightSensorEnabled) {
+    state.light = {
+      ...state.light,
+      enabled: false,
+      status: "disabled",
+      updatedAt: Date.now(),
+      error: null,
+    };
+
+    saveState(state);
+    broadcastState();
+    return;
+  }
+
   try {
     const reading = readLightSensor();
+
+    let nextRoomLightOn = state.light.roomLightOn;
+
+    if (reading.lux > state.settings.lightOnLuxThreshold) {
+      nextRoomLightOn = true;
+    }
+
+    if (reading.lux < state.settings.lightOffLuxThreshold) {
+      nextRoomLightOn = false;
+    }
 
     state.light = {
       ...state.light,
@@ -866,7 +903,7 @@ function pollLightSensor() {
       status: "ok",
       raw: reading.raw,
       lux: reading.lux,
-      roomLightOn: reading.lux > 80,
+      roomLightOn: nextRoomLightOn,
       updatedAt: reading.updatedAt,
       error: null,
     };
@@ -876,6 +913,7 @@ function pollLightSensor() {
   } catch (error) {
     state.light = {
       ...state.light,
+      enabled: true,
       status: "error",
       error: error.message,
       updatedAt: Date.now(),

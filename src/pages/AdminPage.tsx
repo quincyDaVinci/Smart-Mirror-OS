@@ -420,6 +420,46 @@ export function AdminPage({
         </AccordionSection>
 
         <AccordionSection
+          title="Light sensor settings"
+          subtitle="Thresholds voor kamerlicht detectie"
+        >
+          <label>
+            <input
+              type="checkbox"
+              checked={settings.lightSensorEnabled}
+              onChange={(event) =>
+                onUpdateSettings({ lightSensorEnabled: event.target.checked })
+              }
+            />
+            Light sensor enabled
+          </label>
+          <label>
+            Light on threshold lux
+            <input
+              type="number"
+              value={settings.lightOnLuxThreshold}
+              onChange={(event) =>
+                onUpdateSettings({
+                  lightOnLuxThreshold: Number(event.target.value),
+                })
+              }
+            />
+          </label>
+          <label>
+            Light off threshold lux
+            <input
+              type="number"
+              value={settings.lightOffLuxThreshold}
+              onChange={(event) =>
+                onUpdateSettings({
+                  lightOffLuxThreshold: Number(event.target.value),
+                })
+              }
+            />
+          </label>
+        </AccordionSection>
+
+        <AccordionSection
           title="Deployment"
           subtitle="Update check en live uitrollen"
         >

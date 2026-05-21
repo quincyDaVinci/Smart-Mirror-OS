@@ -15,6 +15,9 @@ export type MirrorSettings = {
   zoomPercent: number;
   focusIdleTimeoutSeconds: number;
   mediaFocusExitDelaySeconds: number;
+  lightSensorEnabled: boolean;
+  lightOnLuxThreshold: number;
+  lightOffLuxThreshold: number;
 };
 
 export const defaultMirrorSettings: MirrorSettings = {
@@ -23,13 +26,16 @@ export const defaultMirrorSettings: MirrorSettings = {
   autoSleepEnabled: false,
   sleepTimeoutSeconds: 180,
   showStatusBar: true,
-  layoutPaddingPx: 32,
-  layoutPaddingTopPx: 32,
-  layoutPaddingRightPx: 32,
-  layoutPaddingBottomPx: 32,
-  layoutPaddingLeftPx: 32,
+  layoutPaddingPx: 0,
+  layoutPaddingTopPx: 0,
+  layoutPaddingRightPx: 0,
+  layoutPaddingBottomPx: 0,
+  layoutPaddingLeftPx: 0,
   widgetGapPx: 16,
-  zoomPercent: 100,
+  zoomPercent: 150,
   focusIdleTimeoutSeconds: 45,
   mediaFocusExitDelaySeconds: 10,
+  lightSensorEnabled: true,
+  lightOnLuxThreshold: 50,
+  lightOffLuxThreshold: 70,
 };
