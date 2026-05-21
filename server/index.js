@@ -38,7 +38,10 @@ const ALLOWED_ORIGINS = [
   "http://127.0.0.1:4173",
 ].filter(Boolean);
 
-const { startLightSensor, readLightSensor } = require("./sensors/veml7700");
+const {
+  startLightSensor,
+  readLightSensor,
+} = require("./sensors/veml7700");
 
 function isAllowedOrigin(origin) {
   if (!origin) {
