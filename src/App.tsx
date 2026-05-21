@@ -9,6 +9,7 @@ function App() {
     layout,
     settings,
     presence,
+    light,
     display,
     isConnected,
     connectionStatus,
@@ -58,6 +59,7 @@ function App() {
               settings={settings}
               presence={presence}
               display={display}
+              light={light}
               onToggleWidget={toggleWidget}
               onReorderWidgets={reorderLayout}
               onUpdateWidgetPosition={updateWidgetPosition}

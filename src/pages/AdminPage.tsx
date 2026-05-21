@@ -12,11 +12,13 @@ import type {
   ProviderSecretsInput,
 } from "../types/providerConfig";
 import { AccordionSection } from "../components/admin/AccordionSection";
+import type { LightSensorState } from "../types/light";
 
 type AdminPageProps = {
   layout: LayoutItem[];
   settings: MirrorSettings;
   presence: PresenceState;
+  light: LightSensorState;
   display: DisplayState;
   onToggleWidget: (widgetId: WidgetId) => void;
   onReorderWidgets: (orderedIds: WidgetId[]) => void;
@@ -70,6 +72,7 @@ export function AdminPage({
   layout,
   settings,
   presence,
+  light,
   display,
   onToggleWidget,
   onReorderWidgets,
@@ -393,6 +396,19 @@ export function AdminPage({
               ? new Date(presence.lastMotionAt).toLocaleTimeString("nl-NL")
               : "nog geen beweging"}
           </p>
+          <hr style={{ borderColor: "rgba(255,255,255,0.12)" }} />
+
+          <p>Light status: {light.status}</p>
+          <p>Lux: {light.lux ?? "geen meting"}</p>
+          <p>Raw: {light.raw ?? "geen meting"}</p>
+          <p>Room light on: {light.roomLightOn ? "ja" : "nee"}</p>
+          <p>
+            Light updated:{" "}
+            {light.updatedAt
+              ? new Date(light.updatedAt).toLocaleTimeString("nl-NL")
+              : "nog niet"}
+          </p>
+          {light.error ? <p>Light error: {light.error}</p> : null}
 
           <button
             type="button"

@@ -12,11 +12,13 @@ import type {
   ProviderSecretsInput,
 } from "../types/providerConfig";
 import { defaultProviderConfigStatus } from "../types/providerConfig";
+import type { LightSensorState } from "../types/light";
 
 type MirrorState = {
   layout: LayoutItem[];
   settings: MirrorSettings;
   presence: PresenceState;
+  light: LightSensorState;
   display: DisplayState;
   deployment: DeploymentState;
   media: MediaState;
@@ -179,6 +181,15 @@ export function useMirrorSocket() {
     mode: "idle",
     lastMotionAt: null,
   });
+  const [light, setLight] = useState<LightSensorState>({
+    enabled: true,
+    status: "unknown",
+    raw: null,
+    lux: null,
+    roomLightOn: false,
+    updatedAt: null,
+    error: null,
+  });
   const [display, setDisplay] = useState<DisplayState>({
     mode: "dimmed",
     reason: "initial",
@@ -217,6 +228,7 @@ export function useMirrorSocket() {
     setLayout(nextState.layout);
     setSettings(nextState.settings);
     setPresence(nextState.presence);
+    setLight(nextState.light);
     setDisplay(nextState.display);
     setDeployment(nextState.deployment);
     setMedia(nextState.media);
@@ -822,6 +834,7 @@ export function useMirrorSocket() {
     layout,
     settings,
     presence,
+    light,
     display,
     isConnected,
     connectionStatus,
