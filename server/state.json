@@ -2,34 +2,117 @@
   "layout": [
     {
       "id": "clock",
-      "enabled": true
+      "enabled": true,
+      "position": "top-left"
     },
     {
       "id": "weather",
-      "enabled": true
+      "enabled": true,
+      "position": "top-left"
     },
     {
       "id": "media",
-      "enabled": true
+      "enabled": true,
+      "position": "bottom-right"
     },
     {
       "id": "calendar",
-      "enabled": true
+      "enabled": true,
+      "position": "bottom-left"
     }
   ],
   "settings": {
     "showSeconds": true,
-    "mirrorMode": "normal",
+    "mirrorMode": "portrait-right",
     "autoSleepEnabled": false,
-    "sleepTimeoutSeconds": 100
+    "sleepTimeoutSeconds": 1000,
+    "showStatusBar": false,
+    "layoutPaddingPx": 24,
+    "layoutPaddingTopPx": 0,
+    "layoutPaddingRightPx": 0,
+    "layoutPaddingBottomPx": 0,
+    "layoutPaddingLeftPx": 0,
+    "widgetGapPx": 16,
+    "zoomPercent": 150,
+    "focusIdleTimeoutSeconds": 45,
+    "mediaFocusExitDelaySeconds": 10
   },
   "presence": {
-    "mode": "idle",
-    "lastMotionAt": 1775654178885
+    "mode": "active",
+    "lastMotionAt": 1776537879858
   },
   "display": {
-    "mode": "dimmed",
-    "reason": "timeout",
-    "updatedAt": 1775654279763
+    "mode": "on",
+    "reason": "focus:auto-media",
+    "updatedAt": 1779371761904,
+    "focusedWidgetId": "media",
+    "focusSource": "media-auto",
+    "focusSetAt": 1779371761904,
+    "focusUntil": null,
+    "mediaIdleSince": null,
+    "mediaAutoFocusSuppressed": false,
+    "mediaAutoFocusSuppressedAt": null,
+    "mediaAutoFocusSuppressionSawActive": false,
+    "mediaLyricsVisible": false
+  },
+  "deployment": {
+    "status": "error",
+    "currentCommit": "87aa92fa601c61ea78717824c86072327f0537f5",
+    "currentCommitMessage": "feat: add VEML7700 light sensor integration with reading functionality",
+    "remoteCommit": "f5cb7a7ea2e5d1339d9915ae4df70962d1a17f52",
+    "remoteCommitMessage": "Refactor VEML7700 sensor initialization and error handling; remove performance measurement from active lyric index calculation",
+    "hasUpdate": true,
+    "lastCheckedAt": 1779372522346,
+    "lastDeployedAt": 1779364859525,
+    "message": "Deploy mislukt. Check server logs."
+  },
+  "media": {
+    "status": "playing",
+    "source": "spotify",
+    "kind": "track",
+    "title": "Don't Let It Go to Your Head - 12\" Version",
+    "subtitle": "Jean Carn",
+    "secondaryText": "Happy To Be With You",
+    "productionYear": 1978,
+    "genres": [],
+    "communityRating": 0,
+    "artworkUrl": "https://i.scdn.co/image/ab67616d0000b2735a13e6fabbcc035f0a8e9f43",
+    "progressMs": 1969,
+    "durationMs": 291333,
+    "deviceName": null,
+    "userName": "Spotify",
+    "isLiked": null,
+    "lastUpdatedAt": 1779372925330,
+    "statusChangedAt": 1779372925330,
+    "lastPlayed": {
+      "source": "spotify",
+      "kind": "track",
+      "title": "Don't Let It Go to Your Head - 12\" Version",
+      "subtitle": "Jean Carn",
+      "secondaryText": "Happy To Be With You",
+      "productionYear": 1978,
+      "genres": [],
+      "communityRating": 0,
+      "artworkUrl": "https://i.scdn.co/image/ab67616d0000b2735a13e6fabbcc035f0a8e9f43",
+      "durationMs": 291333,
+      "deviceName": null,
+      "userName": "Spotify",
+      "isLiked": null,
+      "capturedAt": 1779372925604
+    },
+    "sourceState": {
+      "jellyfin": {
+        "enabled": true,
+        "status": "ok",
+        "message": null,
+        "lastCheckedAt": 1779372925214
+      },
+      "spotify": {
+        "enabled": true,
+        "status": "ok",
+        "message": null,
+        "lastCheckedAt": 1779372925330
+      }
+    }
   }
 }
