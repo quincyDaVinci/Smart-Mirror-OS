@@ -2,7 +2,7 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-const { exec } = require("child_process");
+const { exec, execFile } = require("child_process");
 const util = require("util");
 
 const execAsync = util.promisify(exec);
@@ -2018,6 +2018,37 @@ function syncPresenceFromEnvironment() {
   return true;
 }
 
+let lastPhysicalDisplayMode = null;
+
+function syncPhysicalDisplay(mode) {
+  if (mode !== "on" && mode !== "sleep") {
+    return;
+  }
+
+  if (lastPhysicalDisplayMode === mode) {
+    return;
+  }
+
+  lastPhysicalDisplayMode = mode;
+
+  const commandMode = mode === "on" ? "on" : "off";
+
+  execFile(
+    "sudo",
+    ["-n", "/usr/local/bin/smart-mirror-display", commandMode],
+    (error) => {
+      if (error) {
+        appendLog(
+          "error",
+          "display",
+          "Fysieke display sync mislukt",
+          error.message,
+        );
+      }
+    },
+  );
+}
+
 function updateDisplayState(reason = "system") {
   const previousMode = state.display.mode;
   const previousReason = state.display.reason;
@@ -2042,6 +2073,8 @@ function updateDisplayState(reason = "system") {
     reason,
     updatedAt: Date.now(),
   };
+
+  syncPhysicalDisplay(nextMode);
 
   if (previousMode !== nextMode || previousReason !== reason) {
     appendLog(
