@@ -913,6 +913,7 @@ function pollLightSensor() {
       error: null,
     };
 
+    syncPresenceFromEnvironment();
     updateDisplayState(`light:${mode}`);
     persistAndBroadcast();
   } catch (error) {
@@ -1321,13 +1322,14 @@ function updateRuntimeMedia(nextMedia) {
   }
 
   const focusChanged = reconcileFocusState("media:update");
+  const presenceChanged = syncPresenceFromEnvironment();
   const displayChanged = updateDisplayState("media:update");
 
-  if (!mediaChanged && !focusChanged && !displayChanged) {
+  if (!mediaChanged && !focusChanged && !presenceChanged && !displayChanged) {
     return;
   }
 
-  if (focusChanged || lastPlayedChanged || displayChanged) {
+  if (focusChanged || lastPlayedChanged || presenceChanged || displayChanged) {
     saveState(state);
   }
 
@@ -1985,23 +1987,43 @@ function shouldLightKeepDisplayOn() {
   return false;
 }
 
+function syncPresenceFromEnvironment() {
+  if (!state.settings.lightSensorEnabled || state.light.status !== "ok") {
+    return false;
+  }
+
+  const nextMode = shouldLightKeepDisplayOn() ? "active" : "idle";
+
+  if (state.presence.mode === nextMode) {
+    return false;
+  }
+
+  state.presence = {
+    ...state.presence,
+    mode: nextMode,
+    lastMotionAt:
+      nextMode === "active" ? Date.now() : state.presence.lastMotionAt,
+  };
+
+  return true;
+}
+
 function updateDisplayState(reason = "system") {
   const previousMode = state.display.mode;
   const previousReason = state.display.reason;
 
-  let nextMode = "on";
-
-  const lightSensorReady = isLightSensorReady();
   const lightKeepsDisplayOn = shouldLightKeepDisplayOn();
+
+  let nextMode = "on";
 
   if (!state.settings.autoSleepEnabled) {
     nextMode = "on";
-  } else if (lightSensorReady) {
-    nextMode = lightKeepsDisplayOn ? "on" : "sleep";
-  } else if (state.presence.mode === "active") {
+  } else if (!state.settings.lightSensorEnabled) {
+    nextMode = "on";
+  } else if (state.light.status !== "ok") {
     nextMode = "on";
   } else {
-    nextMode = "sleep";
+    nextMode = lightKeepsDisplayOn ? "on" : "sleep";
   }
 
   state.display = {
@@ -2016,7 +2038,7 @@ function updateDisplayState(reason = "system") {
       "info",
       "display",
       "Display state gewijzigd",
-      `mode=${nextMode} · reason=${reason} · autoSleep=${state.settings.autoSleepEnabled} · presence=${state.presence.mode} · light=${state.light.mode} · lightActive=${lightKeepsDisplayOn}`,
+      `mode=${nextMode} · reason=${reason} · autoSleep=${state.settings.autoSleepEnabled} · light=${state.light.mode} · lightActive=${lightKeepsDisplayOn} · media=${state.media.source}:${state.media.kind}:${state.media.status}`,
     );
   }
 
