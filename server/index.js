@@ -1207,7 +1207,7 @@ function syncSpotifyContextKeepAwakeSession() {
     return false;
   }
 
-  if (isSpotifyListeningSession(state.media)) {
+  if (isSpotifyContextSessionAlive()) {
     return false;
   }
 
@@ -1223,7 +1223,7 @@ function syncSpotifyContextKeepAwakeSession() {
     "info",
     "display",
     "Spotify context keep-awake automatisch uitgezet",
-    "Spotify sessie is niet meer actief",
+    "Media focus sessie is beëindigd",
   );
 
   return true;
@@ -1421,8 +1421,8 @@ function updateRuntimeMedia(nextMedia) {
 
   const mediaReason = getMediaDisplayReason(state.media);
 
-  const spotifyContextChanged = syncSpotifyContextKeepAwakeSession();
   const focusChanged = reconcileFocusState("media:update");
+  const spotifyContextChanged = syncSpotifyContextKeepAwakeSession();
   const presenceChanged = syncPresenceFromEnvironment();
   const displayChanged = updateDisplayState("media:update");
 
@@ -2084,6 +2084,25 @@ function isSpotifyListeningSession(media) {
   );
 }
 
+function isSpotifyContextSessionAlive() {
+  if (!state.display.spotifyContextKeepAwake) {
+    return false;
+  }
+
+  if (
+    state.display.focusedWidgetId !== "media" ||
+    state.display.focusSource !== "media-auto"
+  ) {
+    return false;
+  }
+
+  if (isSpotifyListeningSession(state.media)) {
+    return true;
+  }
+
+  return state.display.mediaIdleSince !== null;
+}
+
 function isLightSensorReady() {
   return state.settings.lightSensorEnabled && state.light.status === "ok";
 }
@@ -2119,8 +2138,7 @@ function getDisplayKeepAwakeReason() {
 
   if (
     (state.light.mode === "context" || state.light.mode === "dark") &&
-    state.display.spotifyContextKeepAwake &&
-    isSpotifyListeningSession(state.media)
+    isSpotifyContextSessionAlive()
   ) {
     return state.light.mode === "dark"
       ? "Spotify luistersessie actief in donkere kamer"
@@ -2274,6 +2292,11 @@ setInterval(() => {
   }
 
   if (reconcileFocusState("interval:tick")) {
+    stateChanged = true;
+  }
+
+  if (syncSpotifyContextKeepAwakeSession()) {
+    updateDisplayState("spotify-context:session-ended");
     stateChanged = true;
   }
 
