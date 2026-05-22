@@ -2118,11 +2118,13 @@ function getDisplayKeepAwakeReason() {
   }
 
   if (
-    state.light.mode === "context" &&
+    (state.light.mode === "context" || state.light.mode === "dark") &&
     state.display.spotifyContextKeepAwake &&
     isSpotifyListeningSession(state.media)
   ) {
-    return "Spotify luistersessie speelt in context-zone";
+    return state.light.mode === "dark"
+      ? "Spotify luistersessie actief in donkere kamer"
+      : "Spotify luistersessie actief in context-zone";
   }
 
   return null;
