@@ -16,4 +16,6 @@ export type DisplayState = {
   mediaAutoFocusSuppressedAt: number | null;
   mediaAutoFocusSuppressionSawActive: boolean;
   mediaLyricsVisible: boolean;
+  spotifyContextKeepAwake: boolean;
+  spotifyContextKeepAwakeSetAt: number | null;
 };

@@ -20,6 +20,7 @@ type RemoteControlPageProps = {
   onFocusWidget: (widgetId: WidgetId) => void;
   onClearFocus: () => void;
   onSetMediaLyricsVisible: (visible: boolean) => void;
+  onSetSpotifyContextKeepAwake: (enabled: boolean) => void;
   onResetIdleTimer: () => void;
 };
 
@@ -108,11 +109,7 @@ function FocusButtonIcon({ widgetId }: { widgetId: WidgetId }) {
   return (
     <svg viewBox="0 0 24 24" width="20" height="20" fill="none">
       <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
-      <path
-        d="M10 8.5v7l5-3.5-5-3.5Z"
-        fill="currentColor"
-        stroke="none"
-      />
+      <path d="M10 8.5v7l5-3.5-5-3.5Z" fill="currentColor" stroke="none" />
     </svg>
   );
 }
@@ -140,6 +137,7 @@ export function RemoteControlPage({
   onFocusWidget,
   onClearFocus,
   onSetMediaLyricsVisible,
+  onSetSpotifyContextKeepAwake,
   onResetIdleTimer,
 }: RemoteControlPageProps) {
   const [now, setNow] = useState(0);
@@ -163,9 +161,16 @@ export function RemoteControlPage({
     display.focusUntil !== null && now > 0
       ? Math.max(0, Math.ceil((display.focusUntil - now) / 1000))
       : null;
+
   const remoteMediaTitle = getRemoteMediaTitle(media);
+
   const canToggleLyrics =
     display.focusedWidgetId === "media" &&
+    media.kind === "track" &&
+    (media.status === "playing" || media.status === "paused");
+
+  const canToggleSpotifyContext =
+    media.source === "spotify" &&
     media.kind === "track" &&
     (media.status === "playing" || media.status === "paused");
 
@@ -206,6 +211,14 @@ export function RemoteControlPage({
         </p>
         <p>
           Display: <strong>{display.mode}</strong>
+        </p>
+        <p>
+          Spotify context:{" "}
+          <strong>{display.spotifyContextKeepAwake ? "actief" : "uit"}</strong>
+        </p>
+        <p>
+          Keep awake reden:{" "}
+          <strong>{display.keepAwakeReason ?? "geen actieve reden"}</strong>
         </p>
         <p>
           Media: <strong>{media.status}</strong>
@@ -250,7 +263,11 @@ export function RemoteControlPage({
           Reset naar normal state
         </button>
 
-        <button type="button" onClick={onResetIdleTimer} disabled={!isConnected}>
+        <button
+          type="button"
+          onClick={onResetIdleTimer}
+          disabled={!isConnected}
+        >
           Reset idle timer
         </button>
 
@@ -262,6 +279,17 @@ export function RemoteControlPage({
           disabled={!isConnected || !canToggleLyrics}
         >
           Lyrics {display.mediaLyricsVisible ? "uit" : "aan"}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            onSetSpotifyContextKeepAwake(!display.spotifyContextKeepAwake);
+          }}
+          disabled={!isConnected || !canToggleSpotifyContext}
+        >
+          Spotify context{" "}
+          {display.spotifyContextKeepAwake ? "uit" : "aan voor deze sessie"}
         </button>
       </div>
     </main>

@@ -208,6 +208,8 @@ export function useMirrorSocket() {
     mediaAutoFocusSuppressedAt: null,
     mediaAutoFocusSuppressionSawActive: false,
     mediaLyricsVisible: false,
+    spotifyContextKeepAwake: false,
+    spotifyContextKeepAwakeSetAt: null,
   });
   const [deployment, setDeployment] = useState<DeploymentState>({
     status: "idle",
@@ -811,6 +813,13 @@ export function useMirrorSocket() {
     });
   }
 
+  function setSpotifyContextKeepAwake(enabled: boolean) {
+    void sendAction({
+      type: "display:spotify-context",
+      payload: { enabled },
+    });
+  }
+
   function simulateMotion() {
     void sendAction({
       type: "presence:motion",
@@ -852,6 +861,7 @@ export function useMirrorSocket() {
     focusWidget,
     clearWidgetFocus,
     setMediaLyricsVisible,
+    setSpotifyContextKeepAwake,
     simulateMotion,
     resetIdleTimer,
     checkDeploymentUpdate,

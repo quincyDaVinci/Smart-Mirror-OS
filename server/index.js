@@ -313,6 +313,8 @@ const defaultState = {
     mediaAutoFocusSuppressedAt: null,
     mediaAutoFocusSuppressionSawActive: false,
     mediaLyricsVisible: false,
+    spotifyContextKeepAwake: false,
+    spotifyContextKeepAwakeSetAt: null,
   },
   deployment: {
     status: "idle",
@@ -567,53 +569,77 @@ function normalizeFocusSource(value) {
 function normalizeDisplay(displayInput = {}) {
   const nextDisplay = {
     ...defaultState.display,
+
     mode:
       displayInput.mode === "on" ||
       displayInput.mode === "dimmed" ||
       displayInput.mode === "sleep"
         ? displayInput.mode
         : defaultState.display.mode,
+
     reason:
       typeof displayInput.reason === "string" && displayInput.reason.length > 0
         ? displayInput.reason
         : defaultState.display.reason,
+
     keepAwakeReason:
       typeof displayInput.keepAwakeReason === "string"
         ? displayInput.keepAwakeReason
         : null,
+
     updatedAt: Number.isFinite(Number(displayInput.updatedAt))
       ? Number(displayInput.updatedAt)
       : Date.now(),
+
     focusedWidgetId: isWidgetId(displayInput.focusedWidgetId)
       ? displayInput.focusedWidgetId
       : null,
+
     focusSource: normalizeFocusSource(displayInput.focusSource),
+
     focusSetAt: Number.isFinite(Number(displayInput.focusSetAt))
       ? Number(displayInput.focusSetAt)
       : null,
+
     focusUntil: Number.isFinite(Number(displayInput.focusUntil))
       ? Number(displayInput.focusUntil)
       : null,
+
     mediaIdleSince: Number.isFinite(Number(displayInput.mediaIdleSince))
       ? Number(displayInput.mediaIdleSince)
       : null,
+
     mediaAutoFocusSuppressed:
       typeof displayInput.mediaAutoFocusSuppressed === "boolean"
         ? displayInput.mediaAutoFocusSuppressed
         : defaultState.display.mediaAutoFocusSuppressed,
+
     mediaAutoFocusSuppressedAt: Number.isFinite(
       Number(displayInput.mediaAutoFocusSuppressedAt),
     )
       ? Number(displayInput.mediaAutoFocusSuppressedAt)
       : null,
+
     mediaAutoFocusSuppressionSawActive:
       typeof displayInput.mediaAutoFocusSuppressionSawActive === "boolean"
         ? displayInput.mediaAutoFocusSuppressionSawActive
         : defaultState.display.mediaAutoFocusSuppressionSawActive,
+
     mediaLyricsVisible:
       typeof displayInput.mediaLyricsVisible === "boolean"
         ? displayInput.mediaLyricsVisible
         : defaultState.display.mediaLyricsVisible,
+
+    spotifyContextKeepAwake:
+      typeof displayInput.spotifyContextKeepAwake === "boolean"
+        ? displayInput.spotifyContextKeepAwake
+        : defaultState.display.spotifyContextKeepAwake,
+
+    spotifyContextKeepAwakeSetAt: Number.isFinite(
+      Number(displayInput.spotifyContextKeepAwakeSetAt),
+    )
+      ? Number(displayInput.spotifyContextKeepAwakeSetAt)
+      : null,
   };
 
   if (!nextDisplay.focusedWidgetId) {
@@ -1144,6 +1170,65 @@ function setMediaLyricsVisible(visible, reason = "lyrics:toggle") {
   return true;
 }
 
+function setSpotifyContextKeepAwake(
+  enabled,
+  reason = "spotify-context:toggle",
+) {
+  const nextEnabled =
+    enabled === true && isSpotifyListeningSession(state.media);
+
+  const changed = state.display.spotifyContextKeepAwake !== nextEnabled;
+
+  state.display = {
+    ...state.display,
+    spotifyContextKeepAwake: nextEnabled,
+    spotifyContextKeepAwakeSetAt: nextEnabled ? Date.now() : null,
+    reason,
+    updatedAt: Date.now(),
+  };
+
+  if (changed) {
+    appendLog(
+      "info",
+      "display",
+      "Spotify context keep-awake gewijzigd",
+      nextEnabled ? "aan voor huidige sessie" : "uit",
+    );
+  }
+
+  syncPresenceFromEnvironment();
+  updateDisplayState(reason);
+
+  return changed;
+}
+
+function syncSpotifyContextKeepAwakeSession() {
+  if (!state.display.spotifyContextKeepAwake) {
+    return false;
+  }
+
+  if (isSpotifyListeningSession(state.media)) {
+    return false;
+  }
+
+  state.display = {
+    ...state.display,
+    spotifyContextKeepAwake: false,
+    spotifyContextKeepAwakeSetAt: null,
+    reason: "spotify-context:session-ended",
+    updatedAt: Date.now(),
+  };
+
+  appendLog(
+    "info",
+    "display",
+    "Spotify context keep-awake automatisch uitgezet",
+    "Spotify sessie is niet meer actief",
+  );
+
+  return true;
+}
+
 function reconcileFocusState(trigger = "focus:tick") {
   const now = Date.now();
   const focusedWidgetId = state.display.focusedWidgetId;
@@ -1336,15 +1421,28 @@ function updateRuntimeMedia(nextMedia) {
 
   const mediaReason = getMediaDisplayReason(state.media);
 
-  const focusChanged = reconcileFocusState(mediaReason);
+  const spotifyContextChanged = syncSpotifyContextKeepAwakeSession();
+  const focusChanged = reconcileFocusState("media:update");
   const presenceChanged = syncPresenceFromEnvironment();
-  const displayChanged = updateDisplayState(mediaReason);
+  const displayChanged = updateDisplayState("media:update");
 
-  if (!mediaChanged && !focusChanged && !presenceChanged && !displayChanged) {
+  if (
+    !mediaChanged &&
+    !spotifyContextChanged &&
+    !focusChanged &&
+    !presenceChanged &&
+    !displayChanged
+  ) {
     return;
   }
 
-  if (focusChanged || lastPlayedChanged || presenceChanged || displayChanged) {
+  if (
+    focusChanged ||
+    lastPlayedChanged ||
+    spotifyContextChanged ||
+    presenceChanged ||
+    displayChanged
+  ) {
     saveState(state);
   }
 
@@ -1978,6 +2076,14 @@ function isJellyfinVideoPlaying(media) {
   );
 }
 
+function isSpotifyListeningSession(media) {
+  return (
+    media.source === "spotify" &&
+    media.kind === "track" &&
+    (media.status === "playing" || media.status === "paused")
+  );
+}
+
 function isLightSensorReady() {
   return state.settings.lightSensorEnabled && state.light.status === "ok";
 }
@@ -2009,6 +2115,14 @@ function getDisplayKeepAwakeReason() {
     }
 
     return "Jellyfin video speelt in context-zone";
+  }
+
+  if (
+    state.light.mode === "context" &&
+    state.display.spotifyContextKeepAwake &&
+    isSpotifyListeningSession(state.media)
+  ) {
+    return "Spotify luistersessie speelt in context-zone";
   }
 
   return null;
@@ -2117,7 +2231,7 @@ function updateDisplayState(reason = "system") {
       "info",
       "display",
       "Display state gewijzigd",
-      `mode=${nextMode} · trigger=${reason} · keepAwake=${keepAwakeReason ?? "none"} · light=${state.light.mode} · media=${state.media.source}:${state.media.kind}:${state.media.status}`
+      `mode=${nextMode} · trigger=${reason} · keepAwake=${keepAwakeReason ?? "none"} · light=${state.light.mode} · media=${state.media.source}:${state.media.kind}:${state.media.status}`,
     );
   }
 
@@ -2333,6 +2447,14 @@ function handleClientMessage(message) {
     const { visible } = message.payload ?? {};
 
     setMediaLyricsVisible(visible === true, "lyrics:remote");
+    persistAndBroadcast();
+    return true;
+  }
+
+  if (message.type === "display:spotify-context") {
+    const { enabled } = message.payload ?? {};
+
+    setSpotifyContextKeepAwake(enabled === true, "spotify-context:remote");
     persistAndBroadcast();
     return true;
   }

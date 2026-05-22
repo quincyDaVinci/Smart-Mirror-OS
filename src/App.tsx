@@ -21,6 +21,7 @@ function App() {
     focusWidget,
     clearWidgetFocus,
     setMediaLyricsVisible,
+    setSpotifyContextKeepAwake,
     simulateMotion,
     resetIdleTimer,
     deployment,
@@ -95,6 +96,7 @@ function App() {
               onFocusWidget={focusWidget}
               onClearFocus={clearWidgetFocus}
               onSetMediaLyricsVisible={setMediaLyricsVisible}
+              onSetSpotifyContextKeepAwake={setSpotifyContextKeepAwake}
               onResetIdleTimer={resetIdleTimer}
             />
           }
