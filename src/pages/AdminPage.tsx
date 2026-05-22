@@ -401,7 +401,10 @@ export function AdminPage({
           <p>Light status: {light.status}</p>
           <p>Lux: {light.lux ?? "geen meting"}</p>
           <p>Raw: {light.raw ?? "geen meting"}</p>
+          <p>Light mode: {light.mode}</p>
           <p>Room light on: {light.roomLightOn ? "ja" : "nee"}</p>
+          <p>Light off threshold: {settings.lightOffLuxThreshold} lux</p>
+          <p>Light on threshold: {settings.lightOnLuxThreshold} lux</p>
           <p>
             Light updated:{" "}
             {light.updatedAt
@@ -421,38 +424,42 @@ export function AdminPage({
 
         <AccordionSection
           title="Light sensor settings"
-          subtitle="Thresholds voor kamerlicht detectie"
+          subtitle="Lux thresholds voor kamerlicht detectie"
         >
-          <label>
+          <label style={{ display: "block", marginBottom: "1rem" }}>
             <input
               type="checkbox"
               checked={settings.lightSensorEnabled}
               onChange={(event) =>
                 onUpdateSettings({ lightSensorEnabled: event.target.checked })
               }
-            />
+            />{" "}
             Light sensor enabled
           </label>
-          <label>
-            Light on threshold lux
-            <input
-              type="number"
-              value={settings.lightOnLuxThreshold}
-              onChange={(event) =>
-                onUpdateSettings({
-                  lightOnLuxThreshold: Number(event.target.value),
-                })
-              }
-            />
-          </label>
-          <label>
+
+          <label style={{ display: "block", marginBottom: "1rem" }}>
             Light off threshold lux
             <input
               type="number"
+              step="0.1"
               value={settings.lightOffLuxThreshold}
               onChange={(event) =>
                 onUpdateSettings({
                   lightOffLuxThreshold: Number(event.target.value),
+                })
+              }
+            />
+          </label>
+
+          <label style={{ display: "block" }}>
+            Light on threshold lux
+            <input
+              type="number"
+              step="0.1"
+              value={settings.lightOnLuxThreshold}
+              onChange={(event) =>
+                onUpdateSettings({
+                  lightOnLuxThreshold: Number(event.target.value),
                 })
               }
             />

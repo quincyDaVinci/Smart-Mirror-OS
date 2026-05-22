@@ -16,8 +16,8 @@ export type MirrorSettings = {
   focusIdleTimeoutSeconds: number;
   mediaFocusExitDelaySeconds: number;
   lightSensorEnabled: boolean;
-  lightOnLuxThreshold: number;
   lightOffLuxThreshold: number;
+  lightOnLuxThreshold: number;
 };
 
 export const defaultMirrorSettings: MirrorSettings = {

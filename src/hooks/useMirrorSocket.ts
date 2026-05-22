@@ -187,6 +187,7 @@ export function useMirrorSocket() {
   const [light, setLight] = useState<LightSensorState>({
     enabled: true,
     status: "unknown",
+    mode: "unknown",
     raw: null,
     lux: null,
     roomLightOn: false,

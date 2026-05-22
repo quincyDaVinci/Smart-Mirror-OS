@@ -282,8 +282,8 @@ const defaultState = {
     focusIdleTimeoutSeconds: 45,
     mediaFocusExitDelaySeconds: 10,
     lightSensorEnabled: true,
-    lightOnLuxThreshold: 80,
-    lightOffLuxThreshold: 40,
+    lightOffLuxThreshold: 13.5,
+    lightOnLuxThreshold: 28,
   },
   presence: {
     mode: "idle",
@@ -292,6 +292,7 @@ const defaultState = {
   light: {
     enabled: true,
     status: "unknown",
+    mode: "unknown",
     raw: null,
     lux: null,
     roomLightOn: false,
@@ -474,15 +475,15 @@ function normalizeSettings(input = {}) {
         ? input.lightSensorEnabled
         : defaultState.settings.lightSensorEnabled,
 
-    lightOnLuxThreshold:
-      typeof input.lightOnLuxThreshold === "number"
-        ? input.lightOnLuxThreshold
-        : defaultState.settings.lightOnLuxThreshold,
-
     lightOffLuxThreshold:
       typeof input.lightOffLuxThreshold === "number"
         ? input.lightOffLuxThreshold
         : defaultState.settings.lightOffLuxThreshold,
+
+    lightOnLuxThreshold:
+      typeof input.lightOnLuxThreshold === "number"
+        ? input.lightOnLuxThreshold
+        : defaultState.settings.lightOnLuxThreshold,
   };
 }
 
@@ -869,6 +870,18 @@ state.light = {
   updatedAt: Date.now(),
 };
 
+function getLightMode(lux, settings) {
+  if (lux >= settings.lightOnLuxThreshold) {
+    return "bright";
+  }
+
+  if (lux > settings.lightOffLuxThreshold) {
+    return "context";
+  }
+
+  return "dark";
+}
+
 function pollLightSensor() {
   if (!state.settings.lightSensorEnabled) {
     state.light = {
@@ -886,24 +899,16 @@ function pollLightSensor() {
 
   try {
     const reading = readLightSensor();
-
-    let nextRoomLightOn = state.light.roomLightOn;
-
-    if (reading.lux > state.settings.lightOnLuxThreshold) {
-      nextRoomLightOn = true;
-    }
-
-    if (reading.lux < state.settings.lightOffLuxThreshold) {
-      nextRoomLightOn = false;
-    }
+    const mode = getLightMode(reading.lux, state.settings);
 
     state.light = {
       ...state.light,
       enabled: true,
       status: "ok",
+      mode,
       raw: reading.raw,
       lux: reading.lux,
-      roomLightOn: nextRoomLightOn,
+      roomLightOn: mode === "bright",
       updatedAt: reading.updatedAt,
       error: null,
     };
