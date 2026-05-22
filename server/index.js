@@ -2018,9 +2018,15 @@ function syncPresenceFromEnvironment() {
   return true;
 }
 
+const PHYSICAL_DISPLAY_SCRIPT = "/usr/local/bin/smart-mirror-display";
+
 let lastPhysicalDisplayMode = null;
 
 function syncPhysicalDisplay(mode) {
+  if (process.platform !== "linux") {
+    return;
+  }
+
   if (mode !== "on" && mode !== "sleep") {
     return;
   }
@@ -2029,22 +2035,33 @@ function syncPhysicalDisplay(mode) {
     return;
   }
 
-  lastPhysicalDisplayMode = mode;
-
   const commandMode = mode === "on" ? "on" : "off";
 
   execFile(
     "sudo",
-    ["-n", "/usr/local/bin/smart-mirror-display", commandMode],
+    ["-n", PHYSICAL_DISPLAY_SCRIPT, commandMode],
     (error) => {
       if (error) {
+        lastPhysicalDisplayMode = null;
+
         appendLog(
           "error",
           "display",
           "Fysieke display sync mislukt",
           error.message,
         );
+
+        return;
       }
+
+      lastPhysicalDisplayMode = mode;
+
+      appendLog(
+        "info",
+        "display",
+        "Fysieke display sync uitgevoerd",
+        `physical=${commandMode}`,
+      );
     },
   );
 }
