@@ -1961,6 +1961,10 @@ function isJellyfinVideoPlaying(media) {
   );
 }
 
+function isLightSensorReady() {
+  return state.settings.lightSensorEnabled && state.light.status === "ok";
+}
+
 function shouldLightKeepDisplayOn() {
   if (!state.settings.lightSensorEnabled) {
     return false;
@@ -1987,11 +1991,14 @@ function updateDisplayState(reason = "system") {
 
   let nextMode = "on";
 
+  const lightSensorReady = isLightSensorReady();
   const lightKeepsDisplayOn = shouldLightKeepDisplayOn();
 
   if (!state.settings.autoSleepEnabled) {
     nextMode = "on";
-  } else if (state.presence.mode === "active" || lightKeepsDisplayOn) {
+  } else if (lightSensorReady) {
+    nextMode = lightKeepsDisplayOn ? "on" : "sleep";
+  } else if (state.presence.mode === "active") {
     nextMode = "on";
   } else {
     nextMode = "sleep";
