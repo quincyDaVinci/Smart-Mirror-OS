@@ -913,8 +913,8 @@ function pollLightSensor() {
       error: null,
     };
 
-    saveState(state);
-    broadcastState();
+    updateDisplayState(`light:${mode}`);
+    persistAndBroadcast();
   } catch (error) {
     state.light = {
       ...state.light,
@@ -1321,12 +1321,13 @@ function updateRuntimeMedia(nextMedia) {
   }
 
   const focusChanged = reconcileFocusState("media:update");
+  const displayChanged = updateDisplayState("media:update");
 
-  if (!mediaChanged && !focusChanged) {
+  if (!mediaChanged && !focusChanged && !displayChanged) {
     return;
   }
 
-  if (focusChanged || lastPlayedChanged) {
+  if (focusChanged || lastPlayedChanged || displayChanged) {
     saveState(state);
   }
 
@@ -1952,15 +1953,45 @@ function markPresenceActive() {
   persistAndBroadcast();
 }
 
+function isJellyfinVideoPlaying(media) {
+  return (
+    media.source === "jellyfin" &&
+    media.status === "playing" &&
+    (media.kind === "movie" || media.kind === "episode")
+  );
+}
+
+function shouldLightKeepDisplayOn() {
+  if (!state.settings.lightSensorEnabled) {
+    return false;
+  }
+
+  if (state.light.status !== "ok") {
+    return false;
+  }
+
+  if (state.light.mode === "bright") {
+    return true;
+  }
+
+  if (state.light.mode === "context" && isJellyfinVideoPlaying(state.media)) {
+    return true;
+  }
+
+  return false;
+}
+
 function updateDisplayState(reason = "system") {
   const previousMode = state.display.mode;
   const previousReason = state.display.reason;
 
   let nextMode = "on";
 
+  const lightKeepsDisplayOn = shouldLightKeepDisplayOn();
+
   if (!state.settings.autoSleepEnabled) {
     nextMode = "on";
-  } else if (state.presence.mode === "active") {
+  } else if (state.presence.mode === "active" || lightKeepsDisplayOn) {
     nextMode = "on";
   } else {
     nextMode = "sleep";
@@ -1978,9 +2009,11 @@ function updateDisplayState(reason = "system") {
       "info",
       "display",
       "Display state gewijzigd",
-      `mode=${nextMode} · reason=${reason} · autoSleep=${state.settings.autoSleepEnabled} · presence=${state.presence.mode}`,
+      `mode=${nextMode} · reason=${reason} · autoSleep=${state.settings.autoSleepEnabled} · presence=${state.presence.mode} · light=${state.light.mode} · lightActive=${lightKeepsDisplayOn}`,
     );
   }
+
+  return previousMode !== nextMode || previousReason !== reason;
 }
 
 function startBackgroundJobs() {
