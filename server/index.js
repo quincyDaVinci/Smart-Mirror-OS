@@ -302,6 +302,7 @@ const defaultState = {
   display: {
     mode: "dimmed",
     reason: "initial",
+    keepAwakeReason: null,
     updatedAt: Date.now(),
     focusedWidgetId: null,
     focusSource: null,
@@ -576,6 +577,10 @@ function normalizeDisplay(displayInput = {}) {
       typeof displayInput.reason === "string" && displayInput.reason.length > 0
         ? displayInput.reason
         : defaultState.display.reason,
+    keepAwakeReason:
+      typeof displayInput.keepAwakeReason === "string"
+        ? displayInput.keepAwakeReason
+        : null,
     updatedAt: Number.isFinite(Number(displayInput.updatedAt))
       ? Number(displayInput.updatedAt)
       : Date.now(),
@@ -1977,24 +1982,40 @@ function isLightSensorReady() {
   return state.settings.lightSensorEnabled && state.light.status === "ok";
 }
 
-function shouldLightKeepDisplayOn() {
+function getDisplayKeepAwakeReason() {
+  if (!state.settings.autoSleepEnabled) {
+    return "Auto sleep staat uit";
+  }
+
   if (!state.settings.lightSensorEnabled) {
-    return false;
+    return "Lichtsensor staat uit";
   }
 
   if (state.light.status !== "ok") {
-    return false;
+    return "Lichtsensor niet beschikbaar";
   }
 
   if (state.light.mode === "bright") {
-    return true;
+    return "Kamerlicht aan";
   }
 
   if (state.light.mode === "context" && isJellyfinVideoPlaying(state.media)) {
-    return true;
+    if (state.media.kind === "movie") {
+      return "Jellyfin film speelt in context-zone";
+    }
+
+    if (state.media.kind === "episode") {
+      return "Jellyfin aflevering speelt in context-zone";
+    }
+
+    return "Jellyfin video speelt in context-zone";
   }
 
-  return false;
+  return null;
+}
+
+function shouldLightKeepDisplayOn() {
+  return getDisplayKeepAwakeReason() !== null;
 }
 
 function syncPresenceFromEnvironment() {
@@ -2037,40 +2058,37 @@ function syncPhysicalDisplay(mode) {
 
   const commandMode = mode === "on" ? "on" : "off";
 
-  execFile(
-    "sudo",
-    ["-n", PHYSICAL_DISPLAY_SCRIPT, commandMode],
-    (error) => {
-      if (error) {
-        lastPhysicalDisplayMode = null;
-
-        appendLog(
-          "error",
-          "display",
-          "Fysieke display sync mislukt",
-          error.message,
-        );
-
-        return;
-      }
-
-      lastPhysicalDisplayMode = mode;
+  execFile("sudo", ["-n", PHYSICAL_DISPLAY_SCRIPT, commandMode], (error) => {
+    if (error) {
+      lastPhysicalDisplayMode = null;
 
       appendLog(
-        "info",
+        "error",
         "display",
-        "Fysieke display sync uitgevoerd",
-        `physical=${commandMode}`,
+        "Fysieke display sync mislukt",
+        error.message,
       );
-    },
-  );
+
+      return;
+    }
+
+    lastPhysicalDisplayMode = mode;
+
+    appendLog(
+      "info",
+      "display",
+      "Fysieke display sync uitgevoerd",
+      `physical=${commandMode}`,
+    );
+  });
 }
 
 function updateDisplayState(reason = "system") {
   const previousMode = state.display.mode;
   const previousReason = state.display.reason;
 
-  const lightKeepsDisplayOn = shouldLightKeepDisplayOn();
+  const keepAwakeReason = getDisplayKeepAwakeReason();
+  const lightKeepsDisplayOn = keepAwakeReason !== null;
 
   let nextMode = "on";
 
@@ -2088,6 +2106,7 @@ function updateDisplayState(reason = "system") {
     ...state.display,
     mode: nextMode,
     reason,
+    keepAwakeReason: nextMode === "on" ? keepAwakeReason : null,
     updatedAt: Date.now(),
   };
 
@@ -2098,7 +2117,7 @@ function updateDisplayState(reason = "system") {
       "info",
       "display",
       "Display state gewijzigd",
-      `mode=${nextMode} · reason=${reason} · autoSleep=${state.settings.autoSleepEnabled} · light=${state.light.mode} · lightActive=${lightKeepsDisplayOn} · media=${state.media.source}:${state.media.kind}:${state.media.status}`,
+      `mode=${nextMode} · trigger=${reason} · keepAwake=${keepAwakeReason ?? "none"} · light=${state.light.mode} · media=${state.media.source}:${state.media.kind}:${state.media.status}`
     );
   }
 

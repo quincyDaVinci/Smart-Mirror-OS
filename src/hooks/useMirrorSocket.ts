@@ -197,6 +197,7 @@ export function useMirrorSocket() {
   const [display, setDisplay] = useState<DisplayState>({
     mode: "dimmed",
     reason: "initial",
+    keepAwakeReason: null,
     updatedAt: Date.now(),
     focusedWidgetId: null,
     focusSource: null,

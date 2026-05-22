@@ -5,6 +5,7 @@ export type FocusSource = "manual" | "media-auto";
 export type DisplayState = {
   mode: "on" | "dimmed" | "sleep";
   reason: string;
+  keepAwakeReason: string | null;
   updatedAt: number;
   focusedWidgetId: WidgetId | null;
   focusSource: FocusSource | null;

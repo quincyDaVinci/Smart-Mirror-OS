@@ -389,7 +389,11 @@ export function AdminPage({
         >
           <p>Presence mode: {presence.mode}</p>
           <p>Display mode: {display.mode}</p>
-          <p>Display reason: {display.reason}</p>
+          <p>
+            Waarom blijft display aan:{" "}
+            {display.keepAwakeReason ?? "geen actieve reden"}
+          </p>
+          <p>Laatste display trigger: {display.reason}</p>
           <p>
             Laatste beweging:{" "}
             {presence.lastMotionAt
