@@ -1280,6 +1280,14 @@ function reconcileFocusState(trigger = "focus:tick") {
   return false;
 }
 
+function getMediaDisplayReason(media) {
+  const source = media.source ?? "none";
+  const kind = media.kind ?? "unknown";
+  const status = media.status ?? "unknown";
+
+  return `media:${source}:${kind}:${status}`;
+}
+
 function updateRuntimeMedia(nextMedia) {
   const normalizedMedia = normalizeMediaState(nextMedia);
   const previousLastPlayed = state.media.lastPlayed;
@@ -1321,9 +1329,11 @@ function updateRuntimeMedia(nextMedia) {
     state.media = normalizedMedia;
   }
 
-  const focusChanged = reconcileFocusState("media:update");
+  const mediaReason = getMediaDisplayReason(state.media);
+
+  const focusChanged = reconcileFocusState(mediaReason);
   const presenceChanged = syncPresenceFromEnvironment();
-  const displayChanged = updateDisplayState("media:update");
+  const displayChanged = updateDisplayState(mediaReason);
 
   if (!mediaChanged && !focusChanged && !presenceChanged && !displayChanged) {
     return;
