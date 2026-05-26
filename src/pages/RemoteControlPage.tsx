@@ -146,6 +146,13 @@ export function RemoteControlPage({
   onResetIdleTimer,
 }: RemoteControlPageProps) {
   const [now, setNow] = useState(0);
+  const [draftMediaTimeoutSeconds, setDraftMediaTimeoutSeconds] = useState(
+    settings.mediaFocusExitDelaySeconds,
+  );
+
+  useEffect(() => {
+    setDraftMediaTimeoutSeconds(settings.mediaFocusExitDelaySeconds);
+  }, [settings.mediaFocusExitDelaySeconds]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -178,6 +185,16 @@ export function RemoteControlPage({
     media.source === "spotify" &&
     media.kind === "track" &&
     (media.status === "playing" || media.status === "paused");
+
+  function saveMediaTimeoutSeconds() {
+    if (draftMediaTimeoutSeconds === settings.mediaFocusExitDelaySeconds) {
+      return;
+    }
+
+    onUpdateSettings({
+      mediaFocusExitDelaySeconds: draftMediaTimeoutSeconds,
+    });
+  }
 
   return (
     <main className="remote-page">
@@ -277,18 +294,19 @@ export function RemoteControlPage({
         </button>
 
         <label style={{ display: "block", marginTop: "1rem" }}>
-          Media sessie timeout: {settings.mediaFocusExitDelaySeconds}s
+          Media sessie timeout: {draftMediaTimeoutSeconds}s
           <input
             type="range"
-            min={3}
+            min={0}
             max={120}
-            step={1}
-            value={settings.mediaFocusExitDelaySeconds}
+            step={5}
+            value={draftMediaTimeoutSeconds}
             onChange={(event) => {
-              onUpdateSettings({
-                mediaFocusExitDelaySeconds: Number(event.target.value),
-              });
+              setDraftMediaTimeoutSeconds(Number(event.target.value));
             }}
+            onMouseUp={saveMediaTimeoutSeconds}
+            onTouchEnd={saveMediaTimeoutSeconds}
+            onBlur={saveMediaTimeoutSeconds}
             disabled={!isConnected}
             style={{
               display: "block",

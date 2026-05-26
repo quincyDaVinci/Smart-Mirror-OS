@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { LayoutControls } from "../components/admin/LayoutControls";
 import type { LayoutItem, WidgetEdgePosition, WidgetId } from "../types/layout";
@@ -93,6 +94,37 @@ export function AdminPage({
   onSaveProviderSecrets,
   apiBaseUrl,
 }: AdminPageProps) {
+  const [draftDisplaySettings, setDraftDisplaySettings] = useState({
+    zoomPercent: settings.zoomPercent,
+    layoutPaddingTopPx: settings.layoutPaddingTopPx,
+    layoutPaddingRightPx: settings.layoutPaddingRightPx,
+    layoutPaddingBottomPx: settings.layoutPaddingBottomPx,
+    layoutPaddingLeftPx: settings.layoutPaddingLeftPx,
+    widgetGapPx: settings.widgetGapPx,
+  });
+
+  useEffect(() => {
+    setDraftDisplaySettings({
+      zoomPercent: settings.zoomPercent,
+      layoutPaddingTopPx: settings.layoutPaddingTopPx,
+      layoutPaddingRightPx: settings.layoutPaddingRightPx,
+      layoutPaddingBottomPx: settings.layoutPaddingBottomPx,
+      layoutPaddingLeftPx: settings.layoutPaddingLeftPx,
+      widgetGapPx: settings.widgetGapPx,
+    });
+  }, [
+    settings.zoomPercent,
+    settings.layoutPaddingTopPx,
+    settings.layoutPaddingRightPx,
+    settings.layoutPaddingBottomPx,
+    settings.layoutPaddingLeftPx,
+    settings.widgetGapPx,
+  ]);
+
+  function saveDraftDisplaySettings() {
+    onUpdateSettings(draftDisplaySettings);
+  }
+
   const isExpectedReconnect =
     (deployment.status === "deploying" || deployment.status === "success") &&
     connectionStatus !== "connected";
@@ -286,18 +318,22 @@ export function AdminPage({
           </label>
 
           <label style={{ display: "block", marginBottom: "1rem" }}>
-            Zoom ({settings.zoomPercent}%)
+            Zoom ({draftDisplaySettings.zoomPercent}%)
             <input
               type="range"
               min={50}
               max={150}
               step={5}
-              value={settings.zoomPercent}
+              value={draftDisplaySettings.zoomPercent}
               onChange={(event) => {
-                onUpdateSettings({
+                setDraftDisplaySettings((current) => ({
+                  ...current,
                   zoomPercent: Number(event.target.value),
-                });
+                }));
               }}
+              onMouseUp={saveDraftDisplaySettings}
+              onTouchEnd={saveDraftDisplaySettings}
+              onBlur={saveDraftDisplaySettings}
               style={{
                 display: "block",
                 marginTop: "0.5rem",
@@ -319,22 +355,22 @@ export function AdminPage({
                 {
                   label: "Boven",
                   key: "layoutPaddingTopPx",
-                  value: settings.layoutPaddingTopPx,
+                  value: draftDisplaySettings.layoutPaddingTopPx,
                 },
                 {
                   label: "Rechts",
                   key: "layoutPaddingRightPx",
-                  value: settings.layoutPaddingRightPx,
+                  value: draftDisplaySettings.layoutPaddingRightPx,
                 },
                 {
                   label: "Onder",
                   key: "layoutPaddingBottomPx",
-                  value: settings.layoutPaddingBottomPx,
+                  value: draftDisplaySettings.layoutPaddingBottomPx,
                 },
                 {
                   label: "Links",
                   key: "layoutPaddingLeftPx",
-                  value: settings.layoutPaddingLeftPx,
+                  value: draftDisplaySettings.layoutPaddingLeftPx,
                 },
               ] as const
             ).map(({ label, key, value }) => (
@@ -344,13 +380,17 @@ export function AdminPage({
                   type="range"
                   min={0}
                   max={160}
-                  step={2}
+                  step={5}
                   value={Number(value)}
                   onChange={(event) => {
-                    onUpdateSettings({
+                    setDraftDisplaySettings((current) => ({
+                      ...current,
                       [key]: Number(event.target.value),
-                    } as Partial<MirrorSettings>);
+                    }));
                   }}
+                  onMouseUp={saveDraftDisplaySettings}
+                  onTouchEnd={saveDraftDisplaySettings}
+                  onBlur={saveDraftDisplaySettings}
                   style={{
                     display: "block",
                     marginTop: "0.5rem",
@@ -362,18 +402,22 @@ export function AdminPage({
           </div>
 
           <label style={{ display: "block" }}>
-            Widget spacing ({settings.widgetGapPx}px)
+            Widget spacing ({draftDisplaySettings.widgetGapPx}px)
             <input
               type="range"
               min={0}
               max={64}
-              step={2}
-              value={settings.widgetGapPx}
+              step={5}
+              value={draftDisplaySettings.widgetGapPx}
               onChange={(event) => {
-                onUpdateSettings({
+                setDraftDisplaySettings((current) => ({
+                  ...current,
                   widgetGapPx: Number(event.target.value),
-                });
+                }));
               }}
+              onMouseUp={saveDraftDisplaySettings}
+              onTouchEnd={saveDraftDisplaySettings}
+              onBlur={saveDraftDisplaySettings}
               style={{
                 display: "block",
                 marginTop: "0.5rem",
