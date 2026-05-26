@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { LayoutControls } from "../components/admin/LayoutControls";
 import type { LayoutItem, WidgetEdgePosition, WidgetId } from "../types/layout";
@@ -69,6 +69,92 @@ function formatLogTime(timestamp: number) {
   return new Date(timestamp).toLocaleTimeString("nl-NL");
 }
 
+type CommitRangeProps = {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  suffix?: string;
+  disabled?: boolean;
+  onCommit: (value: number) => void;
+};
+
+function CommitRange({
+  label,
+  value,
+  min,
+  max,
+  step,
+  suffix = "",
+  disabled = false,
+  onCommit,
+}: CommitRangeProps) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const labelValueRef = useRef<HTMLSpanElement | null>(null);
+  const latestValueRef = useRef(value);
+
+  useEffect(() => {
+    latestValueRef.current = value;
+
+    if (inputRef.current && document.activeElement !== inputRef.current) {
+      inputRef.current.value = String(value);
+    }
+
+    if (labelValueRef.current) {
+      labelValueRef.current.textContent = `${value}${suffix}`;
+    }
+  }, [value, suffix]);
+
+  function updateLabel(nextValue: number) {
+    if (labelValueRef.current) {
+      labelValueRef.current.textContent = `${nextValue}${suffix}`;
+    }
+  }
+
+  function commitValue() {
+    const nextValue = Number(inputRef.current?.value ?? value);
+
+    updateLabel(nextValue);
+
+    if (nextValue !== latestValueRef.current) {
+      onCommit(nextValue);
+    }
+  }
+
+  return (
+    <label style={{ display: "block" }}>
+      {label} (
+      <span ref={labelValueRef}>
+        {value}
+        {suffix}
+      </span>
+      )
+      <input
+        ref={inputRef}
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        defaultValue={value}
+        onInput={(event) => {
+          updateLabel(Number(event.currentTarget.value));
+        }}
+        onPointerUp={commitValue}
+        onTouchEnd={commitValue}
+        onKeyUp={commitValue}
+        onBlur={commitValue}
+        disabled={disabled}
+        style={{
+          display: "block",
+          marginTop: "0.5rem",
+          width: "100%",
+        }}
+      />
+    </label>
+  );
+}
+
 export function AdminPage({
   layout,
   settings,
@@ -94,36 +180,6 @@ export function AdminPage({
   onSaveProviderSecrets,
   apiBaseUrl,
 }: AdminPageProps) {
-  const [draftDisplaySettings, setDraftDisplaySettings] = useState({
-    zoomPercent: settings.zoomPercent,
-    layoutPaddingTopPx: settings.layoutPaddingTopPx,
-    layoutPaddingRightPx: settings.layoutPaddingRightPx,
-    layoutPaddingBottomPx: settings.layoutPaddingBottomPx,
-    layoutPaddingLeftPx: settings.layoutPaddingLeftPx,
-    widgetGapPx: settings.widgetGapPx,
-  });
-
-  useEffect(() => {
-    setDraftDisplaySettings({
-      zoomPercent: settings.zoomPercent,
-      layoutPaddingTopPx: settings.layoutPaddingTopPx,
-      layoutPaddingRightPx: settings.layoutPaddingRightPx,
-      layoutPaddingBottomPx: settings.layoutPaddingBottomPx,
-      layoutPaddingLeftPx: settings.layoutPaddingLeftPx,
-      widgetGapPx: settings.widgetGapPx,
-    });
-  }, [
-    settings.zoomPercent,
-    settings.layoutPaddingTopPx,
-    settings.layoutPaddingRightPx,
-    settings.layoutPaddingBottomPx,
-    settings.layoutPaddingLeftPx,
-    settings.widgetGapPx,
-  ]);
-
-  function saveDraftDisplaySettings() {
-    onUpdateSettings(draftDisplaySettings);
-  }
 
   const isExpectedReconnect =
     (deployment.status === "deploying" || deployment.status === "success") &&
@@ -317,30 +373,17 @@ export function AdminPage({
             </select>
           </label>
 
-          <label style={{ display: "block", marginBottom: "1rem" }}>
-            Zoom ({draftDisplaySettings.zoomPercent}%)
-            <input
-              type="range"
-              min={50}
-              max={150}
-              step={5}
-              value={draftDisplaySettings.zoomPercent}
-              onChange={(event) => {
-                setDraftDisplaySettings((current) => ({
-                  ...current,
-                  zoomPercent: Number(event.target.value),
-                }));
-              }}
-              onMouseUp={saveDraftDisplaySettings}
-              onTouchEnd={saveDraftDisplaySettings}
-              onBlur={saveDraftDisplaySettings}
-              style={{
-                display: "block",
-                marginTop: "0.5rem",
-                width: "100%",
-              }}
-            />
-          </label>
+          <CommitRange
+            label="Zoom"
+            value={settings.zoomPercent}
+            min={50}
+            max={150}
+            step={5}
+            suffix="%"
+            onCommit={(zoomPercent) => {
+              onUpdateSettings({ zoomPercent });
+            }}
+          />
 
           <div
             style={{
@@ -355,76 +398,53 @@ export function AdminPage({
                 {
                   label: "Boven",
                   key: "layoutPaddingTopPx",
-                  value: draftDisplaySettings.layoutPaddingTopPx,
+                  value: settings.layoutPaddingTopPx,
                 },
                 {
                   label: "Rechts",
                   key: "layoutPaddingRightPx",
-                  value: draftDisplaySettings.layoutPaddingRightPx,
+                  value: settings.layoutPaddingRightPx,
                 },
                 {
                   label: "Onder",
                   key: "layoutPaddingBottomPx",
-                  value: draftDisplaySettings.layoutPaddingBottomPx,
+                  value: settings.layoutPaddingBottomPx,
                 },
                 {
                   label: "Links",
                   key: "layoutPaddingLeftPx",
-                  value: draftDisplaySettings.layoutPaddingLeftPx,
+                  value: settings.layoutPaddingLeftPx,
                 },
               ] as const
             ).map(({ label, key, value }) => (
-              <label key={key} style={{ display: "block" }}>
-                {label} padding ({value}px)
-                <input
-                  type="range"
-                  min={0}
-                  max={160}
-                  step={5}
-                  value={Number(value)}
-                  onChange={(event) => {
-                    setDraftDisplaySettings((current) => ({
-                      ...current,
-                      [key]: Number(event.target.value),
-                    }));
-                  }}
-                  onMouseUp={saveDraftDisplaySettings}
-                  onTouchEnd={saveDraftDisplaySettings}
-                  onBlur={saveDraftDisplaySettings}
-                  style={{
-                    display: "block",
-                    marginTop: "0.5rem",
-                    width: "100%",
-                  }}
-                />
-              </label>
+              <CommitRange
+                key={key}
+                label={`${label} padding`}
+                value={Number(value)}
+                min={0}
+                max={160}
+                step={5}
+                suffix="px"
+                onCommit={(nextValue) => {
+                  onUpdateSettings({
+                    [key]: nextValue,
+                  } as Partial<MirrorSettings>);
+                }}
+              />
             ))}
           </div>
 
-          <label style={{ display: "block" }}>
-            Widget spacing ({draftDisplaySettings.widgetGapPx}px)
-            <input
-              type="range"
-              min={0}
-              max={64}
-              step={5}
-              value={draftDisplaySettings.widgetGapPx}
-              onChange={(event) => {
-                setDraftDisplaySettings((current) => ({
-                  ...current,
-                  widgetGapPx: Number(event.target.value),
-                }));
-              }}
-              onMouseUp={saveDraftDisplaySettings}
-              onTouchEnd={saveDraftDisplaySettings}
-              onBlur={saveDraftDisplaySettings}
-              style={{
-                display: "block",
-                marginTop: "0.5rem",
-                width: "100%",
-              }}
-            />
-          </label>
+          <CommitRange
+            label="Widget spacing"
+            value={settings.widgetGapPx}
+            min={0}
+            max={64}
+            step={4}
+            suffix="px"
+            onCommit={(widgetGapPx) => {
+              onUpdateSettings({ widgetGapPx });
+            }}
+          />
         </AccordionSection>
 
         <AccordionSection

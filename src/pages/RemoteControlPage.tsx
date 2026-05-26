@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import type { DisplayState } from "../types/display";
 import type { LayoutItem, WidgetId } from "../types/layout";
@@ -129,6 +129,92 @@ function getRemoteMediaTitle(media: MediaState) {
   return media.title;
 }
 
+type CommitRangeProps = {
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  suffix?: string;
+  disabled?: boolean;
+  onCommit: (value: number) => void;
+};
+
+function CommitRange({
+  label,
+  value,
+  min,
+  max,
+  step,
+  suffix = "",
+  disabled = false,
+  onCommit,
+}: CommitRangeProps) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const labelValueRef = useRef<HTMLSpanElement | null>(null);
+  const latestValueRef = useRef(value);
+
+  useEffect(() => {
+    latestValueRef.current = value;
+
+    if (inputRef.current && document.activeElement !== inputRef.current) {
+      inputRef.current.value = String(value);
+    }
+
+    if (labelValueRef.current) {
+      labelValueRef.current.textContent = `${value}${suffix}`;
+    }
+  }, [value, suffix]);
+
+  function updateLabel(nextValue: number) {
+    if (labelValueRef.current) {
+      labelValueRef.current.textContent = `${nextValue}${suffix}`;
+    }
+  }
+
+  function commitValue() {
+    const nextValue = Number(inputRef.current?.value ?? value);
+
+    updateLabel(nextValue);
+
+    if (nextValue !== latestValueRef.current) {
+      onCommit(nextValue);
+    }
+  }
+
+  return (
+    <label style={{ display: "block", marginTop: "1rem" }}>
+      {label} (
+      <span ref={labelValueRef}>
+        {value}
+        {suffix}
+      </span>
+      )
+      <input
+        ref={inputRef}
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        defaultValue={value}
+        onInput={(event) => {
+          updateLabel(Number(event.currentTarget.value));
+        }}
+        onPointerUp={commitValue}
+        onTouchEnd={commitValue}
+        onKeyUp={commitValue}
+        onBlur={commitValue}
+        disabled={disabled}
+        style={{
+          display: "block",
+          marginTop: "0.5rem",
+          width: "100%",
+        }}
+      />
+    </label>
+  );
+}
+
 export function RemoteControlPage({
   layout,
   display,
@@ -146,13 +232,6 @@ export function RemoteControlPage({
   onResetIdleTimer,
 }: RemoteControlPageProps) {
   const [now, setNow] = useState(0);
-  const [draftMediaTimeoutSeconds, setDraftMediaTimeoutSeconds] = useState(
-    settings.mediaFocusExitDelaySeconds,
-  );
-
-  useEffect(() => {
-    setDraftMediaTimeoutSeconds(settings.mediaFocusExitDelaySeconds);
-  }, [settings.mediaFocusExitDelaySeconds]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -185,16 +264,6 @@ export function RemoteControlPage({
     media.source === "spotify" &&
     media.kind === "track" &&
     (media.status === "playing" || media.status === "paused");
-
-  function saveMediaTimeoutSeconds() {
-    if (draftMediaTimeoutSeconds === settings.mediaFocusExitDelaySeconds) {
-      return;
-    }
-
-    onUpdateSettings({
-      mediaFocusExitDelaySeconds: draftMediaTimeoutSeconds,
-    });
-  }
 
   return (
     <main className="remote-page">
@@ -293,28 +362,18 @@ export function RemoteControlPage({
           Reset idle timer
         </button>
 
-        <label style={{ display: "block", marginTop: "1rem" }}>
-          Media sessie timeout: {draftMediaTimeoutSeconds}s
-          <input
-            type="range"
-            min={0}
-            max={120}
-            step={5}
-            value={draftMediaTimeoutSeconds}
-            onChange={(event) => {
-              setDraftMediaTimeoutSeconds(Number(event.target.value));
-            }}
-            onMouseUp={saveMediaTimeoutSeconds}
-            onTouchEnd={saveMediaTimeoutSeconds}
-            onBlur={saveMediaTimeoutSeconds}
-            disabled={!isConnected}
-            style={{
-              display: "block",
-              marginTop: "0.5rem",
-              width: "100%",
-            }}
-          />
-        </label>
+        <CommitRange
+          label="Media sessie timeout"
+          value={settings.mediaFocusExitDelaySeconds}
+          min={5}
+          max={180}
+          step={5}
+          suffix="s"
+          disabled={!isConnected}
+          onCommit={(mediaFocusExitDelaySeconds) => {
+            onUpdateSettings({ mediaFocusExitDelaySeconds });
+          }}
+        />
 
         <button
           type="button"
