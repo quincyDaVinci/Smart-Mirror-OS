@@ -98,6 +98,8 @@ function App() {
               onSetMediaLyricsVisible={setMediaLyricsVisible}
               onSetSpotifyContextKeepAwake={setSpotifyContextKeepAwake}
               onResetIdleTimer={resetIdleTimer}
+              settings={settings}
+              onUpdateSettings={updateSettings}
             />
           }
         />

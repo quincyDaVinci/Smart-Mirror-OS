@@ -1223,7 +1223,7 @@ function syncSpotifyContextKeepAwakeSession() {
     "info",
     "display",
     "Spotify context keep-awake automatisch uitgezet",
-    "Media focus sessie is beëindigd",
+    "Spotify sessie is beëindigd of provider is niet meer actief",
   );
 
   return true;
@@ -1335,7 +1335,7 @@ function reconcileFocusState(trigger = "focus:tick") {
     }
 
     if (state.display.mediaIdleSince === null) {
-      const nextFocusUntil = now + getFocusIdleTimeoutMs();
+      const nextFocusUntil = now + getMediaFocusExitDelayMs();
 
       state.display = {
         ...state.display,
@@ -1354,7 +1354,7 @@ function reconcileFocusState(trigger = "focus:tick") {
     const elapsedMs = now - state.display.mediaIdleSince;
 
     if (
-      elapsedMs >= getFocusIdleTimeoutMs() ||
+      elapsedMs >= getMediaFocusExitDelayMs() ||
       (state.display.focusUntil !== null && now >= state.display.focusUntil)
     ) {
       return clearFocusedWidget("focus:media-timeout");
@@ -1421,10 +1421,10 @@ function updateRuntimeMedia(nextMedia) {
 
   const mediaReason = getMediaDisplayReason(state.media);
 
-  const focusChanged = reconcileFocusState("media:update");
+  const focusChanged = reconcileFocusState(mediaReason);
   const spotifyContextChanged = syncSpotifyContextKeepAwakeSession();
   const presenceChanged = syncPresenceFromEnvironment();
-  const displayChanged = updateDisplayState("media:update");
+  const displayChanged = updateDisplayState(mediaReason);
 
   if (
     !mediaChanged &&
@@ -2084,23 +2084,38 @@ function isSpotifyListeningSession(media) {
   );
 }
 
+function isSameMediaSourceAsContextToggle() {
+  return (
+    state.display.spotifyContextKeepAwake && state.media.source === "spotify"
+  );
+}
+
 function isSpotifyContextSessionAlive() {
   if (!state.display.spotifyContextKeepAwake) {
     return false;
   }
 
-  if (
-    state.display.focusedWidgetId !== "media" ||
-    state.display.focusSource !== "media-auto"
-  ) {
+  // Als Spotify niet meer de actieve provider/media-source is,
+  // is de app/sessie weg en skippen we de timeout.
+  if (state.media.source !== "spotify") {
     return false;
   }
 
-  if (isSpotifyListeningSession(state.media)) {
+  // Playback betekent altijd actieve sessie.
+  if (state.media.status === "playing") {
     return true;
   }
 
-  return state.display.mediaIdleSince !== null;
+  // Paused/idle betekent: alleen actief zolang media-auto focus nog leeft.
+  if (
+    state.display.focusedWidgetId === "media" &&
+    state.display.focusSource === "media-auto" &&
+    state.display.mediaIdleSince !== null
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 function isLightSensorReady() {

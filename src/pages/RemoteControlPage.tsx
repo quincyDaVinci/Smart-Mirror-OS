@@ -4,6 +4,7 @@ import type { DisplayState } from "../types/display";
 import type { LayoutItem, WidgetId } from "../types/layout";
 import type { PresenceState } from "../types/presence";
 import type { MediaState } from "../types/media";
+import type { MirrorSettings } from "../types/settings";
 
 type RemoteControlPageProps = {
   layout: LayoutItem[];
@@ -17,6 +18,8 @@ type RemoteControlPageProps = {
     | "reconnecting"
     | "disconnected";
   connectionError: string | null;
+  settings: MirrorSettings;
+  onUpdateSettings: (nextSettings: Partial<MirrorSettings>) => void;
   onFocusWidget: (widgetId: WidgetId) => void;
   onClearFocus: () => void;
   onSetMediaLyricsVisible: (visible: boolean) => void;
@@ -134,6 +137,8 @@ export function RemoteControlPage({
   isConnected,
   connectionStatus,
   connectionError,
+  settings,
+  onUpdateSettings,
   onFocusWidget,
   onClearFocus,
   onSetMediaLyricsVisible,
@@ -270,6 +275,28 @@ export function RemoteControlPage({
         >
           Reset idle timer
         </button>
+
+        <label style={{ display: "block", marginTop: "1rem" }}>
+          Media sessie timeout: {settings.mediaFocusExitDelaySeconds}s
+          <input
+            type="range"
+            min={3}
+            max={120}
+            step={1}
+            value={settings.mediaFocusExitDelaySeconds}
+            onChange={(event) => {
+              onUpdateSettings({
+                mediaFocusExitDelaySeconds: Number(event.target.value),
+              });
+            }}
+            disabled={!isConnected}
+            style={{
+              display: "block",
+              marginTop: "0.5rem",
+              width: "100%",
+            }}
+          />
+        </label>
 
         <button
           type="button"
