@@ -284,6 +284,7 @@ const defaultState = {
     lightSensorEnabled: true,
     lightOffLuxThreshold: 13.5,
     lightOnLuxThreshold: 28,
+    calibrationModeEnabled: false,
   },
   presence: {
     mode: "idle",
@@ -391,6 +392,7 @@ function normalizeSettings(input = {}) {
     zoomPercent,
     focusIdleTimeoutSeconds,
     mediaFocusExitDelaySeconds,
+    calibrationModeEnabled,
   } = input;
 
   return {
@@ -419,6 +421,12 @@ function normalizeSettings(input = {}) {
       typeof showStatusBar === "boolean"
         ? showStatusBar
         : defaultState.settings.showStatusBar,
+
+    calibrationModeEnabled:
+      typeof calibrationModeEnabled === "boolean"
+        ? calibrationModeEnabled
+        : defaultState.settings.calibrationModeEnabled,
+
     layoutPaddingPx: clampNumber(
       layoutPaddingPx,
       0,
