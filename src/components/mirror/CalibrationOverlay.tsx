@@ -1,5 +1,5 @@
 import type { MirrorSettings } from "../../types/settings";
-import "./CalibrationOverlay.scss";
+import "./CalibrationOverlay.css";
 
 type CalibrationOverlayProps = {
   settings: MirrorSettings;
