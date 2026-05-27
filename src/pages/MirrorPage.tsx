@@ -7,6 +7,7 @@ import type { PresenceState } from "../types/presence";
 import type { DisplayState } from "../types/display";
 import type { MediaState } from "../types/media";
 import { MirrorMediaDock } from "../components/mirror/MirrorMediaDock";
+import { CalibrationOverlay } from "../components/mirror/CalibrationOverlay";
 
 type MirrorPageProps = {
   layout: LayoutItem[];
@@ -213,16 +214,14 @@ function getCalendarSortValue(item: CalendarItem, fallbackIndex: number) {
       ? hour * 60 + minute
       : fallbackIndex;
 
-  const dateRank =
-    item.date === "Vandaag" ? 0 : item.date === "Morgen" ? 1 : 2;
+  const dateRank = item.date === "Vandaag" ? 0 : item.date === "Morgen" ? 1 : 2;
 
   return dateRank * 24 * 60 + minutesOfDay;
 }
 
 function sortCalendarItems(items: CalendarItem[]) {
   return [...items].sort((a, b) => {
-    const startDelta =
-      getCalendarSortValue(a, 0) - getCalendarSortValue(b, 0);
+    const startDelta = getCalendarSortValue(a, 0) - getCalendarSortValue(b, 0);
 
     if (startDelta !== 0) {
       return startDelta;
@@ -496,6 +495,10 @@ export function MirrorPage({
           ) : null
         ) : null}
       </div>
+
+      {settings.calibrationModeEnabled ? (
+        <CalibrationOverlay settings={settings} />
+      ) : null}
     </main>
   );
 }

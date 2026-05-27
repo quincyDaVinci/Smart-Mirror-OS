@@ -18,12 +18,13 @@ export type MirrorSettings = {
   lightSensorEnabled: boolean;
   lightOffLuxThreshold: number;
   lightOnLuxThreshold: number;
+  calibrationModeEnabled: boolean;
 };
 
 export const defaultMirrorSettings: MirrorSettings = {
   showSeconds: true,
   mirrorMode: "normal",
-  autoSleepEnabled: false,
+  autoSleepEnabled: true,
   sleepTimeoutSeconds: 180,
   showStatusBar: true,
   layoutPaddingPx: 0,
@@ -36,6 +37,7 @@ export const defaultMirrorSettings: MirrorSettings = {
   focusIdleTimeoutSeconds: 45,
   mediaFocusExitDelaySeconds: 10,
   lightSensorEnabled: true,
-  lightOnLuxThreshold: 50,
-  lightOffLuxThreshold: 70,
+  lightOnLuxThreshold: 20,
+  lightOffLuxThreshold: 13.5,
+  calibrationModeEnabled: false,
 };

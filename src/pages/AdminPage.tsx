@@ -94,7 +94,6 @@ export function AdminPage({
   onSaveProviderSecrets,
   apiBaseUrl,
 }: AdminPageProps) {
-
   const isExpectedReconnect =
     (deployment.status === "deploying" || deployment.status === "success") &&
     connectionStatus !== "connected";
@@ -265,6 +264,29 @@ export function AdminPage({
           subtitle="Rotatie, zoom, padding en spacing"
           defaultOpen
         >
+          <div style={{ marginBottom: "1rem" }}>
+            <button
+              type="button"
+              onClick={() => {
+                onUpdateSettings({
+                  calibrationModeEnabled: !settings.calibrationModeEnabled,
+                });
+              }}
+            >
+              {settings.calibrationModeEnabled
+                ? "Stop calibration"
+                : "Start calibration"}
+            </button>
+
+            {settings.calibrationModeEnabled ? (
+              <p style={{ marginTop: "0.75rem", color: "#cfcfcf" }}>
+                Calibration staat aan op de mirror. Gebruik de padding waardes
+                hieronder om de witte binnenrand perfect binnen het frame te
+                zetten.
+              </p>
+            ) : null}
+          </div>
+
           <label style={{ display: "block", marginBottom: "1rem" }}>
             Rotatie
             <select
@@ -337,7 +359,7 @@ export function AdminPage({
                 value={Number(value)}
                 min={0}
                 max={160}
-                step={5}
+                step={1}
                 suffix="px"
                 onCommit={(nextValue) => {
                   onUpdateSettings({

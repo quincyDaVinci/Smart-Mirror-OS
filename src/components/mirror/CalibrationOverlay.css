@@ -1,0 +1,33 @@
+.calibration-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  background: black;
+  color: white;
+  pointer-events: none;
+  font-family: Arial, sans-serif;
+}
+
+.calibration-overlay__outer {
+  position: fixed;
+  inset: 0;
+  border: 4px solid white;
+  box-sizing: border-box;
+}
+
+.calibration-overlay__safe {
+  position: fixed;
+  border: 3px dashed white;
+  box-sizing: border-box;
+}
+
+.calibration-overlay__info {
+  position: fixed;
+  top: 32px;
+  left: 32px;
+  padding: 16px 20px;
+  background: rgba(0, 0, 0, 0.85);
+  border: 2px solid white;
+  font-size: 24px;
+  line-height: 1.4;
+}

@@ -179,6 +179,7 @@ export function useMirrorSocket() {
     lightSensorEnabled: true,
     lightOnLuxThreshold: 50,
     lightOffLuxThreshold: 70,
+    calibrationModeEnabled: false,
   });
   const [presence, setPresence] = useState<PresenceState>({
     mode: "idle",
