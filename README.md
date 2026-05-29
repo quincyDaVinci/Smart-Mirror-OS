@@ -1,73 +1,45 @@
-# React + TypeScript + Vite
+# Smart Mirror OS
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Smart Mirror OS is a React + Node.js smart mirror dashboard built for a physical mirror setup. It combines a kiosk-style mirror UI, an admin panel, a mobile remote, media context, weather, calendar data, and sensor-driven sleep behavior.
 
-Currently, two official plugins are available:
+The project was built as part of a frontend development minor and is optimized for a single board computer setup, currently an ODROID N2-style device running a Firefox kiosk.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+- Mirror dashboard with clock, weather, media, and calendar widgets
+- Admin page for layout, display, sensor, provider, and deployment settings
+- Mobile remote page for focusing widgets and controlling mirror state
+- Sleep, dim, and active display states
+- VEML light sensor support for context-aware wake/sleep behavior
+- Jellyfin now-playing support
+- Spotify now-playing and lyrics support
+- Calendar feed support
+- Weather support
+- WebSocket live state updates with HTTP fallback
+- ODROID kiosk setup support
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech stack
 
-## Expanding the ESLint configuration
+- React
+- TypeScript
+- Vite
+- Node.js
+- Express
+- WebSocket
+- Optional I2C light sensor support
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Project structure
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
-
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
-
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-```
+```text
+.
+├── src/                  # React frontend
+│   ├── components/       # Mirror/admin/shared UI components
+│   ├── hooks/            # WebSocket and app state hooks
+│   ├── pages/            # Mirror, admin, and remote pages
+│   ├── types/            # Shared frontend types
+│   └── utils/            # Frontend utilities
+├── server/               # Node.js backend
+    ├── providers/        # Jellyfin, Spotify, weather, calendar providers
+    ├── sensors/          # VEML light sensor integration
+    ├── index.js          # Backend entrypoint
+    └── secretsStore.js   # Local secrets storage
