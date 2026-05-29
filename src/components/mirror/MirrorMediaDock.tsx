@@ -759,22 +759,14 @@ export function MirrorMediaDock({
     () => parseLyrics(lyricsState.lyrics),
     [lyricsState.lyrics],
   );
-  
-  
 
   const activeLyricIndex = useMemo(() => {
-  
-
-  const result = getActiveLyricIndex(
-    lyricLines,
-    liveProgressMs,
-    displayMedia.durationMs,
-  );
-
-  return result;
-}, [lyricLines, liveProgressMs, displayMedia.durationMs, lyricsEnabled]);
-
-
+    return getActiveLyricIndex(
+      lyricLines,
+      liveProgressMs,
+      displayMedia.durationMs,
+    );
+  }, [lyricLines, liveProgressMs, displayMedia.durationMs]);
 
   const lyricsAreSynced = useMemo(
     () => hasSyncedLyricTiming(lyricLines),
@@ -783,21 +775,24 @@ export function MirrorMediaDock({
   const hasLyricLines = lyricLines.length > 0;
 
   const visibleLyricLines = useMemo(() => {
-  if (!hasLyricLines || activeLyricIndex < 0) {
-    return lyricLines.map((line, index) => ({ line, index }));
-  }
+    if (!hasLyricLines || activeLyricIndex < 0) {
+      return lyricLines.map((line, index) => ({ line, index }));
+    }
 
-  const windowSize = 2;
-  const startIndex = Math.max(0, activeLyricIndex - windowSize);
-  const endIndex = Math.min(lyricLines.length, activeLyricIndex + windowSize + 1);
+    const windowSize = 2;
+    const startIndex = Math.max(0, activeLyricIndex - windowSize);
+    const endIndex = Math.min(
+      lyricLines.length,
+      activeLyricIndex + windowSize + 1,
+    );
 
-  return lyricLines
-    .slice(startIndex, endIndex)
-    .map((line, offset) => ({
-      line,
-      index: startIndex + offset,
-    }));
-}, [hasLyricLines, lyricLines, activeLyricIndex]);
+    return lyricLines
+      .slice(startIndex, endIndex)
+      .map((line, offset) => ({
+        line,
+        index: startIndex + offset,
+      }));
+  }, [hasLyricLines, lyricLines, activeLyricIndex]);
 
   useFpsPerfLogger(lyricsEnabled);
 
@@ -909,6 +904,11 @@ export function MirrorMediaDock({
   const className = [
     "mirror-main-media",
     `mirror-main-media--${variant}`,
+    displayMedia.source === "spotify"
+      ? "mirror-main-media--spotify"
+      : displayMedia.source === "jellyfin"
+        ? "mirror-main-media--jellyfin"
+        : "",
     isPosterArtwork ? "mirror-main-media--poster" : "mirror-main-media--cover",
     isVideo ? "mirror-main-media--video" : "",
     lyricsEnabled ? "mirror-main-media--lyrics" : "",

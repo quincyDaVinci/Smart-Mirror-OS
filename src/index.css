@@ -1390,22 +1390,23 @@ button:disabled {
 
 .mirror-compact-weather__location {
   margin: 0;
-  font-size: 1.14rem;
-  font-weight: 600;
-  color: var(--text-primary);
+  font-size: 1.24rem;
+  font-weight: 650;
+  line-height: 1.12;
+  color: rgba(255, 255, 255, 0.97);
 }
 
 .mirror-compact-weather__location-subtitle {
   margin: -4px 0 2px;
-  font-size: 0.86rem;
-  color: var(--text-tertiary);
+  font-size: 0.96rem;
+  color: var(--text-secondary);
   text-transform: lowercase;
 }
 
 .mirror-compact-weather__section-label {
   margin: 0;
-  font-size: 0.82rem;
-  color: var(--text-tertiary);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -1489,9 +1490,9 @@ button:disabled {
 
 .mirror-compact-weather__detail {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: 1rem;
   line-height: 1.35;
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
 }
 
 .mirror-compact-weather__stats {
@@ -1529,8 +1530,8 @@ button:disabled {
 
 .mirror-compact-weather__table-label {
   justify-self: end;
-  color: var(--text-tertiary);
-  font-size: 0.72rem;
+  color: var(--text-secondary);
+  font-size: 0.78rem;
   font-weight: 700;
   line-height: 1;
   letter-spacing: 0.08em;
@@ -1550,12 +1551,13 @@ button:disabled {
   grid-template-columns: minmax(62px, 1fr) 34px 54px 54px;
   align-items: center;
   column-gap: 8px;
-  font-size: 1.02rem;
+  font-size: 1.08rem;
+  line-height: 1.12;
   font-variant-numeric: tabular-nums;
 }
 
 .mirror-compact-weather__forecast-day {
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .mirror-compact-weather__forecast-icon {
@@ -1571,11 +1573,11 @@ button:disabled {
 }
 
 .mirror-compact-weather__forecast-high {
-  color: var(--text-primary);
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .mirror-compact-weather__forecast-low {
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
 }
 
 .mirror-compact-weather__hourly {
@@ -1590,12 +1592,13 @@ button:disabled {
   grid-template-columns: minmax(62px, 1fr) 34px 48px 54px;
   align-items: center;
   column-gap: 8px;
-  font-size: 0.92rem;
+  font-size: 0.98rem;
+  line-height: 1.12;
   font-variant-numeric: tabular-nums;
 }
 
 .mirror-compact-weather__hourly-time {
-  color: var(--text-secondary);
+  color: rgba(255, 255, 255, 0.88);
 }
 
 .mirror-compact-weather__hourly-icon {
@@ -1609,7 +1612,7 @@ button:disabled {
 }
 
 .mirror-compact-weather__hourly-rain {
-  color: var(--text-tertiary);
+  color: var(--text-secondary);
 }
 
 .mirror-compact-time-stack {
@@ -1690,22 +1693,22 @@ button:disabled {
 }
 
 .mirror-compact-agenda__time {
-  font-size: 0.98rem;
+  font-size: 1.06rem;
   font-weight: 700;
-  color: var(--text-primary);
+  color: rgba(255, 255, 255, 0.96);
   text-transform: lowercase;
 }
 
 .mirror-compact-agenda__date {
-  font-size: 0.72rem;
-  color: var(--text-tertiary);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .mirror-compact-agenda__title {
-  font-size: 0.95rem;
-  color: var(--text-secondary);
+  font-size: 1.02rem;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .mirror-compact-media-card {
@@ -1773,11 +1776,27 @@ button:disabled {
   text-align: center;
 }
 
+.mirror-main-media--focus.mirror-main-media--spotify {
+  align-items: center;
+}
+
+.mirror-main-media--focus.mirror-main-media--jellyfin {
+  align-items: start;
+  justify-items: stretch;
+  gap: clamp(14px, 2.2vh, 28px);
+}
+
 .mirror-main-media--focus:not(.mirror-main-media--lyrics):not(
     .mirror-main-media--video
   ) {
   grid-template-rows: minmax(0, 1fr) auto;
   gap: clamp(54px, 7vh, 92px);
+}
+
+.mirror-main-media--focus.mirror-main-media--spotify:not(
+    .mirror-main-media--lyrics
+  ):not(.mirror-main-media--video) {
+  gap: clamp(40px, 5.5vh, 72px);
 }
 
 .mirror-main-media--focus.mirror-main-media--poster {
@@ -1864,12 +1883,39 @@ button:disabled {
   border-radius: 0;
 }
 
+.mirror-main-media--focus.mirror-main-media--spotify:not(
+    .mirror-main-media--lyrics
+  ):not(.mirror-main-media--video)
+  .mirror-main-media__art {
+  align-self: center;
+  justify-self: center;
+  transform: translateY(clamp(-16px, -2vh, -8px));
+}
+
+.mirror-main-media--focus.mirror-main-media--jellyfin:not(
+    .mirror-main-media--lyrics
+  ):not(.mirror-main-media--video)
+  .mirror-main-media__art {
+  align-self: stretch;
+  justify-self: center;
+  width: min(100%, 1120px);
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border-radius: 34px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.05),
+    rgba(0, 0, 0, 0.16)
+  );
+  box-shadow: 0 32px 84px rgba(0, 0, 0, 0.42);
+}
+
 .mirror-main-media--focus.mirror-main-media--lyrics .mirror-main-media__art {
   grid-column: 1;
   grid-row: 2;
   align-self: start;
   justify-self: center;
-  width: min(48vw, 32vh, 360px);
+  width: min(52vw, 36vh, 420px);
   height: auto;
   border-radius: clamp(14px, 1.8vw, 24px);
   box-shadow: 0 28px 70px rgba(0, 0, 0, 0.42);
@@ -1902,6 +1948,11 @@ button:disabled {
 .mirror-main-media--focus.mirror-main-media--lyrics
   .mirror-main-media__art-image {
   aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+
+.mirror-main-media--focus.mirror-main-media--jellyfin
+  .mirror-main-media__art-image {
   object-fit: cover;
 }
 
@@ -1950,6 +2001,32 @@ button:disabled {
   text-align: left;
 }
 
+.mirror-main-media--focus.mirror-main-media--spotify:not(
+    .mirror-main-media--lyrics
+  ):not(.mirror-main-media--video)
+  .mirror-main-media__meta {
+  width: min(78vw, 620px);
+}
+
+.mirror-main-media--focus.mirror-main-media--jellyfin .mirror-main-media__meta {
+  width: min(100%, 1120px);
+  max-width: min(1120px, 100%);
+  align-items: flex-start;
+  justify-self: center;
+  gap: 10px;
+  padding: clamp(18px, 2.4vh, 30px) clamp(18px, 2.2vw, 32px)
+    clamp(20px, 2.8vh, 34px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 30px;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 12, 18, 0.84),
+    rgba(10, 12, 18, 0.58)
+  );
+  box-shadow: 0 30px 72px rgba(0, 0, 0, 0.34);
+  backdrop-filter: blur(18px);
+}
+
 .mirror-main-media--focus.mirror-main-media--lyrics .mirror-main-media__meta {
   grid-column: 1;
   grid-row: 3;
@@ -1994,6 +2071,10 @@ button:disabled {
   padding-right: 64px;
 }
 
+.mirror-main-media--focus.mirror-main-media--jellyfin .mirror-main-media__title-row {
+  padding-right: 0;
+}
+
 .mirror-main-media--focus.mirror-main-media--lyrics
   .mirror-main-media__title-row {
   justify-content: flex-start;
@@ -2030,6 +2111,12 @@ button:disabled {
   font-size: clamp(2rem, 3.8vw, 3.2rem);
   line-height: 1;
   letter-spacing: -0.04em;
+}
+
+.mirror-main-media--focus.mirror-main-media--jellyfin .mirror-main-media__title {
+  font-size: clamp(2.45rem, 4.6vw, 4.4rem);
+  line-height: 0.98;
+  max-width: 14ch;
 }
 
 .mirror-main-media--focus.mirror-main-media--lyrics .mirror-main-media__title {
@@ -2101,14 +2188,14 @@ button:disabled {
 
 .mirror-main-media__artist {
   margin: 0;
-  font-size: 1rem;
+  font-size: 1.02rem;
   color: var(--text-primary);
   overflow-wrap: anywhere;
 }
 
 .mirror-main-media__album {
   margin: 0;
-  font-size: 0.92rem;
+  font-size: 0.94rem;
   color: var(--text-secondary);
   overflow-wrap: anywhere;
 }
@@ -2141,19 +2228,48 @@ button:disabled {
 }
 
 .mirror-main-media--focus .mirror-main-media__artist {
-  font-size: clamp(1.2rem, 2.1vw, 1.75rem);
+  font-size: clamp(1.28rem, 2.25vw, 1.95rem);
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.mirror-main-media--focus.mirror-main-media--spotify .mirror-main-media__artist {
+  font-size: clamp(1.38rem, 2.45vw, 2.05rem);
+  color: rgba(255, 255, 255, 0.96);
 }
 
 .mirror-main-media--focus .mirror-main-media__album {
-  font-size: clamp(1rem, 1.5vw, 1.24rem);
+  font-size: clamp(1.02rem, 1.6vw, 1.32rem);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.mirror-main-media--focus.mirror-main-media--spotify .mirror-main-media__album {
+  font-size: clamp(1.08rem, 1.75vw, 1.42rem);
+  color: rgba(255, 255, 255, 0.84);
 }
 
 .mirror-main-media--focus.mirror-main-media--lyrics .mirror-main-media__artist {
-  font-size: clamp(1.08rem, 1.8vw, 1.45rem);
+  font-size: clamp(1.16rem, 1.95vw, 1.6rem);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .mirror-main-media--focus.mirror-main-media--lyrics .mirror-main-media__album {
-  font-size: clamp(0.9rem, 1.25vw, 1.05rem);
+  font-size: clamp(0.98rem, 1.34vw, 1.18rem);
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.mirror-main-media--focus.mirror-main-media--jellyfin .mirror-main-media__metadata-line,
+.mirror-main-media--focus.mirror-main-media--spotify .mirror-main-media__metadata-line {
+  justify-content: flex-start;
+}
+
+.mirror-main-media--focus.mirror-main-media--jellyfin .mirror-main-media__artist {
+  font-size: clamp(1.18rem, 2vw, 1.82rem);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.mirror-main-media--focus.mirror-main-media--jellyfin .mirror-main-media__album {
+  font-size: clamp(1rem, 1.62vw, 1.32rem);
+  color: rgba(255, 255, 255, 0.68);
 }
 
 .mirror-main-media--focus.mirror-main-media--video .mirror-main-media__artist {
@@ -2189,6 +2305,11 @@ button:disabled {
   justify-content: center;
 }
 
+.mirror-main-media--focus.mirror-main-media--jellyfin .mirror-main-media__detail-row {
+  justify-content: flex-start;
+  gap: 10px;
+}
+
 .mirror-main-media--focus.mirror-main-media--video
   .mirror-main-media__detail-row {
   justify-content: flex-start;
@@ -2219,6 +2340,16 @@ button:disabled {
   backdrop-filter: blur(12px);
 }
 
+.mirror-main-media--focus.mirror-main-media--jellyfin
+  .mirror-main-media__detail-pill {
+  min-height: 36px;
+  padding: 9px 14px;
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 0.94rem;
+}
+
 .mirror-main-media__detail-icon {
   width: 15px;
   height: 15px;
@@ -2239,11 +2370,19 @@ button:disabled {
 
 .mirror-main-media__finish-time {
   margin: 6px 0 0;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(255, 255, 255, 0.95);
   font-size: clamp(1.18rem, 2.1vw, 1.75rem);
   font-weight: 650;
   line-height: 1;
   letter-spacing: 0;
+}
+
+.mirror-main-media--focus.mirror-main-media--jellyfin .mirror-main-media__finish-time {
+  margin-top: 8px;
+  font-size: clamp(1.52rem, 2.8vw, 2.4rem);
+  font-weight: 760;
+  color: var(--accent-amber);
+  text-shadow: 0 8px 22px rgba(0, 0, 0, 0.45);
 }
 
 .mirror-main-media__progress {
@@ -2316,6 +2455,13 @@ button:disabled {
   font-size: 0.9rem;
 }
 
+.mirror-main-media--focus.mirror-main-media--jellyfin
+  .mirror-main-media__progress-label {
+  justify-content: flex-start;
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.78);
+}
+
 .mirror-main-media__progress-finish {
   color: rgba(255, 255, 255, 0.7);
 }
@@ -2373,7 +2519,7 @@ button:disabled {
 
 .mirror-main-media__lyrics-line {
   margin: 0;
-  max-width: min(86vw, 19ch);
+  max-width: min(80vw, 16ch);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2382,7 +2528,7 @@ button:disabled {
   color: rgba(255, 255, 255, 0.24);
   opacity: 0.18;
 
-  font-size: clamp(1.95rem, 4.25vw, 5rem);
+  font-size: clamp(2rem, 4.4vw, 5.1rem);
   font-weight: 760;
   line-height: 1.06;
   letter-spacing: 0;
@@ -2425,6 +2571,15 @@ button:disabled {
   color: rgba(255, 255, 255, 0.96);
   opacity: 1;
   transform: translateZ(0) scale(1);
+}
+
+.mirror-main-media--focus.mirror-main-media--spotify .mirror-main-media__lyrics-line {
+  max-width: min(82vw, 17ch);
+}
+
+.mirror-main-media--focus.mirror-main-media--spotify
+  .mirror-main-media__lyrics-line--active {
+  font-size: clamp(2.1rem, 4.6vw, 5.25rem);
 }
 
 .mirror-main-media__lyrics--estimated .mirror-main-media__lyrics-line--active {
@@ -2580,7 +2735,7 @@ button:disabled {
   .mirror-main-media--focus.mirror-main-media--lyrics .mirror-main-media__art {
     grid-column: 1;
     grid-row: 2;
-    width: min(48vw, 32vh, 360px);
+    width: min(52vw, 36vh, 420px);
     align-self: start;
     justify-self: center;
   }
@@ -2600,6 +2755,28 @@ button:disabled {
     .mirror-main-media__meta {
     width: min(74vw, 560px);
     max-width: 100%;
+  }
+
+  .mirror-main-media--focus.mirror-main-media--spotify:not(
+      .mirror-main-media--lyrics
+    ):not(.mirror-main-media--video)
+    .mirror-main-media__art {
+    transform: translateY(clamp(-12px, -1.4vh, -4px));
+  }
+
+  .mirror-main-media--focus.mirror-main-media--jellyfin .mirror-main-media__meta {
+    padding: clamp(16px, 2vh, 24px) clamp(16px, 2vw, 24px)
+      clamp(18px, 2.2vh, 28px);
+  }
+
+  .mirror-main-media--focus.mirror-main-media--jellyfin .mirror-main-media__title {
+    font-size: clamp(2.1rem, 6vw, 3.4rem);
+    max-width: 100%;
+  }
+
+  .mirror-main-media--focus.mirror-main-media--jellyfin
+    .mirror-main-media__detail-pill {
+    font-size: 0.86rem;
   }
 
   .mirror-main-media--focus.mirror-main-media--lyrics .mirror-main-media__meta {
@@ -2626,8 +2803,8 @@ button:disabled {
   }
 
   .mirror-main-media__lyrics-line {
-    max-width: min(88vw, 18ch);
-    font-size: clamp(1.35rem, 4.6vw, 3.2rem);
+    max-width: min(84vw, 17ch);
+    font-size: clamp(1.4rem, 4.8vw, 3.3rem);
   }
 
   .mirror-main-media__lyrics-line--near {
@@ -2639,7 +2816,7 @@ button:disabled {
   }
 
   .mirror-main-media__lyrics-line--active {
-    font-size: clamp(2.3rem, 7.2vw, 4.8rem);
+    font-size: clamp(2.35rem, 7.4vw, 4.9rem);
   }
 
   .mirror-main-media--focus .mirror-main-media__status-row,
