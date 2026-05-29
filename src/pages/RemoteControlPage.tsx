@@ -58,6 +58,46 @@ function getConnectionStatusLabel(
   }
 }
 
+function getDisplayModeLabel(mode: DisplayState["mode"]) {
+  switch (mode) {
+    case "on":
+      return "Aan";
+    case "dimmed":
+      return "Gedimd";
+    case "sleep":
+      return "Sleep";
+    default:
+      return mode;
+  }
+}
+
+function getFocusLabel(widgetId: WidgetId | null) {
+  switch (widgetId) {
+    case "clock":
+      return "Klok";
+    case "weather":
+      return "Weer";
+    case "media":
+      return "Media";
+    case "calendar":
+      return "Agenda";
+    case null:
+      return "Geen focus";
+    default:
+      return widgetId;
+  }
+}
+
+function getPresenceLabel(mode: PresenceState["mode"]) {
+  return mode === "active" ? "Actief" : "Idle";
+}
+
+function getFocusSourceLabel(source: DisplayState["focusSource"]) {
+  if (source === "manual") return "Handmatig";
+  if (source === "media-auto") return "Media automatisch";
+  return "Geen";
+}
+
 function FocusButtonIcon({ widgetId }: { widgetId: WidgetId }) {
   if (widgetId === "clock") {
     return (
@@ -170,6 +210,21 @@ export function RemoteControlPage({
 
   const remoteMediaTitle = getRemoteMediaTitle(media);
 
+  const activeFocusLabel = getFocusLabel(display.focusedWidgetId);
+
+  const mirrorStateTitle =
+    display.mode === "sleep"
+      ? "Mirror staat in sleep mode"
+      : display.focusedWidgetId
+        ? `${activeFocusLabel} staat in focus`
+        : "Normale mirror weergave";
+
+  const mirrorStateSubtitle =
+    display.keepAwakeReason ??
+    (display.mode === "sleep"
+      ? "Geen actieve wake reason."
+      : "Geen speciale wake reason actief.");
+
   const canToggleLyrics =
     display.focusedWidgetId === "media" &&
     media.kind === "track" &&
@@ -205,112 +260,141 @@ export function RemoteControlPage({
         </p>
       ) : null}
 
-      <section className="remote-summary-card">
-        <p>
-          Focus: <strong>{display.focusedWidgetId ?? "normal state"}</strong>
-        </p>
-        <p>
-          Focus source: <strong>{display.focusSource ?? "none"}</strong>
-        </p>
-        <p>
-          Presence: <strong>{presence.mode}</strong>
-        </p>
-        <p>
-          Display: <strong>{display.mode}</strong>
-        </p>
-        <p>
-          Spotify context:{" "}
-          <strong>{display.spotifyContextKeepAwake ? "actief" : "uit"}</strong>
-        </p>
-        <p>
-          Keep awake reden:{" "}
-          <strong>{display.keepAwakeReason ?? "geen actieve reden"}</strong>
-        </p>
-        <p>
-          Media: <strong>{media.status}</strong>
-          {remoteMediaTitle ? ` - ${remoteMediaTitle}` : ""}
-        </p>
-        <p>
-          Focus timeout: <strong>{focusSecondsLeft ?? "-"}</strong>
-        </p>
+      <section className="remote-hero-card">
+        <div>
+          <p className="remote-eyebrow">Huidige status</p>
+          <h2>{mirrorStateTitle}</h2>
+          <p>{mirrorStateSubtitle}</p>
+        </div>
+
+        <div className="remote-status-pills">
+          <span className="remote-status-pill">
+            Display: {getDisplayModeLabel(display.mode)}
+          </span>
+          <span className="remote-status-pill">
+            Presence: {getPresenceLabel(presence.mode)}
+          </span>
+          <span className="remote-status-pill">
+            Focus bron: {getFocusSourceLabel(display.focusSource)}
+          </span>
+          <span className="remote-status-pill">
+            Timeout: {focusSecondsLeft ?? "-"}s
+          </span>
+        </div>
       </section>
 
-      <section className="remote-focus-grid">
-        {focusButtons.map((button) => (
+      <section className="remote-section">
+        <div className="remote-section-heading">
+          <div>
+            <p className="remote-eyebrow">Focus</p>
+            <h2>Open snel een mirror-widget</h2>
+          </div>
+        </div>
+
+        <div className="remote-focus-grid">
+          {focusButtons.map((button) => (
+            <button
+              key={button.id}
+              type="button"
+              className="remote-focus-button"
+              onClick={() => {
+                onFocusWidget(button.id);
+              }}
+              disabled={!isConnected}
+            >
+              <span className="remote-focus-button__icon" aria-hidden>
+                <FocusButtonIcon widgetId={button.id} />
+              </span>
+              <span className="remote-focus-button__text">
+                <strong>{button.label}</strong>
+                <span>{button.subtitle}</span>
+                {!enabledWidgets.has(button.id) ? (
+                  <em>Widget staat uit in layout</em>
+                ) : null}
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="remote-section">
+        <div className="remote-section-heading">
+          <div>
+            <p className="remote-eyebrow">Bediening</p>
+            <h2>Mirror acties</h2>
+          </div>
+        </div>
+
+        <div className="remote-action-grid">
           <button
-            key={button.id}
             type="button"
-            className="remote-focus-button"
-            onClick={() => {
-              onFocusWidget(button.id);
-            }}
+            className="remote-action-button"
+            onClick={onClearFocus}
+            disabled={!isConnected || display.focusedWidgetId === null}
+          >
+            Reset naar normale weergave
+          </button>
+
+          <button
+            type="button"
+            className="remote-action-button"
+            onClick={onResetIdleTimer}
             disabled={!isConnected}
           >
-            <span className="remote-focus-button__icon" aria-hidden>
-              <FocusButtonIcon widgetId={button.id} />
-            </span>
-            <span className="remote-focus-button__text">
-              <strong>{button.label}</strong>
-              <span>{button.subtitle}</span>
-              {!enabledWidgets.has(button.id) ? (
-                <em>Widget staat uit in layout</em>
-              ) : null}
-            </span>
+            Houd mirror wakker
           </button>
-        ))}
+
+          <div className="remote-range-card">
+            <CommitRange
+              label="Media sessie timeout"
+              value={settings.mediaFocusExitDelaySeconds}
+              min={5}
+              max={180}
+              step={5}
+              suffix="s"
+              disabled={!isConnected}
+              onCommit={(mediaFocusExitDelaySeconds) => {
+                onUpdateSettings({ mediaFocusExitDelaySeconds });
+              }}
+            />
+          </div>
+        </div>
       </section>
 
-      <div className="remote-action-row">
-        <button
-          type="button"
-          onClick={onClearFocus}
-          disabled={!isConnected || display.focusedWidgetId === null}
-        >
-          Reset naar normal state
-        </button>
+      <section className="remote-section">
+        <div className="remote-section-heading">
+          <div>
+            <p className="remote-eyebrow">Media</p>
+            <h2>{remoteMediaTitle || "Geen actieve media"}</h2>
+          </div>
+          <span className="remote-status-pill">{media.status}</span>
+        </div>
 
-        <button
-          type="button"
-          onClick={onResetIdleTimer}
-          disabled={!isConnected}
-        >
-          Reset idle timer
-        </button>
+        <div className="remote-action-grid">
+          <button
+            type="button"
+            className="remote-action-button"
+            onClick={() => {
+              onSetMediaLyricsVisible(!display.mediaLyricsVisible);
+            }}
+            disabled={!isConnected || !canToggleLyrics}
+          >
+            Lyrics {display.mediaLyricsVisible ? "uitzetten" : "aanzetten"}
+          </button>
 
-        <CommitRange
-          label="Media sessie timeout"
-          value={settings.mediaFocusExitDelaySeconds}
-          min={5}
-          max={180}
-          step={5}
-          suffix="s"
-          disabled={!isConnected}
-          onCommit={(mediaFocusExitDelaySeconds) => {
-            onUpdateSettings({ mediaFocusExitDelaySeconds });
-          }}
-        />
-
-        <button
-          type="button"
-          onClick={() => {
-            onSetMediaLyricsVisible(!display.mediaLyricsVisible);
-          }}
-          disabled={!isConnected || !canToggleLyrics}
-        >
-          Lyrics {display.mediaLyricsVisible ? "uit" : "aan"}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            onSetSpotifyContextKeepAwake(!display.spotifyContextKeepAwake);
-          }}
-          disabled={!isConnected || !canToggleSpotifyContext}
-        >
-          Spotify context{" "}
-          {display.spotifyContextKeepAwake ? "uit" : "aan voor deze sessie"}
-        </button>
-      </div>
+          <button
+            type="button"
+            className="remote-action-button"
+            onClick={() => {
+              onSetSpotifyContextKeepAwake(!display.spotifyContextKeepAwake);
+            }}
+            disabled={!isConnected || !canToggleSpotifyContext}
+          >
+            Spotify context{" "}
+            {display.spotifyContextKeepAwake ? "uitzetten" : "aanhouden"}
+          </button>
+        </div>
+      </section>
     </main>
   );
 }

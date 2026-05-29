@@ -69,6 +69,47 @@ function formatLogTime(timestamp: number) {
   return new Date(timestamp).toLocaleTimeString("nl-NL");
 }
 
+function formatOptionalTime(timestamp: number | null) {
+  return timestamp
+    ? new Date(timestamp).toLocaleTimeString("nl-NL")
+    : "nog niet";
+}
+
+function formatLux(lux: number | null) {
+  return lux === null ? "geen meting" : `${lux.toFixed(1)} lux`;
+}
+
+function getDisplayModeLabel(mode: DisplayState["mode"]) {
+  switch (mode) {
+    case "on":
+      return "Aan";
+    case "dimmed":
+      return "Gedimd";
+    case "sleep":
+      return "Sleep";
+    default:
+      return mode;
+  }
+}
+
+function getPresenceModeLabel(mode: PresenceState["mode"]) {
+  return mode === "active" ? "Actief" : "Idle";
+}
+
+function getLightModeLabel(mode: LightSensorState["mode"]) {
+  switch (mode) {
+    case "dark":
+      return "Donker";
+    case "context":
+      return "Twijfelzone";
+    case "bright":
+      return "Licht";
+    case "unknown":
+    default:
+      return "Onbekend";
+  }
+}
+
 export function AdminPage({
   layout,
   settings,
@@ -106,6 +147,16 @@ export function AdminPage({
     : hasRecoveredAfterDeploy
       ? "Deploy afgerond. Verbinding hersteld."
       : (deployment.message ?? "Nog geen update-check uitgevoerd.");
+
+  const connectionTone = isConnected
+    ? "ok"
+    : lastHttpSuccessAt
+      ? "warn"
+      : "error";
+
+  const lightLuxLabel = formatLux(light.lux);
+  const lastMotionLabel = formatOptionalTime(presence.lastMotionAt);
+  const lightUpdatedLabel = formatOptionalTime(light.updatedAt);
 
   return (
     <main className="admin-page">
@@ -154,6 +205,52 @@ export function AdminPage({
         </p>
       ) : null}
 
+      <div className="admin-overview-grid" aria-label="Mirror status overzicht">
+        <section
+          className={`admin-overview-card admin-overview-card--${connectionTone}`}
+        >
+          <p className="admin-overview-card__label">Verbinding</p>
+          <h2 className="admin-overview-card__value">
+            {getConnectionStatusLabel(connectionStatus)}
+          </h2>
+          <p className="admin-overview-card__meta">
+            {lastHttpSuccessAt
+              ? `Laatste HTTP succes: ${formatOptionalTime(lastHttpSuccessAt)}`
+              : "Nog geen HTTP fallback gebruikt"}
+          </p>
+        </section>
+
+        <section className="admin-overview-card">
+          <p className="admin-overview-card__label">Display</p>
+          <h2 className="admin-overview-card__value">
+            {getDisplayModeLabel(display.mode)}
+          </h2>
+          <p className="admin-overview-card__meta">
+            {display.keepAwakeReason ?? display.reason}
+          </p>
+        </section>
+
+        <section className="admin-overview-card">
+          <p className="admin-overview-card__label">Lichtsensor</p>
+          <h2 className="admin-overview-card__value">
+            {settings.lightSensorEnabled ? lightLuxLabel : "Uitgeschakeld"}
+          </h2>
+          <p className="admin-overview-card__meta">
+            {getLightModeLabel(light.mode)} · bijgewerkt: {lightUpdatedLabel}
+          </p>
+        </section>
+
+        <section className="admin-overview-card">
+          <p className="admin-overview-card__label">Sleep context</p>
+          <h2 className="admin-overview-card__value">
+            {getPresenceModeLabel(presence.mode)}
+          </h2>
+          <p className="admin-overview-card__meta">
+            Laatste beweging: {lastMotionLabel}
+          </p>
+        </section>
+      </div>
+
       <div className="admin-sections">
         <AccordionSection
           title="Widgets"
@@ -170,8 +267,8 @@ export function AdminPage({
         </AccordionSection>
 
         <AccordionSection
-          title="Mirror instellingen"
-          subtitle="Klok en sleep gedrag"
+          title="Gebruik & sleep"
+          subtitle="Klok, auto-sleep en focus timing"
           defaultOpen
         >
           <label style={{ display: "block", marginBottom: "1rem" }}>
@@ -260,8 +357,8 @@ export function AdminPage({
         </AccordionSection>
 
         <AccordionSection
-          title="Display settings"
-          subtitle="Rotatie, zoom, padding en spacing"
+          title="Display & kalibratie"
+          subtitle="Rotatie, zoom, safe-area en spacing"
           defaultOpen
         >
           <div style={{ marginBottom: "1rem" }}>
@@ -384,38 +481,106 @@ export function AdminPage({
         </AccordionSection>
 
         <AccordionSection
-          title="Presence debug"
-          subtitle="Live presence en display state"
+          title="Sensor & sleep instellingen"
+          subtitle="VEML thresholds en auto-sleep gedrag"
         >
-          <p>Presence mode: {presence.mode}</p>
-          <p>Display mode: {display.mode}</p>
-          <p>
-            Waarom blijft display aan:{" "}
-            {display.keepAwakeReason ?? "geen actieve reden"}
-          </p>
-          <p>Laatste display trigger: {display.reason}</p>
-          <p>
-            Laatste beweging:{" "}
-            {presence.lastMotionAt
-              ? new Date(presence.lastMotionAt).toLocaleTimeString("nl-NL")
-              : "nog geen beweging"}
-          </p>
-          <hr style={{ borderColor: "rgba(255,255,255,0.12)" }} />
+          <label className="admin-checkbox-row">
+            <input
+              type="checkbox"
+              checked={settings.lightSensorEnabled}
+              onChange={(event) =>
+                onUpdateSettings({ lightSensorEnabled: event.target.checked })
+              }
+            />
+            <span>
+              <strong>Lichtsensor gebruiken</strong>
+              <small>Laat de mirror reageren op kamerlicht.</small>
+            </span>
+          </label>
 
-          <p>Light status: {light.status}</p>
-          <p>Lux: {light.lux ?? "geen meting"}</p>
-          <p>Raw: {light.raw ?? "geen meting"}</p>
-          <p>Light mode: {light.mode}</p>
-          <p>Room light on: {light.roomLightOn ? "ja" : "nee"}</p>
-          <p>Light off threshold: {settings.lightOffLuxThreshold} lux</p>
-          <p>Light on threshold: {settings.lightOnLuxThreshold} lux</p>
-          <p>
-            Light updated:{" "}
-            {light.updatedAt
-              ? new Date(light.updatedAt).toLocaleTimeString("nl-NL")
-              : "nog niet"}
+          <div className="admin-field-grid">
+            <label className="admin-field">
+              Donker vanaf
+              <input
+                type="number"
+                step="0.1"
+                value={settings.lightOffLuxThreshold}
+                onChange={(event) =>
+                  onUpdateSettings({
+                    lightOffLuxThreshold: Number(event.target.value),
+                  })
+                }
+              />
+              <small>Onder deze lux-waarde mag de mirror naar sleep.</small>
+            </label>
+
+            <label className="admin-field">
+              Aan vanaf
+              <input
+                type="number"
+                step="0.1"
+                value={settings.lightOnLuxThreshold}
+                onChange={(event) =>
+                  onUpdateSettings({
+                    lightOnLuxThreshold: Number(event.target.value),
+                  })
+                }
+              />
+              <small>Boven deze lux-waarde blijft de mirror actief.</small>
+            </label>
+          </div>
+
+          <p className="admin-muted">
+            Tussen {settings.lightOffLuxThreshold} en{" "}
+            {settings.lightOnLuxThreshold} lux zit de twijfelzone. Daar gebruikt
+            de mirror extra context in plaats van blind aan/uit te schakelen.
           </p>
-          {light.error ? <p>Light error: {light.error}</p> : null}
+        </AccordionSection>
+
+        <AccordionSection
+          title="Live sensorstatus & test"
+          subtitle="Debug gescheiden van de normale instellingen"
+        >
+          <div className="admin-debug-grid">
+            <p>
+              Presence mode:{" "}
+              <strong>{getPresenceModeLabel(presence.mode)}</strong>
+            </p>
+            <p>
+              Display mode: <strong>{getDisplayModeLabel(display.mode)}</strong>
+            </p>
+            <p>
+              Keep awake:{" "}
+              <strong>{display.keepAwakeReason ?? "geen actieve reden"}</strong>
+            </p>
+            <p>
+              Laatste trigger: <strong>{display.reason}</strong>
+            </p>
+            <p>
+              Laatste beweging: <strong>{lastMotionLabel}</strong>
+            </p>
+            <p>
+              Light status: <strong>{light.status}</strong>
+            </p>
+            <p>
+              Lux: <strong>{lightLuxLabel}</strong>
+            </p>
+            <p>
+              Raw: <strong>{light.raw ?? "geen meting"}</strong>
+            </p>
+            <p>
+              Light mode: <strong>{getLightModeLabel(light.mode)}</strong>
+            </p>
+            <p>
+              Room light: <strong>{light.roomLightOn ? "aan" : "uit"}</strong>
+            </p>
+          </div>
+
+          {light.error ? (
+            <p className="admin-status admin-status--error">
+              Light error: {light.error}
+            </p>
+          ) : null}
 
           <button
             type="button"
@@ -424,50 +589,6 @@ export function AdminPage({
           >
             Simuleer beweging
           </button>
-        </AccordionSection>
-
-        <AccordionSection
-          title="Light sensor settings"
-          subtitle="Lux thresholds voor kamerlicht detectie"
-        >
-          <label style={{ display: "block", marginBottom: "1rem" }}>
-            <input
-              type="checkbox"
-              checked={settings.lightSensorEnabled}
-              onChange={(event) =>
-                onUpdateSettings({ lightSensorEnabled: event.target.checked })
-              }
-            />{" "}
-            Light sensor enabled
-          </label>
-
-          <label style={{ display: "block", marginBottom: "1rem" }}>
-            Light off threshold lux
-            <input
-              type="number"
-              step="0.1"
-              value={settings.lightOffLuxThreshold}
-              onChange={(event) =>
-                onUpdateSettings({
-                  lightOffLuxThreshold: Number(event.target.value),
-                })
-              }
-            />
-          </label>
-
-          <label style={{ display: "block" }}>
-            Light on threshold lux
-            <input
-              type="number"
-              step="0.1"
-              value={settings.lightOnLuxThreshold}
-              onChange={(event) =>
-                onUpdateSettings({
-                  lightOnLuxThreshold: Number(event.target.value),
-                })
-              }
-            />
-          </label>
         </AccordionSection>
 
         <AccordionSection
