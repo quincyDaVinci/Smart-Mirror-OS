@@ -4,7 +4,7 @@ const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
 const SPOTIFY_CURRENTLY_PLAYING_URL =
   "https://api.spotify.com/v1/me/player/currently-playing";
 const SPOTIFY_LIBRARY_CONTAINS_URL =
-  "https://api.spotify.com/v1/me/tracks/contains";
+  "https://api.spotify.com/v1/me/library/contains";
 
 let cachedAccessToken = null;
 let cachedAccessTokenExpiresAt = 0;
@@ -251,13 +251,37 @@ function getProductionYear(item, currentlyPlayingType) {
   return Number.isFinite(year) ? year : null;
 }
 
-async function fetchSpotifyTrackLikedState(accessToken, trackId) {
-  if (!trackId) {
+function getSpotifyTrackLibraryUris(item) {
+  const candidates = [
+    item?.uri,
+    item?.linked_from?.uri,
+    typeof item?.id === "string" ? `spotify:track:${item.id}` : null,
+    typeof item?.linked_from?.id === "string"
+      ? `spotify:track:${item.linked_from.id}`
+      : null,
+  ];
+
+  return [
+    ...new Set(
+      candidates.filter(
+        (candidate) =>
+          typeof candidate === "string" &&
+          candidate.startsWith("spotify:track:"),
+      ),
+    ),
+  ];
+}
+
+async function fetchSpotifyTrackLikedState(accessToken, item) {
+  const trackUris = getSpotifyTrackLibraryUris(item);
+
+  if (trackUris.length === 0) {
     return null;
   }
 
   const checkedAt = Date.now();
-  const cachedLikedState = likedStateCache.get(trackId);
+  const cacheKey = trackUris.join(",");
+  const cachedLikedState = likedStateCache.get(cacheKey);
 
   if (cachedLikedState && cachedLikedState.expiresAt > checkedAt) {
     return cachedLikedState.value;
@@ -265,7 +289,7 @@ async function fetchSpotifyTrackLikedState(accessToken, trackId) {
 
   if (spotifyLikedStateRateLimitedUntil > checkedAt) {
     logSpotifyDebug("fetchSpotifyTrackLikedState:rate-limited-short-circuit", {
-      trackId,
+      trackUris,
       msRemaining: spotifyLikedStateRateLimitedUntil - checkedAt,
     });
 
@@ -273,7 +297,7 @@ async function fetchSpotifyTrackLikedState(accessToken, trackId) {
   }
 
   const url = new URL(SPOTIFY_LIBRARY_CONTAINS_URL);
-  url.searchParams.set("ids", trackId);
+  url.searchParams.set("uris", trackUris.join(","));
 
   const response = await fetch(url, {
     headers: {
@@ -292,34 +316,37 @@ async function fetchSpotifyTrackLikedState(accessToken, trackId) {
       );
 
       spotifyLikedStateRateLimitedUntil = checkedAt + boundedRetryAfterMs;
-      likedStateCache.set(trackId, {
+      likedStateCache.set(cacheKey, {
         value: cachedLikedState?.value ?? null,
         expiresAt: spotifyLikedStateRateLimitedUntil,
       });
 
       console.warn(
-        `Spotify liked-state lookup gaf status 429 voor track ${trackId}; lookup gepauzeerd voor ${Math.ceil(
+        `Spotify liked-state lookup gaf status 429 voor track ${trackUris.join(", ")}; lookup gepauzeerd voor ${Math.ceil(
           boundedRetryAfterMs / 1000,
         )}s`,
       );
       return cachedLikedState?.value ?? null;
     }
 
-    likedStateCache.set(trackId, {
+    likedStateCache.set(cacheKey, {
       value: cachedLikedState?.value ?? null,
       expiresAt: checkedAt + LIKED_STATE_RETRY_CACHE_TTL_MS,
     });
 
     console.warn(
-      `Spotify liked-state lookup gaf status ${response.status} voor track ${trackId}`,
+      `Spotify liked-state lookup gaf status ${response.status} voor track ${trackUris.join(", ")}`,
     );
     return null;
   }
 
   const payload = await response.json();
 
-  if (!Array.isArray(payload) || typeof payload[0] !== "boolean") {
-    likedStateCache.set(trackId, {
+  if (
+    !Array.isArray(payload) ||
+    payload.some((value) => typeof value !== "boolean")
+  ) {
+    likedStateCache.set(cacheKey, {
       value: cachedLikedState?.value ?? null,
       expiresAt: checkedAt + LIKED_STATE_RETRY_CACHE_TTL_MS,
     });
@@ -327,12 +354,14 @@ async function fetchSpotifyTrackLikedState(accessToken, trackId) {
     return null;
   }
 
-  likedStateCache.set(trackId, {
-    value: payload[0],
+  const isLiked = payload.some(Boolean);
+
+  likedStateCache.set(cacheKey, {
+    value: isLiked,
     expiresAt: checkedAt + LIKED_STATE_CACHE_TTL_MS,
   });
 
-  return payload[0];
+  return isLiked;
 }
 
 async function fetchSpotifyNowPlaying() {
@@ -496,7 +525,7 @@ async function fetchSpotifyNowPlaying() {
 
   const isLiked =
     currentlyPlayingType === "track" && typeof item?.id === "string"
-      ? await fetchSpotifyTrackLikedState(accessToken, item.id)
+      ? await fetchSpotifyTrackLikedState(accessToken, item)
       : null;
 
   if (!item) {
