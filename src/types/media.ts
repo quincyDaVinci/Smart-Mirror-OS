@@ -9,12 +9,24 @@ export type ProviderStatus = {
   lastCheckedAt: number | null;
 };
 
+export type MediaProviderIds = {
+  imdb: string | null;
+  tmdb: string | null;
+  tvdb: string | null;
+};
+
 export type MediaSnapshot = {
   source: MediaSource | null;
   kind: MediaKind;
   title: string;
   subtitle: string;
   secondaryText: string;
+  sourceItemId: string | null;
+  playSessionId: string | null;
+  seriesTitle: string | null;
+  seasonNumber: number | null;
+  episodeNumber: number | null;
+  providerIds: MediaProviderIds;
   productionYear: number | null;
   genres: string[];
   communityRating: number | null;
@@ -33,6 +45,12 @@ export type MediaState = {
   title: string;
   subtitle: string;
   secondaryText: string;
+  sourceItemId: string | null;
+  playSessionId: string | null;
+  seriesTitle: string | null;
+  seasonNumber: number | null;
+  episodeNumber: number | null;
+  providerIds: MediaProviderIds;
   productionYear: number | null;
   genres: string[];
   communityRating: number | null;
@@ -58,6 +76,16 @@ export const defaultMediaState: MediaState = {
   title: "Geen media actief",
   subtitle: "Er wordt nu niets afgespeeld",
   secondaryText: "",
+  sourceItemId: null,
+  playSessionId: null,
+  seriesTitle: null,
+  seasonNumber: null,
+  episodeNumber: null,
+  providerIds: {
+    imdb: null,
+    tmdb: null,
+    tvdb: null,
+  },
   productionYear: null,
   genres: [],
   communityRating: null,

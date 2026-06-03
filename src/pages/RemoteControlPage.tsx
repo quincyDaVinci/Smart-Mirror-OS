@@ -24,6 +24,7 @@ type RemoteControlPageProps = {
   onFocusWidget: (widgetId: WidgetId) => void;
   onClearFocus: () => void;
   onSetMediaLyricsVisible: (visible: boolean) => void;
+  onSetMediaJellyfinTriviaVisible: (visible: boolean) => void;
   onSetSpotifyContextKeepAwake: (enabled: boolean) => void;
   onResetIdleTimer: () => void;
 };
@@ -183,6 +184,7 @@ export function RemoteControlPage({
   onFocusWidget,
   onClearFocus,
   onSetMediaLyricsVisible,
+  onSetMediaJellyfinTriviaVisible,
   onSetSpotifyContextKeepAwake,
   onResetIdleTimer,
 }: RemoteControlPageProps) {
@@ -228,6 +230,12 @@ export function RemoteControlPage({
   const canToggleLyrics =
     display.focusedWidgetId === "media" &&
     media.kind === "track" &&
+    (media.status === "playing" || media.status === "paused");
+
+  const canToggleJellyfinTrivia =
+    display.focusedWidgetId === "media" &&
+    media.source === "jellyfin" &&
+    (media.kind === "movie" || media.kind === "episode") &&
     (media.status === "playing" || media.status === "paused");
 
   const canToggleSpotifyContext =
@@ -380,6 +388,20 @@ export function RemoteControlPage({
             disabled={!isConnected || !canToggleLyrics}
           >
             Lyrics {display.mediaLyricsVisible ? "uitzetten" : "aanzetten"}
+          </button>
+
+          <button
+            type="button"
+            className="remote-action-button"
+            onClick={() => {
+              onSetMediaJellyfinTriviaVisible(
+                !display.mediaJellyfinTriviaVisible,
+              );
+            }}
+            disabled={!isConnected || !canToggleJellyfinTrivia}
+          >
+            Jellyfin Trivia{" "}
+            {display.mediaJellyfinTriviaVisible ? "uitzetten" : "aanzetten"}
           </button>
 
           <button

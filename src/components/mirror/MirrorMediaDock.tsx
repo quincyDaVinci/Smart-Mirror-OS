@@ -5,6 +5,8 @@ import { getWebSocketUrl } from "../../utils/getWebSocketUrl";
 type MirrorMediaDockProps = {
   media: MediaState;
   showLyrics?: boolean;
+  showJellyfinTrivia?: boolean;
+  jellyfinTriviaSessionKey?: string | null;
   variant?: "compact" | "focus";
 };
 
@@ -30,6 +32,42 @@ type LyricsState =
   | { status: "ready"; lyrics: LyricsPayload | null; message: string | null }
   | { status: "error"; lyrics: null; message: string };
 
+type JellyfinTriviaItem = {
+  id: string;
+  source: "moviemistakes-trivia" | "moviemistakes-goof";
+  sourceTitleId: string;
+  sourceUrl: string;
+  text: string;
+  startMs: number | null;
+  endMs: number | null;
+  helpfulVotes: number | null;
+  totalVotes: number | null;
+  score: number;
+  spoilerLevel: "none" | "mild" | "high";
+  kind:
+    | "scene"
+    | "actor"
+    | "director"
+    | "cameo"
+    | "improvisation"
+    | "practical-effect"
+    | "hidden-detail"
+    | "blooper"
+    | "behind-scenes"
+    | "general";
+};
+
+type JellyfinTriviaState =
+  | { status: "idle"; items: JellyfinTriviaItem[]; message: null }
+  | { status: "loading"; items: JellyfinTriviaItem[]; message: null }
+  | { status: "ready"; items: JellyfinTriviaItem[]; message: string | null }
+  | { status: "error"; items: JellyfinTriviaItem[]; message: string };
+
+type ActiveTriviaPopup = {
+  item: JellyfinTriviaItem;
+  hideAt: number;
+};
+
 type LyricLine = {
   text: string;
   startMs: number | null;
@@ -45,6 +83,9 @@ type ProgressAnchor = {
 
 const PAUSED_RECENTLY_PLAYED_AFTER_MS = 45 * 1000;
 const LYRICS_AUTO_HIDE_AFTER_MS = 3500;
+const TRIVIA_TIMED_EARLY_WINDOW_MS = 8000;
+const TRIVIA_TIMED_LATE_WINDOW_MS = 12000;
+const TRIVIA_UNTIMED_EDGE_MARGIN_MS = 3 * 60 * 1000;
 
 
 
@@ -342,6 +383,112 @@ function getActiveLyricIndex(
   return activeIndex;
 }
 
+function getTriviaPopupDurationMs(text: string) {
+  return Math.min(30000, Math.max(15000, 15000 + text.length * 45));
+}
+
+function getTriviaBudget(
+  kind: MediaState["kind"],
+  durationMs: number | null,
+  strongUntimedItemCount: number,
+) {
+  if (durationMs === null || durationMs <= 0) {
+    return kind === "movie" ? 5 : 1;
+  }
+
+  const durationMinutes = durationMs / 60000;
+
+  if (kind === "episode") {
+    if (durationMinutes <= 25) {
+      return strongUntimedItemCount >= 2 && durationMinutes >= 22 ? 2 : 1;
+    }
+
+    if (durationMinutes <= 44) return 2;
+    if (durationMinutes <= 64) return 3;
+    return 4;
+  }
+
+  if (durationMinutes <= 99) return 5;
+  if (durationMinutes <= 129) return 6;
+  if (durationMinutes <= 159) return 7;
+  return 8;
+}
+
+function getDeterministicJitterMs(value: string, maxJitterMs: number) {
+  let hash = 0;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+
+  return Math.round((hash / 0xffffffff - 0.5) * maxJitterMs * 2);
+}
+
+function getUntimedTriviaWindow(durationMs: number | null) {
+  if (durationMs === null || durationMs <= TRIVIA_UNTIMED_EDGE_MARGIN_MS * 2) {
+    return null;
+  }
+
+  const startMs = Math.max(durationMs * 0.1, TRIVIA_UNTIMED_EDGE_MARGIN_MS);
+  const endMs = Math.min(
+    durationMs * 0.9,
+    durationMs - TRIVIA_UNTIMED_EDGE_MARGIN_MS,
+  );
+
+  return endMs > startMs ? { startMs, endMs } : null;
+}
+
+function buildUntimedTriviaSlots(
+  items: JellyfinTriviaItem[],
+  durationMs: number | null,
+  kind: MediaState["kind"],
+) {
+  const window = getUntimedTriviaWindow(durationMs);
+
+  if (!window) {
+    return [];
+  }
+
+  const untimedItems = items
+    .filter((item) => item.startMs === null)
+    .sort((a, b) => b.score - a.score);
+  const budget = getTriviaBudget(kind, durationMs, untimedItems.length);
+  const selectedItems = untimedItems.slice(0, budget);
+
+  if (selectedItems.length === 0) {
+    return [];
+  }
+
+  const spacing = (window.endMs - window.startMs) / (selectedItems.length + 1);
+
+  return selectedItems.map((item, index) => {
+    const baseStartMs = window.startMs + spacing * (index + 1);
+    const jitterMs = getDeterministicJitterMs(item.id, Math.min(45000, spacing * 0.28));
+    const startMs = Math.min(
+      window.endMs,
+      Math.max(window.startMs, Math.round(baseStartMs + jitterMs)),
+    );
+
+    return { itemId: item.id, startMs };
+  });
+}
+
+function getTriviaMediaKey(media: MediaState) {
+  return [
+    media.sourceItemId ?? "",
+    media.title,
+    media.subtitle,
+    media.artworkUrl ?? "",
+    media.durationMs ?? "",
+    media.seasonNumber ?? "",
+    media.episodeNumber ?? "",
+  ].join("\n");
+}
+
+function getTriviaSourceLabel(source: JellyfinTriviaItem["source"]) {
+  return source === "moviemistakes-goof" ? "Goof" : "Trivia";
+}
+
 function getProviderMessage(media: MediaState, source: MediaState["source"]) {
   if (source === "spotify") {
     return media.sourceState.spotify.message;
@@ -440,6 +587,8 @@ function AlbumIcon() {
 export function MirrorMediaDock({
   media,
   showLyrics = false,
+  showJellyfinTrivia = false,
+  jellyfinTriviaSessionKey = null,
   variant = "compact",
 }: MirrorMediaDockProps) {
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -451,6 +600,20 @@ export function MirrorMediaDock({
   const [lyricsSuppressedKey, setLyricsSuppressedKey] = useState<string | null>(
     null,
   );
+  const [jellyfinTriviaState, setJellyfinTriviaState] =
+    useState<JellyfinTriviaState>({
+      status: "idle",
+      items: [],
+      message: null,
+    });
+  const [jellyfinTriviaLoadedKey, setJellyfinTriviaLoadedKey] = useState<
+    string | null
+  >(null);
+  const [shownTriviaIds, setShownTriviaIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [activeTriviaPopup, setActiveTriviaPopup] =
+    useState<ActiveTriviaPopup | null>(null);
   const [progressAnchor, setProgressAnchor] = useState<ProgressAnchor | null>(
     null,
   );
@@ -474,6 +637,12 @@ export function MirrorMediaDock({
     title: media.title,
     subtitle: media.subtitle,
     secondaryText: media.secondaryText,
+    sourceItemId: media.sourceItemId,
+    playSessionId: media.playSessionId,
+    seriesTitle: media.seriesTitle,
+    seasonNumber: media.seasonNumber,
+    episodeNumber: media.episodeNumber,
+    providerIds: media.providerIds,
     productionYear: media.productionYear,
     genres: media.genres,
     communityRating: media.communityRating,
@@ -491,9 +660,13 @@ export function MirrorMediaDock({
   const mediaProgressKey = [
     displayMedia.source,
     displayMedia.kind,
+    displayMedia.sourceItemId,
+    displayMedia.playSessionId,
     displayMedia.title,
     displayMedia.subtitle,
     displayMedia.durationMs ?? "",
+    displayMedia.seasonNumber ?? "",
+    displayMedia.episodeNumber ?? "",
   ].join("\n");
 
   const pausedDurationMs =
@@ -663,6 +836,26 @@ export function MirrorMediaDock({
     requestedLyricsEnabled && lyricsSuppressedKey !== lyricsQueryKey;
   const showSpotifyLikedIcon =
     displayMedia.source === "spotify" && displayMedia.kind === "track";
+  const requestedJellyfinTriviaEnabled =
+    variant === "focus" &&
+    showJellyfinTrivia &&
+    jellyfinTriviaSessionKey !== null &&
+    hasLiveMedia &&
+    media.source === "jellyfin" &&
+    (media.kind === "movie" || media.kind === "episode") &&
+    (media.status === "playing" || media.status === "paused");
+  const jellyfinTriviaMediaKey = getTriviaMediaKey(media);
+  const jellyfinTriviaEnabled = requestedJellyfinTriviaEnabled;
+  const scheduledTriviaSlots = useMemo(
+    () =>
+      buildUntimedTriviaSlots(
+        jellyfinTriviaState.items,
+        media.durationMs,
+        media.kind,
+      ),
+    [jellyfinTriviaState.items, media.durationMs, media.kind],
+  );
+
   useEffect(() => {
     if (!requestedLyricsEnabled) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -674,6 +867,114 @@ export function MirrorMediaDock({
       currentKey !== null && currentKey !== lyricsQueryKey ? null : currentKey,
     );
   }, [requestedLyricsEnabled, lyricsQueryKey]);
+
+  useEffect(() => {
+    if (!jellyfinTriviaEnabled) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setJellyfinTriviaState({ status: "idle", items: [], message: null });
+      setJellyfinTriviaLoadedKey(null);
+      setShownTriviaIds(new Set());
+      setActiveTriviaPopup(null);
+      return;
+    }
+
+    setJellyfinTriviaLoadedKey(null);
+    setShownTriviaIds(new Set());
+    setActiveTriviaPopup(null);
+  }, [
+    jellyfinTriviaEnabled,
+    jellyfinTriviaMediaKey,
+    jellyfinTriviaSessionKey,
+  ]);
+
+  useEffect(() => {
+    if (!jellyfinTriviaEnabled || jellyfinTriviaSessionKey === null) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const query = new URLSearchParams({
+      sessionKey: jellyfinTriviaSessionKey,
+      title: media.title,
+    });
+
+    if (media.sourceItemId) {
+      query.set("itemId", media.sourceItemId);
+    }
+
+    if (media.durationMs !== null) {
+      query.set("durationMs", String(media.durationMs));
+    }
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setJellyfinTriviaState({ status: "loading", items: [], message: null });
+    setJellyfinTriviaLoadedKey(null);
+
+    fetch(`${getApiBaseUrl()}/media/jellyfin-trivia?${query.toString()}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        const payload = (await response.json()) as {
+          ok?: unknown;
+          items?: unknown;
+          message?: unknown;
+          error?: unknown;
+        };
+
+        if (!response.ok || payload.ok !== true) {
+          throw new Error(
+            typeof payload.error === "string"
+              ? payload.error
+              : `HTTP ${response.status}`,
+          );
+        }
+
+        const items = Array.isArray(payload.items)
+          ? payload.items.filter(
+              (item): item is JellyfinTriviaItem =>
+                item !== null &&
+                typeof item === "object" &&
+                typeof (item as JellyfinTriviaItem).id === "string" &&
+                typeof (item as JellyfinTriviaItem).text === "string",
+            )
+          : [];
+
+        setJellyfinTriviaState({
+          status: "ready",
+          items,
+          message:
+            typeof payload.message === "string" ? payload.message : null,
+        });
+        setJellyfinTriviaLoadedKey(jellyfinTriviaMediaKey);
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setJellyfinTriviaState({
+          status: "error",
+          items: [],
+          message:
+            error instanceof Error
+              ? error.message
+              : "Jellyfin trivia ophalen mislukt.",
+        });
+        setJellyfinTriviaLoadedKey(jellyfinTriviaMediaKey);
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [
+    jellyfinTriviaEnabled,
+    jellyfinTriviaMediaKey,
+    jellyfinTriviaSessionKey,
+    media.title,
+    media.sourceItemId,
+    media.durationMs,
+  ]);
 
   useEffect(() => {
     if (!lyricsEnabled) {
@@ -901,6 +1202,79 @@ export function MirrorMediaDock({
     hasLyricLines,
   ]);
 
+  useEffect(() => {
+    if (!activeTriviaPopup) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setActiveTriviaPopup(null);
+    }, Math.max(0, activeTriviaPopup.hideAt - Date.now()));
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [activeTriviaPopup]);
+
+  useEffect(() => {
+    if (
+      !jellyfinTriviaEnabled ||
+      jellyfinTriviaState.status !== "ready" ||
+      jellyfinTriviaLoadedKey !== jellyfinTriviaMediaKey ||
+      activeTriviaPopup ||
+      liveProgressMs === null ||
+      media.status !== "playing"
+    ) {
+      return;
+    }
+
+    const timedCandidate = jellyfinTriviaState.items.find(
+      (item) =>
+        item.startMs !== null &&
+        !shownTriviaIds.has(item.id) &&
+        liveProgressMs >= item.startMs - TRIVIA_TIMED_EARLY_WINDOW_MS &&
+        liveProgressMs <= item.startMs + TRIVIA_TIMED_LATE_WINDOW_MS,
+    );
+
+    const dueSlot = scheduledTriviaSlots.find(
+      (slot) =>
+        !shownTriviaIds.has(slot.itemId) &&
+        liveProgressMs >= slot.startMs &&
+        liveProgressMs <= slot.startMs + 30000,
+    );
+    const untimedCandidate = dueSlot
+      ? jellyfinTriviaState.items.find((item) => item.id === dueSlot.itemId) ??
+        null
+      : null;
+    const nextTrivia = timedCandidate ?? untimedCandidate;
+
+    if (!nextTrivia) {
+      return;
+    }
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setShownTriviaIds((previousIds) => {
+      const nextIds = new Set(previousIds);
+      nextIds.add(nextTrivia.id);
+      return nextIds;
+    });
+    setActiveTriviaPopup({
+      item: nextTrivia,
+      hideAt: Date.now() + getTriviaPopupDurationMs(nextTrivia.text),
+    });
+  }, [
+    jellyfinTriviaEnabled,
+    jellyfinTriviaState.status,
+    jellyfinTriviaState.items,
+    jellyfinTriviaLoadedKey,
+    jellyfinTriviaMediaKey,
+    activeTriviaPopup,
+    liveProgressMs,
+    media.status,
+    scheduledTriviaSlots,
+    shownTriviaIds,
+  ]);
+
   const className = [
     "mirror-main-media",
     `mirror-main-media--${variant}`,
@@ -912,6 +1286,7 @@ export function MirrorMediaDock({
     isPosterArtwork ? "mirror-main-media--poster" : "mirror-main-media--cover",
     isVideo ? "mirror-main-media--video" : "",
     lyricsEnabled ? "mirror-main-media--lyrics" : "",
+    jellyfinTriviaEnabled ? "mirror-main-media--trivia" : "",
     isIdle ? "mirror-main-media--idle" : "",
   ]
     .filter(Boolean)
@@ -1099,6 +1474,17 @@ export function MirrorMediaDock({
               </div>
             </div>
           ) : null}
+        </aside>
+      ) : null}
+
+      {jellyfinTriviaEnabled && activeTriviaPopup ? (
+        <aside className="mirror-main-media__trivia" aria-live="polite">
+          <p className="mirror-main-media__trivia-label">
+            {getTriviaSourceLabel(activeTriviaPopup.item.source)}
+          </p>
+          <p className="mirror-main-media__trivia-text">
+            {activeTriviaPopup.item.text}
+          </p>
         </aside>
       ) : null}
     </section>

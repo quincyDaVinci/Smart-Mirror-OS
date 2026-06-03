@@ -21,6 +21,7 @@ function App() {
     focusWidget,
     clearWidgetFocus,
     setMediaLyricsVisible,
+    setMediaJellyfinTriviaVisible,
     setSpotifyContextKeepAwake,
     simulateMotion,
     resetIdleTimer,
@@ -96,6 +97,7 @@ function App() {
               onFocusWidget={focusWidget}
               onClearFocus={clearWidgetFocus}
               onSetMediaLyricsVisible={setMediaLyricsVisible}
+              onSetMediaJellyfinTriviaVisible={setMediaJellyfinTriviaVisible}
               onSetSpotifyContextKeepAwake={setSpotifyContextKeepAwake}
               onResetIdleTimer={resetIdleTimer}
               settings={settings}

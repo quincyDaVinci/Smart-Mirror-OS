@@ -14,6 +14,9 @@ const http = require("http");
 const { WebSocketServer } = require("ws");
 const { fetchJellyfinNowPlaying } = require("./providers/jellyfinNowPlaying");
 const {
+  fetchJellyfinTriviaForMedia,
+} = require("./providers/jellyfinTrivia");
+const {
   fetchSpotifyNowPlaying,
   resetSpotifyAccessTokenCache,
 } = require("./providers/spotifyNowPlaying");
@@ -314,6 +317,8 @@ const defaultState = {
     mediaAutoFocusSuppressedAt: null,
     mediaAutoFocusSuppressionSawActive: false,
     mediaLyricsVisible: false,
+    mediaJellyfinTriviaVisible: false,
+    mediaJellyfinTriviaSessionKey: null,
     spotifyContextKeepAwake: false,
     spotifyContextKeepAwakeSetAt: null,
   },
@@ -335,6 +340,16 @@ const defaultState = {
     title: "Geen media actief",
     subtitle: "Er wordt nu niets afgespeeld",
     secondaryText: "",
+    sourceItemId: null,
+    playSessionId: null,
+    seriesTitle: null,
+    seasonNumber: null,
+    episodeNumber: null,
+    providerIds: {
+      imdb: null,
+      tmdb: null,
+      tvdb: null,
+    },
     productionYear: null,
     genres: [],
     communityRating: null,
@@ -638,6 +653,17 @@ function normalizeDisplay(displayInput = {}) {
         ? displayInput.mediaLyricsVisible
         : defaultState.display.mediaLyricsVisible,
 
+    mediaJellyfinTriviaVisible:
+      typeof displayInput.mediaJellyfinTriviaVisible === "boolean"
+        ? displayInput.mediaJellyfinTriviaVisible
+        : defaultState.display.mediaJellyfinTriviaVisible,
+
+    mediaJellyfinTriviaSessionKey:
+      typeof displayInput.mediaJellyfinTriviaSessionKey === "string" &&
+      displayInput.mediaJellyfinTriviaSessionKey.length > 0
+        ? displayInput.mediaJellyfinTriviaSessionKey
+        : null,
+
     spotifyContextKeepAwake:
       typeof displayInput.spotifyContextKeepAwake === "boolean"
         ? displayInput.spotifyContextKeepAwake
@@ -656,10 +682,14 @@ function normalizeDisplay(displayInput = {}) {
     nextDisplay.focusUntil = null;
     nextDisplay.mediaIdleSince = null;
     nextDisplay.mediaLyricsVisible = false;
+    nextDisplay.mediaJellyfinTriviaVisible = false;
+    nextDisplay.mediaJellyfinTriviaSessionKey = null;
   }
 
   if (nextDisplay.focusedWidgetId !== "media") {
     nextDisplay.mediaLyricsVisible = false;
+    nextDisplay.mediaJellyfinTriviaVisible = false;
+    nextDisplay.mediaJellyfinTriviaSessionKey = null;
   }
 
   if (nextDisplay.focusSource === "media-auto") {
@@ -727,6 +757,20 @@ function normalizeProviderRuntimeStatus(input = {}, fallback = {}) {
   };
 }
 
+function normalizeOptionalString(value) {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function normalizeMediaProviderIds(input = {}) {
+  const providerIds = input && typeof input === "object" ? input : {};
+
+  return {
+    imdb: normalizeOptionalString(providerIds.imdb ?? providerIds.Imdb),
+    tmdb: normalizeOptionalString(providerIds.tmdb ?? providerIds.Tmdb),
+    tvdb: normalizeOptionalString(providerIds.tvdb ?? providerIds.Tvdb),
+  };
+}
+
 function normalizeMediaSnapshot(snapshotInput = null) {
   if (!snapshotInput || typeof snapshotInput !== "object") {
     return null;
@@ -747,6 +791,12 @@ function normalizeMediaSnapshot(snapshotInput = null) {
       typeof snapshotInput.secondaryText === "string"
         ? snapshotInput.secondaryText
         : defaultState.media.secondaryText,
+    sourceItemId: normalizeOptionalString(snapshotInput.sourceItemId),
+    playSessionId: normalizeOptionalString(snapshotInput.playSessionId),
+    seriesTitle: normalizeOptionalString(snapshotInput.seriesTitle),
+    seasonNumber: normalizeOptionalNumber(snapshotInput.seasonNumber),
+    episodeNumber: normalizeOptionalNumber(snapshotInput.episodeNumber),
+    providerIds: normalizeMediaProviderIds(snapshotInput.providerIds),
     productionYear: Number.isFinite(Number(snapshotInput.productionYear))
       ? Number(snapshotInput.productionYear)
       : null,
@@ -805,6 +855,12 @@ function normalizeMediaState(mediaInput = {}) {
       typeof mediaInput.secondaryText === "string"
         ? mediaInput.secondaryText
         : defaultState.media.secondaryText,
+    sourceItemId: normalizeOptionalString(mediaInput.sourceItemId),
+    playSessionId: normalizeOptionalString(mediaInput.playSessionId),
+    seriesTitle: normalizeOptionalString(mediaInput.seriesTitle),
+    seasonNumber: normalizeOptionalNumber(mediaInput.seasonNumber),
+    episodeNumber: normalizeOptionalNumber(mediaInput.episodeNumber),
+    providerIds: normalizeMediaProviderIds(mediaInput.providerIds),
     productionYear: Number.isFinite(Number(mediaInput.productionYear))
       ? Number(mediaInput.productionYear)
       : null,
@@ -1028,6 +1084,14 @@ function createLastPlayedSnapshot(mediaState) {
     title: mediaState.title,
     subtitle: mediaState.subtitle,
     secondaryText: mediaState.secondaryText,
+    sourceItemId: mediaState.sourceItemId,
+    playSessionId: mediaState.playSessionId,
+    seriesTitle: mediaState.seriesTitle,
+    seasonNumber: mediaState.seasonNumber,
+    episodeNumber: mediaState.episodeNumber,
+    providerIds: {
+      ...(mediaState.providerIds ?? defaultState.media.providerIds),
+    },
     productionYear: mediaState.productionYear,
     genres: [...(mediaState.genres ?? [])],
     communityRating: mediaState.communityRating,
@@ -1051,6 +1115,13 @@ function shouldRefreshLastPlayedSnapshot(previousSnapshot, nextMedia) {
     previousSnapshot.title !== nextMedia.title ||
     previousSnapshot.subtitle !== nextMedia.subtitle ||
     previousSnapshot.secondaryText !== nextMedia.secondaryText ||
+    previousSnapshot.sourceItemId !== nextMedia.sourceItemId ||
+    previousSnapshot.playSessionId !== nextMedia.playSessionId ||
+    previousSnapshot.seriesTitle !== nextMedia.seriesTitle ||
+    previousSnapshot.seasonNumber !== nextMedia.seasonNumber ||
+    previousSnapshot.episodeNumber !== nextMedia.episodeNumber ||
+    JSON.stringify(previousSnapshot.providerIds) !==
+      JSON.stringify(nextMedia.providerIds) ||
     previousSnapshot.artworkUrl !== nextMedia.artworkUrl ||
     previousSnapshot.durationMs !== nextMedia.durationMs ||
     previousSnapshot.isLiked !== nextMedia.isLiked
@@ -1059,6 +1130,35 @@ function shouldRefreshLastPlayedSnapshot(previousSnapshot, nextMedia) {
 
 function isMediaPlayableSource(mediaState) {
   return mediaState.source === "jellyfin" || mediaState.source === "spotify";
+}
+
+function isJellyfinTriviaEligible(mediaState) {
+  return (
+    mediaState.source === "jellyfin" &&
+    (mediaState.kind === "movie" || mediaState.kind === "episode") &&
+    (mediaState.status === "playing" || mediaState.status === "paused")
+  );
+}
+
+function getJellyfinTriviaSessionKey(mediaState) {
+  if (!isJellyfinTriviaEligible(mediaState)) {
+    return null;
+  }
+
+  if (mediaState.playSessionId) {
+    return `play-session:${mediaState.playSessionId}`;
+  }
+
+  return [
+    "fallback",
+    mediaState.sourceItemId ?? "",
+    mediaState.title ?? "",
+    mediaState.subtitle ?? "",
+    mediaState.artworkUrl ?? "",
+    mediaState.durationMs ?? "",
+    mediaState.seasonNumber ?? "",
+    mediaState.episodeNumber ?? "",
+  ].join("\n");
 }
 
 function setFocusedWidget(
@@ -1094,6 +1194,14 @@ function setFocusedWidget(
     mediaAutoFocusSuppressionSawActive: false,
     mediaLyricsVisible:
       normalizedWidgetId === "media" ? state.display.mediaLyricsVisible : false,
+    mediaJellyfinTriviaVisible:
+      normalizedWidgetId === "media"
+        ? state.display.mediaJellyfinTriviaVisible
+        : false,
+    mediaJellyfinTriviaSessionKey:
+      normalizedWidgetId === "media"
+        ? state.display.mediaJellyfinTriviaSessionKey
+        : null,
     reason,
     updatedAt: now,
   };
@@ -1136,6 +1244,8 @@ function clearFocusedWidget(reason = "focus:clear", options = {}) {
       shouldSuppressMediaAutoFocus &&
       (mediaIsCurrentlyActive || state.display.focusSource === "media-auto"),
     mediaLyricsVisible: false,
+    mediaJellyfinTriviaVisible: false,
+    mediaJellyfinTriviaSessionKey: null,
     reason,
     updatedAt: now,
   };
@@ -1174,6 +1284,74 @@ function setMediaLyricsVisible(visible, reason = "lyrics:toggle") {
       nextVisible ? "aan" : "uit",
     );
   }
+
+  return true;
+}
+
+function setMediaJellyfinTriviaVisible(
+  visible,
+  reason = "jellyfin-trivia:toggle",
+) {
+  const nextSessionKey = getJellyfinTriviaSessionKey(state.media);
+  const nextVisible =
+    visible === true &&
+    state.display.focusedWidgetId === "media" &&
+    nextSessionKey !== null;
+
+  const changed =
+    state.display.mediaJellyfinTriviaVisible !== nextVisible ||
+    state.display.mediaJellyfinTriviaSessionKey !==
+      (nextVisible ? nextSessionKey : null);
+
+  state.display = {
+    ...state.display,
+    mediaJellyfinTriviaVisible: nextVisible,
+    mediaJellyfinTriviaSessionKey: nextVisible ? nextSessionKey : null,
+    reason,
+    updatedAt: Date.now(),
+  };
+
+  if (changed) {
+    appendLog(
+      "info",
+      "focus",
+      "Jellyfin trivia zichtbaarheid gewijzigd",
+      nextVisible ? "aan" : "uit",
+    );
+  }
+
+  return true;
+}
+
+function syncMediaJellyfinTriviaSession() {
+  if (!state.display.mediaJellyfinTriviaVisible) {
+    return false;
+  }
+
+  const nextSessionKey = getJellyfinTriviaSessionKey(state.media);
+
+  if (
+    state.display.focusedWidgetId === "media" &&
+    nextSessionKey !== null &&
+    state.display.mediaJellyfinTriviaSessionKey === nextSessionKey
+  ) {
+    return false;
+  }
+
+  state.display = {
+    ...state.display,
+    mediaJellyfinTriviaVisible: false,
+    mediaJellyfinTriviaSessionKey: null,
+    reason: "jellyfin-trivia:session-ended",
+    updatedAt: Date.now(),
+  };
+
+  appendLog(
+    "info",
+    "focus",
+    "Jellyfin trivia automatisch uitgezet",
+    "Jellyfin sessie is beÃ«indigd of media is gewijzigd",
+  );
 
   return true;
 }
@@ -1429,6 +1607,7 @@ function updateRuntimeMedia(nextMedia) {
 
   const mediaReason = getMediaDisplayReason(state.media);
 
+  const jellyfinTriviaChanged = syncMediaJellyfinTriviaSession();
   const focusChanged = reconcileFocusState(mediaReason);
   const spotifyContextChanged = syncSpotifyContextKeepAwakeSession();
   const presenceChanged = syncPresenceFromEnvironment();
@@ -1436,6 +1615,7 @@ function updateRuntimeMedia(nextMedia) {
 
   if (
     !mediaChanged &&
+    !jellyfinTriviaChanged &&
     !spotifyContextChanged &&
     !focusChanged &&
     !presenceChanged &&
@@ -1447,6 +1627,7 @@ function updateRuntimeMedia(nextMedia) {
   if (
     focusChanged ||
     lastPlayedChanged ||
+    jellyfinTriviaChanged ||
     spotifyContextChanged ||
     presenceChanged ||
     displayChanged
@@ -2499,6 +2680,14 @@ function handleClientMessage(message) {
     return true;
   }
 
+  if (message.type === "display:jellyfin-trivia") {
+    const { visible } = message.payload ?? {};
+
+    setMediaJellyfinTriviaVisible(visible === true, "jellyfin-trivia:remote");
+    persistAndBroadcast();
+    return true;
+  }
+
   if (message.type === "display:spotify-context") {
     const { enabled } = message.payload ?? {};
 
@@ -3015,6 +3204,56 @@ app.get("/media/lyrics", async (req, res) => {
   });
 
   res.status(result.status).json(result.body);
+});
+
+app.get("/media/jellyfin-trivia", async (req, res) => {
+  const currentSessionKey = getJellyfinTriviaSessionKey(state.media);
+  const requestedSessionKey =
+    typeof req.query.sessionKey === "string" ? req.query.sessionKey : null;
+
+  console.log("[jellyfin-trivia:req]", {
+    ip: req.socket.remoteAddress,
+    itemId: req.query.itemId,
+    title: req.query.title,
+    requestedSessionKey,
+    currentSessionKey,
+  });
+
+  if (
+    requestedSessionKey !== null &&
+    currentSessionKey !== null &&
+    requestedSessionKey !== currentSessionKey
+  ) {
+    res.json({
+      ok: true,
+      eligible: false,
+      mediaKey: null,
+      sessionKey: currentSessionKey,
+      sourceProvider: null,
+      sourceTitleId: null,
+      sourceUrls: [],
+      errorCode: null,
+      items: [],
+      message: "Jellyfin sessie is gewijzigd.",
+    });
+    return;
+  }
+
+  const body = await fetchJellyfinTriviaForMedia({
+    media: state.media,
+    sessionKey: currentSessionKey,
+  });
+
+  console.log("[jellyfin-trivia:res]", {
+    itemCount: body.items.length,
+    eligible: body.eligible,
+    sourceProvider: body.sourceProvider,
+    sourceTitleId: body.sourceTitleId,
+    errorCode: body.errorCode,
+    message: body.message,
+  });
+
+  res.json(body);
 });
 
 console.log("[boot] registering action route");

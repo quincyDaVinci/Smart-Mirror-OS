@@ -209,6 +209,8 @@ export function useMirrorSocket() {
     mediaAutoFocusSuppressedAt: null,
     mediaAutoFocusSuppressionSawActive: false,
     mediaLyricsVisible: false,
+    mediaJellyfinTriviaVisible: false,
+    mediaJellyfinTriviaSessionKey: null,
     spotifyContextKeepAwake: false,
     spotifyContextKeepAwakeSetAt: null,
   });
@@ -814,6 +816,13 @@ export function useMirrorSocket() {
     });
   }
 
+  function setMediaJellyfinTriviaVisible(visible: boolean) {
+    void sendAction({
+      type: "display:jellyfin-trivia",
+      payload: { visible },
+    });
+  }
+
   function setSpotifyContextKeepAwake(enabled: boolean) {
     void sendAction({
       type: "display:spotify-context",
@@ -862,6 +871,7 @@ export function useMirrorSocket() {
     focusWidget,
     clearWidgetFocus,
     setMediaLyricsVisible,
+    setMediaJellyfinTriviaVisible,
     setSpotifyContextKeepAwake,
     simulateMotion,
     resetIdleTimer,

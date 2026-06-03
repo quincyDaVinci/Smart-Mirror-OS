@@ -1,6 +1,11 @@
 const CHECKED_IDLE_MESSAGE = "Geen actieve Jellyfin sessie.";
 const { getJellyfinSecrets } = require("../secretsStore");
 
+const JELLYFIN_ACTIVE_WITHIN_SECONDS = 20;
+const STALE_PLAYING_AFTER_MS = 8000;
+
+let previousPlaybackObservation = null;
+
 function ticksToMs(ticks) {
   return typeof ticks === "number" ? Math.floor(ticks / 10000) : null;
 }
@@ -64,6 +69,28 @@ function buildSecondaryText(item) {
   }
 
   return "";
+}
+
+function normalizeProviderIds(item) {
+  const providerIds =
+    item && typeof item.ProviderIds === "object" && item.ProviderIds !== null
+      ? item.ProviderIds
+      : {};
+
+  return {
+    imdb:
+      typeof providerIds.Imdb === "string" && providerIds.Imdb.length > 0
+        ? providerIds.Imdb
+        : null,
+    tmdb:
+      typeof providerIds.Tmdb === "string" && providerIds.Tmdb.length > 0
+        ? providerIds.Tmdb
+        : null,
+    tvdb:
+      typeof providerIds.Tvdb === "string" && providerIds.Tvdb.length > 0
+        ? providerIds.Tvdb
+        : null,
+  };
 }
 
 function getArtworkTargetItemId(item) {
@@ -141,6 +168,55 @@ function pickBestSession(sessions, preferredUserName, preferredDeviceName) {
   );
 }
 
+function getPlaybackObservationKey(session, item, playSessionId) {
+  return [
+    typeof item?.Id === "string" ? item.Id : "",
+    playSessionId ?? "",
+    session?.DeviceId ?? "",
+    session?.DeviceName ?? "",
+    session?.UserId ?? "",
+    session?.UserName ?? "",
+  ].join("\n");
+}
+
+function getEffectivePlaybackStatus({
+  session,
+  item,
+  playSessionId,
+  positionMs,
+  checkedAt,
+}) {
+  if (session.PlayState?.IsPaused) {
+    previousPlaybackObservation = null;
+    return "paused";
+  }
+
+  const observationKey = getPlaybackObservationKey(session, item, playSessionId);
+  const previousObservation = previousPlaybackObservation;
+  const isSamePlayback =
+    previousObservation?.key === observationKey &&
+    previousObservation.positionMs === positionMs;
+  const firstSeenAt = isSamePlayback
+    ? previousObservation.firstSeenAt
+    : checkedAt;
+
+  previousPlaybackObservation = {
+    key: observationKey,
+    positionMs,
+    firstSeenAt,
+  };
+
+  if (
+    positionMs !== null &&
+    isSamePlayback &&
+    checkedAt - firstSeenAt >= STALE_PLAYING_AFTER_MS
+  ) {
+    return "paused";
+  }
+
+  return "playing";
+}
+
 async function fetchJellyfinNowPlaying() {
   const jellyfinSecrets = getJellyfinSecrets();
 
@@ -164,7 +240,10 @@ async function fetchJellyfinNowPlaying() {
   }
 
   const sessionsUrl = new URL("/Sessions", baseUrl);
-  sessionsUrl.searchParams.set("activeWithinSeconds", "90");
+  sessionsUrl.searchParams.set(
+    "activeWithinSeconds",
+    String(JELLYFIN_ACTIVE_WITHIN_SECONDS),
+  );
 
   const response = await fetch(sessionsUrl, {
     headers: {
@@ -185,6 +264,8 @@ async function fetchJellyfinNowPlaying() {
   );
 
   if (!bestSession?.NowPlayingItem) {
+    previousPlaybackObservation = null;
+
     return {
       media: null,
       providerStatus: {
@@ -197,21 +278,50 @@ async function fetchJellyfinNowPlaying() {
   }
 
   const item = bestSession.NowPlayingItem;
+  const playSessionId =
+    typeof bestSession.PlayState?.PlaySessionId === "string"
+      ? bestSession.PlayState.PlaySessionId
+      : typeof bestSession.PlaySessionId === "string"
+        ? bestSession.PlaySessionId
+        : null;
+  const progressMs = ticksToMs(bestSession.PlayState?.PositionTicks ?? null);
+  const status = getEffectivePlaybackStatus({
+    session: bestSession,
+    item,
+    playSessionId,
+    positionMs: progressMs,
+    checkedAt,
+  });
 
   return {
     media: {
-      status: bestSession.PlayState?.IsPaused ? "paused" : "playing",
+      status,
       source: "jellyfin",
       kind: getMediaKind(item.Type),
       title: item.Name ?? "Onbekende titel",
       subtitle: buildSubtitle(item),
       secondaryText: buildSecondaryText(item),
+      sourceItemId: typeof item.Id === "string" ? item.Id : null,
+      playSessionId,
+      seriesTitle:
+        item.Type === "Episode" && typeof item.SeriesName === "string"
+          ? item.SeriesName
+          : null,
+      seasonNumber:
+        item.Type === "Episode" && typeof item.ParentIndexNumber === "number"
+          ? item.ParentIndexNumber
+          : null,
+      episodeNumber:
+        item.Type === "Episode" && typeof item.IndexNumber === "number"
+          ? item.IndexNumber
+          : null,
+      providerIds: normalizeProviderIds(item),
       productionYear: item.ProductionYear ?? null,
       genres: Array.isArray(item.Genres) ? item.Genres : [],
       communityRating:
         typeof item.CommunityRating === "number" ? item.CommunityRating : null,
       artworkUrl: buildArtworkUrl(baseUrl, item, apiKey),
-      progressMs: ticksToMs(bestSession.PlayState?.PositionTicks ?? null),
+      progressMs,
       durationMs: ticksToMs(item.RunTimeTicks ?? null),
       deviceName: bestSession.DeviceName ?? null,
       userName: bestSession.UserName ?? null,

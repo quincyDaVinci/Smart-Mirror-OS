@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { LayoutControls } from "../components/admin/LayoutControls";
 import type { LayoutItem, WidgetEdgePosition, WidgetId } from "../types/layout";
@@ -48,6 +49,87 @@ type AdminPageProps = {
   apiBaseUrl: string;
 };
 
+type AdminTriviaItem = {
+  id: string;
+  source: "moviemistakes-trivia" | "moviemistakes-goof";
+  sourceUrl?: string;
+  text: string;
+  startMs: number | null;
+  endMs: number | null;
+  helpfulVotes: number | null;
+  totalVotes: number | null;
+  score: number;
+  spoilerLevel: "none" | "mild" | "high";
+  kind: string;
+};
+
+type AdminTriviaResponse = {
+  ok: boolean;
+  eligible: boolean;
+  mediaKey: string | null;
+  sessionKey: string | null;
+  sourceProvider: "moviemistakes" | null;
+  sourceTitleId: string | null;
+  sourceUrls: string[];
+  errorCode: string | null;
+  items: AdminTriviaItem[];
+  message: string | null;
+};
+
+type AdminTriviaState =
+  | { status: "idle"; data: null; error: null }
+  | { status: "loading"; data: AdminTriviaResponse | null; error: null }
+  | { status: "ready"; data: AdminTriviaResponse; error: null }
+  | { status: "error"; data: AdminTriviaResponse | null; error: string };
+
+async function fetchAdminJellyfinTrivia(apiBaseUrl: string) {
+  const response = await fetch(`${apiBaseUrl}/media/jellyfin-trivia`, {
+    cache: "no-store",
+  });
+  const payload = (await response.json()) as Partial<AdminTriviaResponse> & {
+    error?: unknown;
+  };
+
+  if (!response.ok || payload.ok !== true) {
+    throw new Error(
+      typeof payload.error === "string"
+        ? payload.error
+        : `HTTP ${response.status}`,
+    );
+  }
+
+  return {
+    ok: true,
+    eligible: payload.eligible === true,
+    mediaKey: typeof payload.mediaKey === "string" ? payload.mediaKey : null,
+    sessionKey:
+      typeof payload.sessionKey === "string" ? payload.sessionKey : null,
+    sourceProvider:
+      payload.sourceProvider === "moviemistakes"
+        ? payload.sourceProvider
+        : null,
+    sourceTitleId:
+      typeof payload.sourceTitleId === "string" ? payload.sourceTitleId : null,
+    sourceUrls: Array.isArray(payload.sourceUrls)
+      ? payload.sourceUrls.filter(
+          (sourceUrl): sourceUrl is string => typeof sourceUrl === "string",
+        )
+      : [],
+    errorCode:
+      typeof payload.errorCode === "string" ? payload.errorCode : null,
+    items: Array.isArray(payload.items)
+      ? payload.items.filter(
+          (item): item is AdminTriviaItem =>
+            item !== null &&
+            typeof item === "object" &&
+            typeof (item as AdminTriviaItem).id === "string" &&
+            typeof (item as AdminTriviaItem).text === "string",
+        )
+      : [],
+    message: typeof payload.message === "string" ? payload.message : null,
+  } satisfies AdminTriviaResponse;
+}
+
 function getConnectionStatusLabel(
   status: "connecting" | "connected" | "reconnecting" | "disconnected",
 ) {
@@ -77,6 +159,83 @@ function formatOptionalTime(timestamp: number | null) {
 
 function formatLux(lux: number | null) {
   return lux === null ? "geen meting" : `${lux.toFixed(1)} lux`;
+}
+
+function formatTriviaTime(ms: number | null) {
+  if (ms === null || !Number.isFinite(ms)) {
+    return "Geen timestamp";
+  }
+
+  const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function getTriviaSourceLabel(source: AdminTriviaItem["source"]) {
+  switch (source) {
+    case "moviemistakes-trivia":
+      return "MovieMistakes trivia";
+    case "moviemistakes-goof":
+      return "MovieMistakes mistake";
+    default:
+      return "MovieMistakes trivia";
+  }
+}
+
+function getTriviaProviderLabel(
+  provider: AdminTriviaResponse["sourceProvider"],
+) {
+  switch (provider) {
+    case "moviemistakes":
+      return "MovieMistakes";
+    default:
+      return "geen bron";
+  }
+}
+
+function getTriviaTitleUrl(data: AdminTriviaResponse) {
+  if (!data.sourceTitleId) {
+    return null;
+  }
+
+  if (data.sourceProvider === "moviemistakes") {
+    return `https://www.moviemistakes.com/${data.sourceTitleId}`;
+  }
+
+  return data.sourceUrls[0] ?? null;
+}
+
+function formatTriviaSourceUrl(sourceUrl: string) {
+  return sourceUrl.replace("https://www.moviemistakes.com", "MovieMistakes");
+}
+
+function getAdminTriviaStatusLabel(
+  state: AdminTriviaState,
+  data: AdminTriviaResponse | null,
+) {
+  if (state.status === "loading") {
+    return "Ophalen...";
+  }
+
+  if (state.status === "error") {
+    return "Fout";
+  }
+
+  if (!data) {
+    return "Nog niet opgehaald";
+  }
+
+  if (data.errorCode === "moviemistakes-title-not-found") {
+    return "Niet gevonden";
+  }
+
+  if (data.errorCode) {
+    return "Fout";
+  }
+
+  return data.eligible ? "Beschikbaar" : "Niet beschikbaar";
 }
 
 function getDisplayModeLabel(mode: DisplayState["mode"]) {
@@ -157,6 +316,76 @@ export function AdminPage({
   const lightLuxLabel = formatLux(light.lux);
   const lastMotionLabel = formatOptionalTime(presence.lastMotionAt);
   const lightUpdatedLabel = formatOptionalTime(light.updatedAt);
+  const [triviaState, setTriviaState] = useState<AdminTriviaState>({
+    status: "idle",
+    data: null,
+    error: null,
+  });
+
+  useEffect(() => {
+    let isActive = true;
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTriviaState((currentState) => ({
+      status: "loading",
+      data: currentState.data,
+      error: null,
+    }));
+
+    fetchAdminJellyfinTrivia(apiBaseUrl)
+      .then((data) => {
+        if (!isActive) {
+          return;
+        }
+
+        setTriviaState({ status: "ready", data, error: null });
+      })
+      .catch((error) => {
+        if (!isActive) {
+          return;
+        }
+
+        setTriviaState((currentState) => ({
+          status: "error",
+          data: currentState.data,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Jellyfin trivia ophalen mislukt.",
+        }));
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [apiBaseUrl]);
+
+  function refreshJellyfinTrivia() {
+    setTriviaState((currentState) => ({
+      status: "loading",
+      data: currentState.data,
+      error: null,
+    }));
+
+    void fetchAdminJellyfinTrivia(apiBaseUrl)
+      .then((data) => {
+        setTriviaState({ status: "ready", data, error: null });
+      })
+      .catch((error) => {
+        setTriviaState((currentState) => ({
+          status: "error",
+          data: currentState.data,
+          error:
+            error instanceof Error
+              ? error.message
+              : "Jellyfin trivia ophalen mislukt.",
+        }));
+      });
+  }
+
+  const triviaData = triviaState.data;
+  const triviaItems = triviaData?.items ?? [];
+  const triviaTitleUrl = triviaData ? getTriviaTitleUrl(triviaData) : null;
 
   return (
     <main className="admin-page">
@@ -649,6 +878,131 @@ export function AdminPage({
             onRefreshStatus={onRefreshProviderConfigStatus}
             onSaveSecrets={onSaveProviderSecrets}
           />
+        </AccordionSection>
+
+        <AccordionSection
+          title="Jellyfin Trivia"
+          subtitle="Laatste opgehaalde MovieMistakes trivia voor de huidige Jellyfin media"
+        >
+          <div className="admin-trivia-toolbar">
+            <div>
+              <p className="admin-trivia-status">
+                Status:{" "}
+                <strong>
+                  {getAdminTriviaStatusLabel(triviaState, triviaData)}
+                </strong>
+              </p>
+              <p className="admin-muted">
+                Items: {triviaItems.length} Â· Sessie:{" "}
+                {triviaData?.sessionKey ?? "geen actieve sessie"}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={refreshJellyfinTrivia}
+              disabled={triviaState.status === "loading"}
+            >
+              Trivia opnieuw ophalen
+            </button>
+          </div>
+
+          {triviaState.status === "error" ? (
+            <p className="admin-status admin-status--error">
+              {triviaState.error}
+            </p>
+          ) : null}
+
+          {triviaData?.errorCode ? (
+            <p className="admin-status admin-status--error">
+              Foutcode: {triviaData.errorCode}
+            </p>
+          ) : null}
+
+          {triviaData?.message ? (
+            <p className="admin-muted">{triviaData.message}</p>
+          ) : null}
+
+          {triviaData?.sourceTitleId ? (
+            <p className="admin-muted">
+              Bron: {getTriviaProviderLabel(triviaData.sourceProvider)}{" "}
+              {triviaTitleUrl ? (
+                <a
+                  className="admin-trivia-item__link"
+                  href={triviaTitleUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {triviaData.sourceTitleId}
+                </a>
+              ) : (
+                triviaData.sourceTitleId
+              )}
+            </p>
+          ) : null}
+
+          {triviaData?.sourceUrls.length ? (
+            <div className="admin-trivia-source-list">
+              <span>Geprobeerde bronnen:</span>
+              {triviaData.sourceUrls.map((sourceUrl) => (
+                <a
+                  key={sourceUrl}
+                  href={sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {formatTriviaSourceUrl(sourceUrl)}
+                </a>
+              ))}
+            </div>
+          ) : null}
+
+          {!triviaData && triviaState.status !== "loading" ? (
+            <p className="admin-muted">Trivia is nog niet opgehaald.</p>
+          ) : null}
+
+          {triviaData && triviaItems.length === 0 ? (
+            <p className="admin-muted">
+              Geen trivia gevonden voor de huidige Jellyfin media.
+            </p>
+          ) : null}
+
+          {triviaItems.length > 0 ? (
+            <div className="admin-trivia-list">
+              {triviaItems.map((item) => (
+                <article className="admin-trivia-item" key={item.id}>
+                  <div className="admin-trivia-item__meta">
+                    <span>{getTriviaSourceLabel(item.source)}</span>
+                    <span>Score {item.score}</span>
+                    <span>{item.kind}</span>
+                    <span>{formatTriviaTime(item.startMs)}</span>
+                    {item.helpfulVotes !== null ? (
+                      <span>
+                        {item.helpfulVotes}
+                        {item.totalVotes !== null
+                          ? `/${item.totalVotes}`
+                          : ""}{" "}
+                        helpful
+                      </span>
+                    ) : null}
+                  </div>
+
+                  <p className="admin-trivia-item__text">{item.text}</p>
+
+                  {item.sourceUrl ? (
+                    <a
+                      className="admin-trivia-item__link"
+                      href={item.sourceUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open bron
+                    </a>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          ) : null}
         </AccordionSection>
 
         <AccordionSection

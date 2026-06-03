@@ -489,6 +489,10 @@ export function MirrorPage({
               <MirrorMediaDock
                 media={media}
                 showLyrics={display.mediaLyricsVisible}
+                showJellyfinTrivia={display.mediaJellyfinTriviaVisible}
+                jellyfinTriviaSessionKey={
+                  display.mediaJellyfinTriviaSessionKey
+                }
                 variant="focus"
               />
             </div>

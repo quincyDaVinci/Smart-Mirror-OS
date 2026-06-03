@@ -16,6 +16,8 @@ export type DisplayState = {
   mediaAutoFocusSuppressedAt: number | null;
   mediaAutoFocusSuppressionSawActive: boolean;
   mediaLyricsVisible: boolean;
+  mediaJellyfinTriviaVisible: boolean;
+  mediaJellyfinTriviaSessionKey: string | null;
   spotifyContextKeepAwake: boolean;
   spotifyContextKeepAwakeSetAt: number | null;
 };
