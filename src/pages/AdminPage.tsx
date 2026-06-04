@@ -15,6 +15,7 @@ import type {
 import { AccordionSection } from "../components/admin/AccordionSection";
 import type { LightSensorState } from "../types/light";
 import { CommitRange } from "../components/common/CommitRange";
+import type { MediaState } from "../types/media";
 
 type AdminPageProps = {
   layout: LayoutItem[];
@@ -47,6 +48,7 @@ type AdminPageProps = {
   onRefreshProviderConfigStatus: () => Promise<void>;
   onSaveProviderSecrets: (nextSecrets: ProviderSecretsInput) => Promise<void>;
   apiBaseUrl: string;
+  media: MediaState;
 };
 
 type AdminTriviaItem = {
@@ -115,8 +117,7 @@ async function fetchAdminJellyfinTrivia(apiBaseUrl: string) {
           (sourceUrl): sourceUrl is string => typeof sourceUrl === "string",
         )
       : [],
-    errorCode:
-      typeof payload.errorCode === "string" ? payload.errorCode : null,
+    errorCode: typeof payload.errorCode === "string" ? payload.errorCode : null,
     items: Array.isArray(payload.items)
       ? payload.items.filter(
           (item): item is AdminTriviaItem =>
@@ -269,12 +270,29 @@ function getLightModeLabel(mode: LightSensorState["mode"]) {
   }
 }
 
+function getAdminTriviaMediaRefreshKey(media: MediaState) {
+  return [
+    media.source,
+    media.kind,
+    media.status,
+    media.sourceItemId ?? "",
+    media.playSessionId ?? "",
+    media.title,
+    media.subtitle,
+    media.seriesTitle ?? "",
+    media.seasonNumber ?? "",
+    media.episodeNumber ?? "",
+    media.durationMs ?? "",
+  ].join("\n");
+}
+
 export function AdminPage({
   layout,
   settings,
   presence,
   light,
   display,
+  media,
   onToggleWidget,
   onReorderWidgets,
   onUpdateWidgetPosition,
@@ -297,6 +315,8 @@ export function AdminPage({
   const isExpectedReconnect =
     (deployment.status === "deploying" || deployment.status === "success") &&
     connectionStatus !== "connected";
+
+  const triviaMediaRefreshKey = getAdminTriviaMediaRefreshKey(media);
 
   const hasRecoveredAfterDeploy =
     deployment.status === "success" && connectionStatus === "connected";
@@ -358,7 +378,7 @@ export function AdminPage({
     return () => {
       isActive = false;
     };
-  }, [apiBaseUrl]);
+  }, [apiBaseUrl, triviaMediaRefreshKey]);
 
   function refreshJellyfinTrivia() {
     setTriviaState((currentState) => ({

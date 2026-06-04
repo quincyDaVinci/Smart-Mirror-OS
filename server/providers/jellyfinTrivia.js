@@ -59,7 +59,10 @@ function isJellyfinVideoMedia(media) {
 
 function normalizeSearchText(value) {
   return typeof value === "string"
-    ? value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim()
+    ? value
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim()
     : "";
 }
 
@@ -223,11 +226,17 @@ function detectTriviaKind(text, source) {
     return "improvisation";
   }
 
-  if (/\bpractical effect\b|\bminiature\b|\bprosthetic\b|\bstunt\b|\bmakeup\b/.test(lower)) {
+  if (
+    /\bpractical effect\b|\bminiature\b|\bprosthetic\b|\bstunt\b|\bmakeup\b/.test(
+      lower,
+    )
+  ) {
     return "practical-effect";
   }
 
-  if (/\bhidden\b|\beaster egg\b|\bbackground\b|\bprop\b|\bdetail\b/.test(lower)) {
+  if (
+    /\bhidden\b|\beaster egg\b|\bbackground\b|\bprop\b|\bdetail\b/.test(lower)
+  ) {
     return "hidden-detail";
   }
 
@@ -250,7 +259,14 @@ function detectTriviaKind(text, source) {
   return "general";
 }
 
-function scoreTriviaItem({ text, startMs, helpfulVotes, totalVotes, kind, source }) {
+function scoreTriviaItem({
+  text,
+  startMs,
+  helpfulVotes,
+  totalVotes,
+  kind,
+  source,
+}) {
   const lower = text.toLowerCase();
   let score = 13;
 
@@ -262,7 +278,11 @@ function scoreTriviaItem({ text, startMs, helpfulVotes, totalVotes, kind, source
     score += Math.min(18, Math.round(Math.log2(helpfulVotes + 1) * 3));
   }
 
-  if (typeof totalVotes === "number" && totalVotes > 0 && helpfulVotes !== null) {
+  if (
+    typeof totalVotes === "number" &&
+    totalVotes > 0 &&
+    helpfulVotes !== null
+  ) {
     score += Math.max(0, Math.round((helpfulVotes / totalVotes) * 6));
   }
 
@@ -271,11 +291,19 @@ function scoreTriviaItem({ text, startMs, helpfulVotes, totalVotes, kind, source
   else if (text.length <= 320) score += 1;
   else score -= 25;
 
-  if (/\b(scene|shot|camera|background|prop|costume|stunt|set|filmed)\b/.test(lower)) {
+  if (
+    /\b(scene|shot|camera|background|prop|costume|stunt|set|filmed)\b/.test(
+      lower,
+    )
+  ) {
     score += 6;
   }
 
-  if (/\b(release date|released in|runtime|running time|certificate|rated)\b/.test(lower)) {
+  if (
+    /\b(release date|released in|runtime|running time|certificate|rated)\b/.test(
+      lower,
+    )
+  ) {
     score -= 14;
   }
 
@@ -316,7 +344,9 @@ function createTriviaItem({
       ? totalVotesOverride
       : parsedVotes.totalVotes;
   const startMs =
-    typeof startMsOverride === "number" ? startMsOverride : parseTimestampMs(text);
+    typeof startMsOverride === "number"
+      ? startMsOverride
+      : parseTimestampMs(text);
   const spoilerLevel = detectSpoilerLevel(text, rawChunk);
   const kind = detectTriviaKind(text, source);
   const score = scoreTriviaItem({
@@ -379,16 +409,40 @@ function getMovieMistakesSourceUrls(movieMistakesTitleId) {
   };
 }
 
+function getEpisodeSeriesTitle(media) {
+  if (typeof media?.seriesTitle === "string" && media.seriesTitle.trim()) {
+    return media.seriesTitle.trim();
+  }
+
+  if (typeof media?.subtitle === "string" && media.subtitle.trim()) {
+    const [subtitleSeriesTitle] = media.subtitle.split(/\s+(?:·|Â·|\u00b7)\s+/);
+
+    if (subtitleSeriesTitle?.trim()) {
+      return subtitleSeriesTitle.trim();
+    }
+  }
+
+  return typeof media?.title === "string" ? media.title.trim() : "";
+}
+
 function getMovieMistakesSearchQuery(media) {
   const title =
-    media.kind === "episode" ? media.seriesTitle || media.title : media.title;
+    media.kind === "episode" ? getEpisodeSeriesTitle(media) : media.title;
+
+  if (media.kind === "episode") {
+    return title ?? "";
+  }
 
   return [title, media.productionYear].filter(Boolean).join(" ");
 }
 
 function parseMovieMistakesTitleLabel(label) {
   const normalizedLabel = normalizeWhitespace(label);
-  const match = normalizedLabel.match(/^(.*?)\s*\((\d{4})\)$/);
+
+  // Werkt voor:
+  // South Park (1997 TV show)
+  // South Park: Bigger, Longer & Uncut (1999)
+  const match = normalizedLabel.match(/^(.*?)\s*\((\d{4})(?:[^)]*)?\)$/);
 
   if (!match) {
     return {
@@ -406,56 +460,165 @@ function parseMovieMistakesTitleLabel(label) {
 function parseMovieMistakesSearchResults(html, media) {
   const candidates = [];
   const seenIds = new Set();
-  const resultPattern =
-    /<h2>\s*<a[^>]+href=["']\/(film\d+)["'][^>]*>([\s\S]*?)<\/a>\s*<\/h2>/gi;
+
+  const expectedTitle = normalizeSearchText(
+    media.kind === "episode" ? getEpisodeSeriesTitle(media) : media.title,
+  );
+
+  const linkPattern =
+    /<a\b[^>]*href=["']\/((?:film|tv)\d+)(?:\/[^"']*)?["'][^>]*>([\s\S]*?)<\/a>/gi;
+
   let match;
 
-  while ((match = resultPattern.exec(html)) !== null && candidates.length < 8) {
+  while ((match = linkPattern.exec(html)) !== null && candidates.length < 30) {
     const movieMistakesTitleId = match[1];
 
     if (seenIds.has(movieMistakesTitleId)) {
       continue;
     }
 
-    const { title, year } = parseMovieMistakesTitleLabel(stripHtml(match[2]));
+    const matchIndex = match.index;
+    const contextHtml = html.slice(
+      Math.max(0, matchIndex - 1400),
+      Math.min(html.length, matchIndex + 1400),
+    );
+    const contextText = stripHtml(contextHtml);
+    const normalizedContext = normalizeSearchText(contextText);
 
-    if (!title) {
-      continue;
+    const linkText = stripHtml(match[2]);
+    let label = linkText;
+
+    const nearbyTitleMatches = [
+      ...contextText.matchAll(/([A-Z0-9][^()]{1,120}\(\d{4}(?:[^)]*)?\))/g),
+    ];
+
+    const nearbyExpectedTitle = nearbyTitleMatches.find((titleMatch) =>
+      normalizeSearchText(titleMatch[1]).includes(expectedTitle),
+    );
+
+    if (nearbyExpectedTitle?.[1]) {
+      label = nearbyExpectedTitle[1];
     }
 
+    const { title, year } = parseMovieMistakesTitleLabel(label);
+
     seenIds.add(movieMistakesTitleId);
-    candidates.push({ movieMistakesTitleId, title, year });
+    candidates.push({
+      movieMistakesTitleId,
+      title,
+      year,
+      contextMatchesExpectedTitle:
+        expectedTitle.length > 0 && normalizedContext.includes(expectedTitle),
+    });
   }
 
-  const expectedTitle = normalizeSearchText(
-    media.kind === "episode" ? media.seriesTitle || media.title : media.title,
-  );
-  const expectedYear = Number.isFinite(Number(media.productionYear))
-    ? Number(media.productionYear)
-    : null;
-  const matchingCandidates = candidates.filter((candidate) => {
-    const candidateTitle = normalizeSearchText(candidate.title);
-    const titleMatches =
-      expectedTitle.length > 0 &&
-      (candidateTitle.includes(expectedTitle) ||
-        expectedTitle.includes(candidateTitle));
-    const yearMatches =
-      expectedYear === null ||
-      candidate.year === null ||
-      candidate.year === expectedYear;
+  const expectedYear =
+    media.kind === "movie" && Number.isFinite(Number(media.productionYear))
+      ? Number(media.productionYear)
+      : null;
 
-    return titleMatches && yearMatches;
+  console.log("[jellyfin-trivia:moviemistakes:search-candidates]", {
+    expectedTitle,
+    expectedYear,
+    candidates: candidates.map((candidate) => ({
+      movieMistakesTitleId: candidate.movieMistakesTitleId,
+      title: candidate.title,
+      year: candidate.year,
+      contextMatchesExpectedTitle: candidate.contextMatchesExpectedTitle,
+    })),
   });
 
-  if (matchingCandidates.length === 1) {
-    return matchingCandidates[0].movieMistakesTitleId;
+  if (media.kind === "episode") {
+    const tvCandidates = candidates.filter((candidate) =>
+      candidate.movieMistakesTitleId.startsWith("tv"),
+    );
+
+    const matchingTvCandidates = tvCandidates.filter((candidate) => {
+      const candidateTitle = normalizeSearchText(candidate.title);
+
+      return (
+        candidateTitle === expectedTitle ||
+        candidateTitle.includes(expectedTitle) ||
+        expectedTitle.includes(candidateTitle) ||
+        candidate.contextMatchesExpectedTitle
+      );
+    });
+
+    if (matchingTvCandidates.length === 1) {
+      return matchingTvCandidates[0].movieMistakesTitleId;
+    }
+
+    if (tvCandidates.length === 1) {
+      return tvCandidates[0].movieMistakesTitleId;
+    }
   }
 
-  if (!expectedYear && candidates.length === 1) {
-    return candidates[0].movieMistakesTitleId;
+  const scoredCandidates = candidates
+    .map((candidate) => {
+      const candidateTitle = normalizeSearchText(candidate.title);
+      let score = 0;
+
+      if (candidateTitle === expectedTitle) score += 100;
+      else if (candidateTitle.includes(expectedTitle)) score += 60;
+      else if (expectedTitle.includes(candidateTitle)) score += 40;
+
+      if (candidate.contextMatchesExpectedTitle) {
+        score += 30;
+      }
+
+      if (media.kind === "episode") {
+        if (candidate.movieMistakesTitleId.startsWith("tv")) {
+          score += 80;
+        }
+
+        if (candidate.movieMistakesTitleId.startsWith("film")) {
+          score -= 80;
+        }
+      }
+
+      if (media.kind === "movie") {
+        if (candidate.movieMistakesTitleId.startsWith("film")) {
+          score += 30;
+        }
+
+        if (candidate.movieMistakesTitleId.startsWith("tv")) {
+          score -= 40;
+        }
+      }
+
+      if (
+        expectedYear !== null &&
+        candidate.year !== null &&
+        candidate.year === expectedYear
+      ) {
+        score += 20;
+      }
+
+      if (
+        expectedYear !== null &&
+        candidate.year !== null &&
+        candidate.year !== expectedYear
+      ) {
+        score -= 40;
+      }
+
+      return { ...candidate, score };
+    })
+    .filter((candidate) => candidate.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  if (scoredCandidates.length === 0) {
+    return null;
   }
 
-  return null;
+  const bestCandidate = scoredCandidates[0];
+  const secondCandidate = scoredCandidates[1];
+
+  if (secondCandidate && secondCandidate.score === bestCandidate.score) {
+    return null;
+  }
+
+  return bestCandidate.movieMistakesTitleId;
 }
 
 function parseMovieMistakesTimecode(block) {
@@ -489,9 +652,7 @@ function parseMovieMistakesTimecode(block) {
 }
 
 function parseMovieMistakesNetVotes(block) {
-  const match = block.match(
-    /id=["']netvotesentry\d+["'][^>]*>\s*(-?\d+)\s*</i,
-  );
+  const match = block.match(/id=["']netvotesentry\d+["'][^>]*>\s*(-?\d+)\s*</i);
 
   if (!match) {
     return null;
@@ -518,10 +679,105 @@ function extractMovieMistakesEntryBlocks(html) {
   return blocks;
 }
 
-function parseMovieMistakesPage(html, source, movieMistakesTitleId, sourceUrl) {
+function getEpisodeCodeCandidates(media) {
+  const season = Number(media.seasonNumber);
+  const episode = Number(media.episodeNumber);
+
+  if (!Number.isFinite(season) || !Number.isFinite(episode)) {
+    return [];
+  }
+
+  const seasonRaw = String(season);
+  const episodeRaw = String(episode);
+  const seasonPadded = seasonRaw.padStart(2, "0");
+  const episodePadded = episodeRaw.padStart(2, "0");
+
+  return [
+    `s${seasonRaw} e${episodeRaw}`,
+    `s${seasonRaw}e${episodeRaw}`,
+    `s${seasonRaw} ep${episodeRaw}`,
+    `s${seasonPadded} e${episodePadded}`,
+    `s${seasonPadded}e${episodePadded}`,
+    `season ${seasonRaw} episode ${episodeRaw}`,
+  ];
+}
+
+function movieMistakesBlockMatchesMedia(block, media) {
+  if (media?.kind !== "episode") {
+    return true;
+  }
+
+  const normalizedBlock = normalizeSearchText(stripHtml(block));
+  const normalizedEpisodeTitle = normalizeSearchText(media.title);
+  const episodeCodes = getEpisodeCodeCandidates(media);
+
+  if (!normalizedEpisodeTitle || episodeCodes.length === 0) {
+    return true;
+  }
+
+  return (
+    normalizedBlock.includes(normalizedEpisodeTitle) &&
+    episodeCodes.some((episodeCode) => normalizedBlock.includes(episodeCode))
+  );
+}
+
+function getEpisodeCodeCandidates(media) {
+  const season = Number(media.seasonNumber);
+  const episode = Number(media.episodeNumber);
+
+  if (!Number.isFinite(season) || !Number.isFinite(episode)) {
+    return [];
+  }
+
+  const seasonRaw = String(season);
+  const episodeRaw = String(episode);
+  const seasonPadded = seasonRaw.padStart(2, "0");
+  const episodePadded = episodeRaw.padStart(2, "0");
+
+  return [
+    `s${seasonRaw} e${episodeRaw}`,
+    `s${seasonRaw}e${episodeRaw}`,
+    `s${seasonRaw} ep${episodeRaw}`,
+    `s${seasonRaw} episode ${episodeRaw}`,
+    `s${seasonPadded} e${episodePadded}`,
+    `s${seasonPadded}e${episodePadded}`,
+    `season ${seasonRaw} episode ${episodeRaw}`,
+  ];
+}
+
+function movieMistakesBlockMatchesMedia(block, media) {
+  if (media?.kind !== "episode") {
+    return true;
+  }
+
+  const normalizedBlock = normalizeSearchText(stripHtml(block));
+  const normalizedEpisodeTitle = normalizeSearchText(media.title);
+  const episodeCodes = getEpisodeCodeCandidates(media);
+
+  if (!normalizedEpisodeTitle || episodeCodes.length === 0) {
+    return true;
+  }
+
+  return (
+    normalizedBlock.includes(normalizedEpisodeTitle) &&
+    episodeCodes.some((episodeCode) => normalizedBlock.includes(episodeCode))
+  );
+}
+
+function parseMovieMistakesPage(
+  html,
+  source,
+  movieMistakesTitleId,
+  sourceUrl,
+  media = null,
+) {
   const items = [];
 
   for (const { entryId, block } of extractMovieMistakesEntryBlocks(html)) {
+    if (!movieMistakesBlockMatchesMedia(block, media)) {
+      continue;
+    }
+
     const textMatch = block.match(
       /<span[^>]+id=["']innerentrytext\d+["'][^>]*>([\s\S]*?)<\/span>/i,
     );
@@ -533,6 +789,7 @@ function parseMovieMistakesPage(html, source, movieMistakesTitleId, sourceUrl) {
     const text = stripHtml(textMatch[1]);
     const startMs = parseMovieMistakesTimecode(block);
     const netVotes = parseMovieMistakesNetVotes(block);
+
     const item = createTriviaItem({
       source,
       sourceTitleId: movieMistakesTitleId,
@@ -601,8 +858,22 @@ async function resolveMovieMistakesTitleId(media) {
 
   const query = getMovieMistakesSearchQuery(media);
 
+  console.log("[jellyfin-trivia:moviemistakes:search-query]", {
+    query,
+    title: media.title,
+    subtitle: media.subtitle,
+    seriesTitle: media.seriesTitle,
+    seasonNumber: media.seasonNumber,
+    episodeNumber: media.episodeNumber,
+  });
+
   if (!query) {
-    setCachedEntry(resolvedTitleIdCache, cacheKey, null, NOT_FOUND_CACHE_TTL_MS);
+    setCachedEntry(
+      resolvedTitleIdCache,
+      cacheKey,
+      null,
+      NOT_FOUND_CACHE_TTL_MS,
+    );
     return null;
   }
 
@@ -621,12 +892,17 @@ async function resolveMovieMistakesTitleId(media) {
     );
     return resolvedTitleId;
   } catch {
-    setCachedEntry(resolvedTitleIdCache, cacheKey, null, NOT_FOUND_CACHE_TTL_MS);
+    setCachedEntry(
+      resolvedTitleIdCache,
+      cacheKey,
+      null,
+      NOT_FOUND_CACHE_TTL_MS,
+    );
     return null;
   }
 }
 
-async function fetchMovieMistakesTriviaPayload(movieMistakesTitleId) {
+async function fetchMovieMistakesTriviaPayload(movieMistakesTitleId, media) {
   const cacheKey = `moviemistakes:${movieMistakesTitleId}`;
   const cachedPayload = getCachedEntry(triviaPayloadCache, cacheKey);
 
@@ -668,6 +944,7 @@ async function fetchMovieMistakesTriviaPayload(movieMistakesTitleId) {
               "moviemistakes-trivia",
               movieMistakesTitleId,
               sourceUrls.trivia,
+              media,
             )
           : []),
         ...(mistakesResult.html
@@ -676,6 +953,7 @@ async function fetchMovieMistakesTriviaPayload(movieMistakesTitleId) {
               "moviemistakes-goof",
               movieMistakesTitleId,
               sourceUrls.title,
+              media,
             )
           : []),
       ])
@@ -741,7 +1019,10 @@ async function fetchJellyfinTriviaForMedia({ media, sessionKey }) {
   const sourceUrls = getMovieMistakesSourceUrls(movieMistakesTitleId);
 
   try {
-    const items = await fetchMovieMistakesTriviaPayload(movieMistakesTitleId);
+    const items = await fetchMovieMistakesTriviaPayload(
+      movieMistakesTitleId,
+      media,
+    );
 
     return {
       ok: true,

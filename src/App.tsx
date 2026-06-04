@@ -62,6 +62,7 @@ function App() {
               presence={presence}
               display={display}
               light={light}
+              media={media}
               onToggleWidget={toggleWidget}
               onReorderWidgets={reorderLayout}
               onUpdateWidgetPosition={updateWidgetPosition}
@@ -102,6 +103,7 @@ function App() {
               onResetIdleTimer={resetIdleTimer}
               settings={settings}
               onUpdateSettings={updateSettings}
+              apiBaseUrl={apiBaseUrl}
             />
           }
         />

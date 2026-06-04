@@ -12,6 +12,7 @@ type RemoteControlPageProps = {
   display: DisplayState;
   presence: PresenceState;
   media: MediaState;
+  apiBaseUrl: string;
   isConnected: boolean;
   connectionStatus:
     | "connecting"
@@ -171,6 +172,44 @@ function getRemoteMediaTitle(media: MediaState) {
   return media.title;
 }
 
+type RemoteTriviaAvailability =
+  | { status: "idle"; available: false }
+  | { status: "loading"; available: false }
+  | { status: "available"; available: true }
+  | { status: "unavailable"; available: false }
+  | { status: "error"; available: false };
+
+function getRemoteTriviaLookupKey(media: MediaState) {
+  return [
+    media.source,
+    media.kind,
+    media.status,
+    media.sourceItemId ?? "",
+    media.title,
+    media.subtitle,
+    media.seriesTitle ?? "",
+    media.seasonNumber ?? "",
+    media.episodeNumber ?? "",
+    media.durationMs ?? "",
+  ].join("\n");
+}
+
+function getRemoteTriviaAvailabilityLabel(state: RemoteTriviaAvailability) {
+  switch (state.status) {
+    case "loading":
+      return "Trivia: controleren...";
+    case "available":
+      return "Trivia: beschikbaar";
+    case "unavailable":
+      return "Trivia: niet beschikbaar";
+    case "error":
+      return "Trivia: fout bij check";
+    case "idle":
+    default:
+      return "Trivia: onbekend";
+  }
+}
+
 export function RemoteControlPage({
   layout,
   display,
@@ -180,6 +219,7 @@ export function RemoteControlPage({
   connectionStatus,
   connectionError,
   settings,
+  apiBaseUrl,
   onUpdateSettings,
   onFocusWidget,
   onClearFocus,
@@ -189,6 +229,9 @@ export function RemoteControlPage({
   onResetIdleTimer,
 }: RemoteControlPageProps) {
   const [now, setNow] = useState(0);
+
+  const [remoteTriviaAvailability, setRemoteTriviaAvailability] =
+    useState<RemoteTriviaAvailability>({ status: "idle", available: false });
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -238,10 +281,56 @@ export function RemoteControlPage({
     (media.kind === "movie" || media.kind === "episode") &&
     (media.status === "playing" || media.status === "paused");
 
+  const remoteTriviaLookupKey = getRemoteTriviaLookupKey(media);
+
   const canToggleSpotifyContext =
     media.source === "spotify" &&
     media.kind === "track" &&
     (media.status === "playing" || media.status === "paused");
+
+  useEffect(() => {
+    if (!canToggleJellyfinTrivia) {
+      setRemoteTriviaAvailability({ status: "idle", available: false });
+      return;
+    }
+
+    let isActive = true;
+
+    setRemoteTriviaAvailability({ status: "loading", available: false });
+
+    fetch(`${apiBaseUrl}/media/jellyfin-trivia`, { cache: "no-store" })
+      .then(async (response) => {
+        const payload = (await response.json()) as {
+          ok?: unknown;
+          items?: unknown;
+        };
+
+        if (!response.ok || payload.ok !== true) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+
+        if (!isActive) {
+          return;
+        }
+
+        setRemoteTriviaAvailability(
+          Array.isArray(payload.items) && payload.items.length > 0
+            ? { status: "available", available: true }
+            : { status: "unavailable", available: false },
+        );
+      })
+      .catch(() => {
+        if (!isActive) {
+          return;
+        }
+
+        setRemoteTriviaAvailability({ status: "error", available: false });
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [apiBaseUrl, canToggleJellyfinTrivia, remoteTriviaLookupKey]);
 
   return (
     <main className="remote-page">
@@ -398,11 +487,20 @@ export function RemoteControlPage({
                 !display.mediaJellyfinTriviaVisible,
               );
             }}
-            disabled={!isConnected || !canToggleJellyfinTrivia}
+            disabled={
+              !isConnected ||
+              !canToggleJellyfinTrivia ||
+              (!display.mediaJellyfinTriviaVisible &&
+                !remoteTriviaAvailability.available)
+            }
           >
             Jellyfin Trivia{" "}
             {display.mediaJellyfinTriviaVisible ? "uitzetten" : "aanzetten"}
           </button>
+
+          <span className="remote-status-pill">
+            {getRemoteTriviaAvailabilityLabel(remoteTriviaAvailability)}
+          </span>
 
           <button
             type="button"

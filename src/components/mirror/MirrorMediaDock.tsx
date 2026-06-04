@@ -87,8 +87,6 @@ const TRIVIA_TIMED_EARLY_WINDOW_MS = 8000;
 const TRIVIA_TIMED_LATE_WINDOW_MS = 12000;
 const TRIVIA_UNTIMED_EDGE_MARGIN_MS = 3 * 60 * 1000;
 
-
-
 const DEBUG_LYRICS_PERF = false;
 
 function sendLyricsPerf(label: string, data: Record<string, unknown>) {
@@ -166,11 +164,6 @@ function useFpsPerfLogger(enabled: boolean) {
   }, [enabled]);
 }
 
-
-
-
-
-
 function getApiBaseUrl() {
   const url = new URL(getWebSocketUrl());
   url.protocol = url.protocol === "wss:" ? "https:" : "http:";
@@ -226,7 +219,9 @@ function getAnchoredProgressMs(
   const elapsedMs = Math.max(0, nowMs - anchor.capturedAt);
   const nextProgressMs = anchor.progressMs + elapsedMs;
 
-  return durationMs !== null ? Math.min(nextProgressMs, durationMs) : nextProgressMs;
+  return durationMs !== null
+    ? Math.min(nextProgressMs, durationMs)
+    : nextProgressMs;
 }
 
 function formatClockTime(timestampMs: number) {
@@ -241,7 +236,9 @@ function parseSyncedLyrics(value: string) {
   const lines: LyricLine[] = [];
 
   for (const rawLine of value.split("\n")) {
-    const match = rawLine.match(/^\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]\s*(.*)$/);
+    const match = rawLine.match(
+      /^\[(\d{1,2}):(\d{2})(?:\.(\d{1,3}))?\]\s*(.*)$/,
+    );
 
     if (!match) {
       continue;
@@ -463,7 +460,10 @@ function buildUntimedTriviaSlots(
 
   return selectedItems.map((item, index) => {
     const baseStartMs = window.startMs + spacing * (index + 1);
-    const jitterMs = getDeterministicJitterMs(item.id, Math.min(45000, spacing * 0.28));
+    const jitterMs = getDeterministicJitterMs(
+      item.id,
+      Math.min(45000, spacing * 0.28),
+    );
     const startMs = Math.min(
       window.endMs,
       Math.max(window.startMs, Math.round(baseStartMs + jitterMs)),
@@ -558,9 +558,7 @@ function DetailIcon({ name }: { name: DetailIconName }) {
 function HeartIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden focusable="false">
-      <path
-        d="M12 20.4 4.6 13C2.5 10.9 2.5 7.5 4.6 5.4a5.1 5.1 0 0 1 7.2 0l.2.2.2-.2a5.1 5.1 0 0 1 7.2 7.2L12 20.4Z"
-      />
+      <path d="M12 20.4 4.6 13C2.5 10.9 2.5 7.5 4.6 5.4a5.1 5.1 0 0 1 7.2 0l.2.2.2-.2a5.1 5.1 0 0 1 7.2 7.2L12 20.4Z" />
     </svg>
   );
 }
@@ -620,12 +618,8 @@ export function MirrorMediaDock({
   const lyricViewportRef = useRef<HTMLDivElement | null>(null);
   const lyricLineRefs = useRef<Array<HTMLParagraphElement | null>>([]);
 
-
-
   const previousActiveLyricIndexRef = useRef<number | null>(null);
-
-
-
+  const previousTriviaProgressRef = useRef<number | null>(null);
 
   const hasLiveMedia =
     media.source !== null &&
@@ -804,7 +798,10 @@ export function MirrorMediaDock({
   const videoDetailPillCandidates: Array<DetailPill | null> = [
     kindLabel ? { icon: "film" as const, label: kindLabel } : null,
     displayMedia.productionYear
-      ? { icon: "calendar" as const, label: String(displayMedia.productionYear) }
+      ? {
+          icon: "calendar" as const,
+          label: String(displayMedia.productionYear),
+        }
       : null,
     displayMedia.genres.length > 0
       ? {
@@ -813,7 +810,10 @@ export function MirrorMediaDock({
         }
       : null,
     displayMedia.communityRating !== null
-      ? { icon: "star" as const, label: displayMedia.communityRating.toFixed(1) }
+      ? {
+          icon: "star" as const,
+          label: displayMedia.communityRating.toFixed(1),
+        }
       : null,
   ];
   const videoDetailPills = videoDetailPillCandidates.filter(
@@ -881,11 +881,7 @@ export function MirrorMediaDock({
     setJellyfinTriviaLoadedKey(null);
     setShownTriviaIds(new Set());
     setActiveTriviaPopup(null);
-  }, [
-    jellyfinTriviaEnabled,
-    jellyfinTriviaMediaKey,
-    jellyfinTriviaSessionKey,
-  ]);
+  }, [jellyfinTriviaEnabled, jellyfinTriviaMediaKey, jellyfinTriviaSessionKey]);
 
   useEffect(() => {
     if (!jellyfinTriviaEnabled || jellyfinTriviaSessionKey === null) {
@@ -943,8 +939,7 @@ export function MirrorMediaDock({
         setJellyfinTriviaState({
           status: "ready",
           items,
-          message:
-            typeof payload.message === "string" ? payload.message : null,
+          message: typeof payload.message === "string" ? payload.message : null,
         });
         setJellyfinTriviaLoadedKey(jellyfinTriviaMediaKey);
       })
@@ -1027,8 +1022,7 @@ export function MirrorMediaDock({
         setLyricsState({
           status: "ready",
           lyrics,
-          message:
-            typeof payload.message === "string" ? payload.message : null,
+          message: typeof payload.message === "string" ? payload.message : null,
         });
       })
       .catch((error) => {
@@ -1087,89 +1081,69 @@ export function MirrorMediaDock({
       activeLyricIndex + windowSize + 1,
     );
 
-    return lyricLines
-      .slice(startIndex, endIndex)
-      .map((line, offset) => ({
-        line,
-        index: startIndex + offset,
-      }));
+    return lyricLines.slice(startIndex, endIndex).map((line, offset) => ({
+      line,
+      index: startIndex + offset,
+    }));
   }, [hasLyricLines, lyricLines, activeLyricIndex]);
 
   useFpsPerfLogger(lyricsEnabled);
 
   useEffect(() => {
-  if (!lyricsEnabled || activeLyricIndex < 0) {
-    return;
-  }
+    if (!lyricsEnabled || activeLyricIndex < 0) {
+      return;
+    }
 
-  const previousIndex = previousActiveLyricIndexRef.current;
+    const previousIndex = previousActiveLyricIndexRef.current;
 
-  if (previousIndex === activeLyricIndex) {
-    return;
-  }
+    if (previousIndex === activeLyricIndex) {
+      return;
+    }
 
-  previousActiveLyricIndexRef.current = activeLyricIndex;
+    previousActiveLyricIndexRef.current = activeLyricIndex;
 
-  sendLyricsPerf("active-line-change", {
-    from: previousIndex,
-    to: activeLyricIndex,
-    lineCount: lyricLines.length,
-    progressMs: liveProgressMs,
-  });
-}, [lyricsEnabled, activeLyricIndex, lyricLines.length, liveProgressMs]);
-
-
-
-
+    sendLyricsPerf("active-line-change", {
+      from: previousIndex,
+      to: activeLyricIndex,
+      lineCount: lyricLines.length,
+      progressMs: liveProgressMs,
+    });
+  }, [lyricsEnabled, activeLyricIndex, lyricLines.length, liveProgressMs]);
 
   useEffect(() => {
     lyricLineRefs.current.length = lyricLines.length;
   }, [lyricLines.length]);
 
   useEffect(() => {
-  
-   // Tijdelijke performance-test:
-  // scrollTo staat uit, omdat we nu alleen een klein lyrics-window renderen.
- // const startedAt = performance.now();
-
- // const viewport = lyricViewportRef.current;
- // const activeLine =
- //   activeLyricIndex >= 0 ? lyricLineRefs.current[activeLyricIndex] : null;
-
- // if (!viewport || !activeLine) {
- //   return;
- // }
-
- // const beforeMeasure = performance.now();
-
- // const activeOffsetTop = activeLine.offsetTop;
- // const viewportHeight = viewport.clientHeight;
- // const activeLineHeight = activeLine.clientHeight;
-
- // const afterMeasure = performance.now();
-
- // const nextScrollTop =
- //   activeOffsetTop - viewportHeight / 2 + activeLineHeight / 2;
-
- // viewport.scrollTo({
- //   top: Math.max(0, nextScrollTop),
- //   behavior: "auto",
- // });
-
- // const finishedAt = performance.now();
-
- // sendLyricsPerf("lyrics-scroll", {
- //   activeLyricIndex,
- //   lineCount: lyricLines.length,
- //   measureMs: Number((afterMeasure - beforeMeasure).toFixed(2)),
- //   totalMs: Number((finishedAt - startedAt).toFixed(2)),
- //   nextScrollTop: Math.round(nextScrollTop),
- // });
-}, [activeLyricIndex, lyricLines.length]);
-
-
-
-
+    // Tijdelijke performance-test:
+    // scrollTo staat uit, omdat we nu alleen een klein lyrics-window renderen.
+    // const startedAt = performance.now();
+    // const viewport = lyricViewportRef.current;
+    // const activeLine =
+    //   activeLyricIndex >= 0 ? lyricLineRefs.current[activeLyricIndex] : null;
+    // if (!viewport || !activeLine) {
+    //   return;
+    // }
+    // const beforeMeasure = performance.now();
+    // const activeOffsetTop = activeLine.offsetTop;
+    // const viewportHeight = viewport.clientHeight;
+    // const activeLineHeight = activeLine.clientHeight;
+    // const afterMeasure = performance.now();
+    // const nextScrollTop =
+    //   activeOffsetTop - viewportHeight / 2 + activeLineHeight / 2;
+    // viewport.scrollTo({
+    //   top: Math.max(0, nextScrollTop),
+    //   behavior: "auto",
+    // });
+    // const finishedAt = performance.now();
+    // sendLyricsPerf("lyrics-scroll", {
+    //   activeLyricIndex,
+    //   lineCount: lyricLines.length,
+    //   measureMs: Number((afterMeasure - beforeMeasure).toFixed(2)),
+    //   totalMs: Number((finishedAt - startedAt).toFixed(2)),
+    //   nextScrollTop: Math.round(nextScrollTop),
+    // });
+  }, [activeLyricIndex, lyricLines.length]);
 
   useEffect(() => {
     if (!requestedLyricsEnabled || !lyricsEnabled) {
@@ -1179,8 +1153,7 @@ export function MirrorMediaDock({
     const lyricsUnavailable =
       lyricsState.status === "error" ||
       (lyricsState.status === "ready" &&
-        (lyricsState.lyrics?.instrumental === true ||
-          !hasLyricLines));
+        (lyricsState.lyrics?.instrumental === true || !hasLyricLines));
 
     if (!lyricsUnavailable) {
       return;
@@ -1203,18 +1176,31 @@ export function MirrorMediaDock({
   ]);
 
   useEffect(() => {
-    if (!activeTriviaPopup) {
+    const previousProgressMs = previousTriviaProgressRef.current;
+    previousTriviaProgressRef.current = liveProgressMs;
+
+    if (
+      !activeTriviaPopup ||
+      liveProgressMs === null ||
+      previousProgressMs === null
+    ) {
       return;
     }
 
-    const timeoutId = window.setTimeout(() => {
-      setActiveTriviaPopup(null);
-    }, Math.max(0, activeTriviaPopup.hideAt - Date.now()));
+    const progressDeltaMs = liveProgressMs - previousProgressMs;
+    const didSeek = progressDeltaMs < -5000 || progressDeltaMs > 12000;
 
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [activeTriviaPopup]);
+    const timedPopupIsNoLongerRelevant =
+      activeTriviaPopup.item.startMs !== null &&
+      (liveProgressMs <
+        activeTriviaPopup.item.startMs - TRIVIA_TIMED_EARLY_WINDOW_MS ||
+        liveProgressMs >
+          activeTriviaPopup.item.startMs + TRIVIA_TIMED_LATE_WINDOW_MS + 5000);
+
+    if (didSeek || timedPopupIsNoLongerRelevant) {
+      setActiveTriviaPopup(null);
+    }
+  }, [activeTriviaPopup, liveProgressMs]);
 
   useEffect(() => {
     if (
@@ -1243,8 +1229,8 @@ export function MirrorMediaDock({
         liveProgressMs <= slot.startMs + 30000,
     );
     const untimedCandidate = dueSlot
-      ? jellyfinTriviaState.items.find((item) => item.id === dueSlot.itemId) ??
-        null
+      ? (jellyfinTriviaState.items.find((item) => item.id === dueSlot.itemId) ??
+        null)
       : null;
     const nextTrivia = timedCandidate ?? untimedCandidate;
 
