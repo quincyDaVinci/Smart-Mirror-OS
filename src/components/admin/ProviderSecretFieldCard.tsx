@@ -3,6 +3,7 @@ import type {
   ProviderSecretFieldInput,
   ProviderSecretFieldStatus,
 } from "../../types/providerConfig";
+import "./ProviderSecretFieldCard.css";
 
 type ProviderSecretFieldCardProps = {
   title: string;
@@ -63,86 +64,72 @@ export function ProviderSecretFieldCard({
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        padding: 16,
-        borderRadius: 16,
-        border: "1px solid rgba(255,255,255,0.08)",
-        background: "rgba(255,255,255,0.02)",
-        display: "grid",
-        gap: 12,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 12,
-          alignItems: "center",
-          flexWrap: "wrap",
-        }}
-      >
-        <h4 style={{ margin: 0 }}>{title}</h4>
-        <span style={{ opacity: 0.72, fontSize: 14 }}>
+    <form onSubmit={handleSubmit} className="provider-secret-card">
+      <div className="provider-secret-card__header">
+        <h4 className="provider-secret-card__heading">{title}</h4>
+        <span className="provider-secret-card__status">
           {summary.hasValue ? "waarde ingesteld" : "nog geen waarde"}
         </span>
       </div>
 
-      <div style={{ display: "grid", gap: 6 }}>
+      <div className="provider-secret-card__summary">
         <div>
           Label: <strong>{summary.label}</strong>
         </div>
-        <div style={{ opacity: 0.72, fontSize: 14 }}>
+        <div className="provider-secret-card__meta">
           Laatst bijgewerkt: {formatUpdatedAt(summary.updatedAt)}
         </div>
       </div>
 
-      <label>
+      <label className="provider-secret-card__field">
         Name
         <input
+          className="provider-secret-card__field-control"
           type="text"
           value={name}
           onChange={(event) => setName(event.target.value)}
           placeholder="Alleen voor jezelf"
-          style={{ display: "block", width: "100%", marginTop: 6 }}
         />
       </label>
 
-      <label>
+      <label className="provider-secret-card__field">
         Value
         {multiline ? (
           <textarea
+            className="provider-secret-card__field-control"
             value={value}
             onChange={(event) => setValue(event.target.value)}
             placeholder={placeholder}
             rows={5}
-            style={{ display: "block", width: "100%", marginTop: 6 }}
           />
         ) : (
           <input
+            className="provider-secret-card__field-control"
             type={inputType}
             value={value}
             onChange={(event) => setValue(event.target.value)}
             placeholder={placeholder}
-            style={{ display: "block", width: "100%", marginTop: 6 }}
           />
         )}
       </label>
 
-      <p style={{ margin: 0, opacity: 0.72, fontSize: 14 }}>
+      <p className="provider-secret-card__helper">
         Value wordt nooit teruggestuurd naar de browser. Laat Value leeg om de
         huidige opgeslagen waarde te behouden.
       </p>
 
       {helperText ? (
-        <p style={{ margin: 0, opacity: 0.72, fontSize: 14 }}>{helperText}</p>
+        <p className="provider-secret-card__helper">{helperText}</p>
       ) : null}
 
-      {message ? <p style={{ color: "#b8ffb8", margin: 0 }}>{message}</p> : null}
-      {error ? <p style={{ color: "#ffb3b3", margin: 0 }}>{error}</p> : null}
+      {message ? <p className="provider-secret-card__message">{message}</p> : null}
+      {error ? (
+        <p className="provider-secret-card__message provider-secret-card__message--error">
+          {error}
+        </p>
+      ) : null}
 
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+      <div className="provider-secret-card__actions">
         <button type="submit" disabled={isSaving}>
           {isSaving ? "Opslaan..." : submitLabel}
         </button>

@@ -16,6 +16,7 @@ import { AccordionSection } from "../components/admin/AccordionSection";
 import type { LightSensorState } from "../types/light";
 import { CommitRange } from "../components/common/CommitRange";
 import type { MediaState } from "../types/media";
+import "./AdminPage.css";
 
 type AdminPageProps = {
   layout: LayoutItem[];
@@ -533,7 +534,7 @@ export function AdminPage({
     <main className="admin-page">
       <div className="admin-header">
         <h1 className="admin-title">Smart Mirror Admin</h1>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div className="admin-links">
           <Link to="/" className="admin-link">
             Ga naar mirror
           </Link>
@@ -548,10 +549,7 @@ export function AdminPage({
       </p>
 
       {!isConnected && lastHttpSuccessAt ? (
-        <p
-          className="admin-status"
-          style={{ marginTop: "-8px", color: "#cfcfcf" }}
-        >
+        <p className="admin-status admin-status--tight">
           Transport: HTTP fallback actief
         </p>
       ) : null}
@@ -559,19 +557,13 @@ export function AdminPage({
       {connectionError &&
       !isExpectedReconnect &&
       connectionStatus !== "connected" ? (
-        <p
-          className="admin-status"
-          style={{ color: "#ffb3b3", marginTop: "-8px" }}
-        >
+        <p className="admin-status admin-status--error admin-status--tight">
           {connectionError}
         </p>
       ) : null}
 
       {isExpectedReconnect ? (
-        <p
-          className="admin-status"
-          style={{ color: "#cfcfcf", marginTop: "-8px" }}
-        >
+        <p className="admin-status admin-status--tight">
           Services herstarten. Even wachten...
         </p>
       ) : null}
@@ -640,7 +632,7 @@ export function AdminPage({
           title="Gebruik & sleep"
           subtitle="Klok, auto-sleep en focus timing"
         >
-          <label style={{ display: "block", marginBottom: "1rem" }}>
+          <label className="admin-checkbox-inline">
             <input
               type="checkbox"
               checked={settings.showSeconds}
@@ -651,7 +643,7 @@ export function AdminPage({
             Toon seconden in klok
           </label>
 
-          <label style={{ display: "block", marginBottom: "1rem" }}>
+          <label className="admin-checkbox-inline">
             <input
               type="checkbox"
               checked={settings.autoSleepEnabled}
@@ -664,9 +656,10 @@ export function AdminPage({
             Auto sleep inschakelen
           </label>
 
-          <label style={{ display: "block" }}>
+          <label className="admin-form-group">
             Sleep timeout (seconden)
             <input
+              className="admin-form-control"
               type="number"
               min={10}
               step={10}
@@ -676,17 +669,13 @@ export function AdminPage({
                   sleepTimeoutSeconds: Number(event.target.value),
                 });
               }}
-              style={{
-                display: "block",
-                marginTop: "0.5rem",
-                width: "100%",
-              }}
             />
           </label>
 
-          <label style={{ display: "block", marginTop: "1rem" }}>
+          <label className="admin-form-group admin-form-group--spaced">
             Focus timeout (seconden)
             <input
+              className="admin-form-control"
               type="number"
               min={10}
               step={5}
@@ -696,17 +685,13 @@ export function AdminPage({
                   focusIdleTimeoutSeconds: Number(event.target.value),
                 });
               }}
-              style={{
-                display: "block",
-                marginTop: "0.5rem",
-                width: "100%",
-              }}
             />
           </label>
 
-          <label style={{ display: "block", marginTop: "1rem" }}>
+          <label className="admin-form-group admin-form-group--spaced">
             Media focus exit delay (seconden)
             <input
+              className="admin-form-control"
               type="number"
               min={3}
               step={1}
@@ -716,11 +701,6 @@ export function AdminPage({
                   mediaFocusExitDelaySeconds: Number(event.target.value),
                 });
               }}
-              style={{
-                display: "block",
-                marginTop: "0.5rem",
-                width: "100%",
-              }}
             />
           </label>
         </AccordionSection>
@@ -729,7 +709,7 @@ export function AdminPage({
           title="Display & kalibratie"
           subtitle="Rotatie, zoom, safe-area en spacing"
         >
-          <div style={{ marginBottom: "1rem" }}>
+          <div className="admin-calibration-actions">
             <button
               type="button"
               onClick={() => {
@@ -744,7 +724,7 @@ export function AdminPage({
             </button>
 
             {settings.calibrationModeEnabled ? (
-              <p style={{ marginTop: "0.75rem", color: "#cfcfcf" }}>
+              <p className="admin-inline-help">
                 Calibration staat aan op de mirror. Gebruik de padding waardes
                 hieronder om de witte binnenrand perfect binnen het frame te
                 zetten.
@@ -752,20 +732,16 @@ export function AdminPage({
             ) : null}
           </div>
 
-          <label style={{ display: "block", marginBottom: "1rem" }}>
+          <label className="admin-form-group admin-form-group--with-margin">
             Rotatie
             <select
+              className="admin-form-control"
               value={settings.mirrorMode}
               onChange={(event) => {
                 onUpdateSettings({
                   mirrorMode: event.target
                     .value as MirrorSettings["mirrorMode"],
                 });
-              }}
-              style={{
-                display: "block",
-                marginTop: "0.5rem",
-                width: "100%",
               }}
             >
               <option value="normal">Landscape / normaal</option>
@@ -786,14 +762,7 @@ export function AdminPage({
             }}
           />
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-              gap: "0.75rem",
-              marginBottom: "1rem",
-            }}
-          >
+          <div className="admin-calibration-grid">
             {(
               [
                 {
@@ -979,7 +948,7 @@ export function AdminPage({
           <p>Update beschikbaar: {deployment.hasUpdate ? "ja" : "nee"}</p>
           <p>{deploymentMessage}</p>
 
-          <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+          <div className="admin-button-row">
             <button
               type="button"
               onClick={onCheckDeploymentUpdate}
@@ -1148,30 +1117,18 @@ export function AdminPage({
           title="Server logs"
           subtitle="Backend events en errors"
         >
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: "10px" }}
-          >
+          <div className="admin-log-list">
             {logs.length === 0 ? (
               <p>Nog geen serverlogs.</p>
             ) : (
               logs.map((log) => (
-                <div
-                  key={log.id}
-                  style={{
-                    fontFamily: "monospace",
-                    fontSize: "0.85rem",
-                    paddingBottom: "10px",
-                    borderBottom: "1px solid rgba(255,255,255,0.08)",
-                  }}
-                >
+                <div key={log.id} className="admin-log-entry">
                   <div>
                     [{formatLogTime(log.timestamp)}] {log.level.toUpperCase()} ·{" "}
                     {log.source}
                   </div>
                   <div>{log.message}</div>
-                  {log.meta ? (
-                    <div style={{ opacity: 0.7 }}>{log.meta}</div>
-                  ) : null}
+                  {log.meta ? <div className="admin-log-meta">{log.meta}</div> : null}
                 </div>
               ))
             )}
@@ -1182,30 +1139,18 @@ export function AdminPage({
           title="Browser / socket logs"
           subtitle="Frontend reconnect en fallback gedrag"
         >
-          <div
-            style={{ display: "flex", flexDirection: "column", gap: "10px" }}
-          >
+          <div className="admin-log-list">
             {clientLogs.length === 0 ? (
               <p>Nog geen browserlogs.</p>
             ) : (
               clientLogs.map((log) => (
-                <div
-                  key={log.id}
-                  style={{
-                    fontFamily: "monospace",
-                    fontSize: "0.85rem",
-                    paddingBottom: "10px",
-                    borderBottom: "1px solid rgba(255,255,255,0.08)",
-                  }}
-                >
+                <div key={log.id} className="admin-log-entry">
                   <div>
                     [{formatLogTime(log.timestamp)}] {log.level.toUpperCase()} ·{" "}
                     {log.source}
                   </div>
                   <div>{log.message}</div>
-                  {log.meta ? (
-                    <div style={{ opacity: 0.7 }}>{log.meta}</div>
-                  ) : null}
+                  {log.meta ? <div className="admin-log-meta">{log.meta}</div> : null}
                 </div>
               ))
             )}

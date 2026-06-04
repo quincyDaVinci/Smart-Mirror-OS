@@ -21,7 +21,9 @@ export function SortableLayoutItem({
   return (
     <div
       ref={ref}
-      className={`sortable-item ${isDragging ? "sortable-item--dragging" : ""}`}
+      className={`admin-sortable-item ${
+        isDragging ? "admin-sortable-item--dragging" : ""
+      }`}
     >
       <button
         ref={handleRef}
@@ -32,7 +34,7 @@ export function SortableLayoutItem({
         ⋮⋮
       </button>
 
-      <div className="sortable-item-content">{children}</div>
+      <div className="admin-sortable-item__content">{children}</div>
     </div>
   );
 }

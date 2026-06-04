@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MediaState } from "../../types/media";
 import { getWebSocketUrl } from "../../utils/getWebSocketUrl";
+import "./MirrorMediaDock.css";
 
 type MirrorMediaDockProps = {
   media: MediaState;

@@ -1,0 +1,547 @@
+.admin-accordion {
+  overflow: hidden;
+}
+
+.admin-accordion__chevron {
+  flex-shrink: 0;
+  font-size: 1.2rem;
+  opacity: 0.72;
+  transform: rotate(-90deg);
+  transition:
+    transform 220ms ease,
+    opacity 220ms ease;
+}
+
+.admin-accordion__content {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 260ms ease;
+}
+
+.admin-accordion__content-inner {
+  overflow: hidden;
+  min-height: 0;
+  padding-top: 0;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition:
+    opacity 220ms ease,
+    transform 220ms ease,
+    padding-top 220ms ease;
+}
+
+.admin-accordion__subtitle {
+  margin: 6px 0 0;
+  color: #b8b8b8;
+  font-size: 0.92rem;
+}
+
+.admin-accordion__title {
+  margin: 0;
+  font-size: 1.15rem;
+  letter-spacing: -0.02em;
+}
+
+.admin-accordion__trigger {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.admin-accordion__trigger-text {
+  min-width: 0;
+}
+
+.admin-accordion--open .admin-accordion__chevron {
+  transform: rotate(0deg);
+  opacity: 1;
+}
+
+.admin-accordion--open .admin-accordion__content {
+  grid-template-rows: 1fr;
+}
+
+.admin-accordion--open .admin-accordion__content-inner {
+  padding-top: 18px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.admin-button-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.admin-calibration-actions {
+  margin-bottom: 1rem;
+}
+
+.admin-calibration-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.admin-card {
+  width: 100%;
+  max-width: none;
+  padding: 20px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.045),
+    rgba(255, 255, 255, 0.028)
+  );
+  border: 1px solid var(--border-soft);
+  backdrop-filter: var(--blur-panel);
+  box-shadow: var(--shadow-soft);
+  transition:
+    transform 220ms ease,
+    border-color 220ms ease,
+    background-color 220ms ease,
+    box-shadow 220ms ease;
+}
+
+.admin-card:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.admin-card-title {
+  margin: 0 0 16px;
+  font-size: 1.1rem;
+}
+
+.admin-checkbox-inline {
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.admin-checkbox-inline input {
+  width: auto;
+  margin-right: 8px;
+}
+
+.admin-checkbox-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.admin-checkbox-row input {
+  width: auto;
+  margin-top: 4px;
+}
+
+.admin-checkbox-row span {
+  display: grid;
+  gap: 3px;
+}
+
+.admin-checkbox-row small,
+.admin-field small {
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+}
+
+.admin-debug-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px 14px;
+  margin-bottom: 16px;
+}
+
+.admin-debug-grid p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.admin-field {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+}
+
+.admin-form-control {
+  display: block;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
+.admin-form-group {
+  display: block;
+}
+
+.admin-form-group--spaced {
+  margin-top: 1rem;
+}
+
+.admin-form-group--with-margin {
+  margin-bottom: 1rem;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.admin-inline-help {
+  margin-top: 0.75rem;
+  color: #cfcfcf;
+}
+
+.admin-link {
+  color: white;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease,
+    opacity 180ms ease;
+}
+
+.admin-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.admin-links {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-log-entry {
+  font-family: monospace;
+  font-size: 0.85rem;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-log-meta {
+  opacity: 0.7;
+}
+
+.admin-muted {
+  margin: 14px 0 0;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.admin-overview-card {
+  padding: 16px;
+  border-radius: 22px;
+  border: 1px solid var(--border-soft);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.admin-overview-card--error {
+  border-color: rgba(255, 143, 143, 0.25);
+}
+
+.admin-overview-card--ok {
+  border-color: rgba(142, 240, 167, 0.22);
+}
+
+.admin-overview-card--warn {
+  border-color: rgba(255, 196, 107, 0.25);
+}
+
+.admin-overview-card__label {
+  margin: 0 0 8px;
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.admin-overview-card__meta {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+.admin-overview-card__value {
+  margin: 0;
+  font-size: 1.25rem;
+  letter-spacing: -0.03em;
+}
+
+.admin-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  max-width: 1180px;
+  margin: 0 0 18px;
+}
+
+.admin-page {
+  min-height: 100vh;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top, rgba(255, 255, 255, 0.06), transparent 28%),
+    #0b0b0b;
+  color: white;
+}
+
+.admin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  transition: border-color 180ms ease;
+}
+
+.admin-row:last-child {
+  border-bottom: none;
+}
+
+.admin-row-hint {
+  font-size: 0.8rem;
+  color: var(--text-tertiary);
+}
+
+.admin-row-label {
+  text-transform: capitalize;
+}
+
+.admin-row-left {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-sections {
+  display: grid;
+  gap: 16px;
+  max-width: 760px;
+}
+
+.admin-sortable-item {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.admin-sortable-item:last-child {
+  border-bottom: none;
+}
+
+.admin-sortable-item--dragging {
+  opacity: 0.6;
+}
+
+.admin-sortable-item__content {
+  flex: 1;
+}
+
+.admin-status {
+  margin: 0 0 16px;
+  color: #cfcfcf;
+}
+
+.admin-status--error {
+  color: var(--accent-red);
+}
+
+.admin-status--tight {
+  margin-top: -8px;
+}
+
+.admin-title {
+  margin: 0;
+  font-size: 1.9rem;
+  letter-spacing: -0.03em;
+}
+
+.admin-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+  color: #cfcfcf;
+}
+
+.admin-toggle select {
+  width: auto;
+  min-width: 168px;
+  padding: 8px 10px;
+  border-radius: 10px;
+}
+
+.admin-trivia-item {
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.admin-trivia-item__link {
+  display: inline-flex;
+  margin-top: 10px;
+  color: var(--accent-amber);
+  font-size: 0.84rem;
+  text-decoration: none;
+}
+
+.admin-trivia-item__link:hover {
+  text-decoration: underline;
+}
+
+.admin-trivia-item__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.admin-trivia-item__meta span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.admin-trivia-item__text {
+  margin: 0;
+  color: var(--text-primary);
+  line-height: 1.45;
+}
+
+.admin-trivia-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.admin-trivia-source-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+}
+
+.admin-trivia-source-list a {
+  color: var(--accent-amber);
+  text-decoration: none;
+}
+
+.admin-trivia-source-list a:hover {
+  text-decoration: underline;
+}
+
+.admin-trivia-source-list span {
+  flex-basis: 100%;
+}
+
+.admin-trivia-status {
+  margin: 0;
+  color: var(--text-primary);
+}
+
+.admin-trivia-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.drag-handle {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+  border-radius: 12px;
+  width: 44px;
+  min-width: 44px;
+  cursor: grab;
+  font-size: 1.1rem;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+@media (min-width: 1050px) {
+  .admin-sections {
+    max-width: 1180px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .admin-sections > .admin-card:first-child {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 720px) {
+  .admin-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-link {
+    padding: 9px 12px;
+  }
+
+  .admin-page {
+    padding: 16px;
+  }
+
+  .admin-trivia-toolbar {
+    flex-direction: column;
+  }
+
+  .admin-trivia-toolbar button {
+    width: 100%;
+  }
+}

@@ -6,6 +6,7 @@ import type { PresenceState } from "../types/presence";
 import type { MediaState } from "../types/media";
 import type { MirrorSettings } from "../types/settings";
 import { CommitRange } from "../components/common/CommitRange";
+import "./RemoteControlPage.css";
 
 type RemoteControlPageProps = {
   layout: LayoutItem[];
@@ -338,21 +339,21 @@ export function RemoteControlPage({
         <h1 className="remote-title">Smart Mirror Remote</h1>
 
         <div className="remote-links">
-          <Link to="/" className="admin-link">
+          <Link to="/" className="remote-link">
             Mirror
           </Link>
-          <Link to="/admin" className="admin-link">
+          <Link to="/admin" className="remote-link">
             Admin
           </Link>
         </div>
       </div>
 
-      <p className="admin-status">
+      <p className="remote-status">
         Status: <strong>{getConnectionStatusLabel(connectionStatus)}</strong>
       </p>
 
       {connectionError ? (
-        <p className="admin-status" style={{ color: "#ffb3b3" }}>
+        <p className="remote-status remote-status--error">
           {connectionError}
         </p>
       ) : null}

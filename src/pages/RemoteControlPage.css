@@ -1,0 +1,262 @@
+.remote-action-button {
+  min-height: 52px;
+  text-align: left;
+}
+
+.remote-action-button--stacked {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+}
+
+.remote-action-button__hint {
+  color: var(--text-tertiary);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.remote-action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 10px;
+}
+
+.remote-eyebrow {
+  margin: 0 0 5px;
+  color: var(--text-tertiary);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.remote-focus-button {
+  padding: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.remote-focus-button__icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.06);
+  color: #dcefff;
+  flex-shrink: 0;
+}
+
+.remote-focus-button__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.remote-focus-button__text em {
+  color: var(--text-tertiary);
+  font-size: 0.78rem;
+  font-style: normal;
+}
+
+.remote-focus-button__text span {
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+}
+
+.remote-focus-button__text strong {
+  font-size: 1rem;
+}
+
+.remote-focus-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.remote-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.remote-hero-card {
+  margin-top: 8px;
+  margin-bottom: 18px;
+  padding: 20px;
+  border-radius: 24px;
+  border: 1px solid rgba(140, 231, 255, 0.14);
+  background:
+    radial-gradient(
+      circle at 0% 0%,
+      rgba(140, 231, 255, 0.12),
+      transparent 34%
+    ),
+    rgba(255, 255, 255, 0.045);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+}
+
+.remote-hero-card h2,
+.remote-section-heading h2 {
+  margin: 0;
+  font-size: clamp(1.18rem, 4vw, 1.7rem);
+  letter-spacing: -0.03em;
+}
+
+.remote-hero-card p {
+  margin: 8px 0 0;
+  color: var(--text-secondary);
+}
+
+.remote-link {
+  color: white;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 10px 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.03);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    transform 180ms ease,
+    opacity 180ms ease;
+}
+
+.remote-link:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.remote-links {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.remote-page {
+  min-height: 100vh;
+  padding: 24px;
+  background:
+    radial-gradient(
+      circle at 20% 0%,
+      rgba(140, 231, 255, 0.09),
+      transparent 26%
+    ),
+    radial-gradient(
+      circle at 100% 100%,
+      rgba(255, 196, 107, 0.08),
+      transparent 28%
+    ),
+    #07090d;
+  color: white;
+}
+
+.remote-range-card {
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.remote-section {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.remote-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.remote-status {
+  margin: 0 0 16px;
+  color: #cfcfcf;
+}
+
+.remote-status--error {
+  color: var(--accent-red);
+}
+
+.remote-status-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.remote-status-pills {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 360px;
+}
+
+.remote-title {
+  margin: 0;
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  letter-spacing: -0.03em;
+}
+
+@media (max-width: 720px) {
+  .remote-action-grid,
+  .remote-focus-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .remote-action-button,
+  .remote-focus-button {
+    width: 100%;
+  }
+
+  .remote-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .remote-hero-card {
+    grid-template-columns: 1fr;
+  }
+
+  .remote-link {
+    padding: 9px 12px;
+  }
+
+  .remote-page {
+    padding: 16px;
+  }
+
+  .remote-status-pills {
+    justify-content: flex-start;
+    max-width: none;
+  }
+}

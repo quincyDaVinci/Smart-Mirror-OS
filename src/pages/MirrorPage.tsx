@@ -8,6 +8,7 @@ import type { DisplayState } from "../types/display";
 import type { MediaState } from "../types/media";
 import { MirrorMediaDock } from "../components/mirror/MirrorMediaDock";
 import { CalibrationOverlay } from "../components/mirror/CalibrationOverlay";
+import "./MirrorPage.css";
 
 type MirrorPageProps = {
   layout: LayoutItem[];

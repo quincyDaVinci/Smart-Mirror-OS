@@ -4,6 +4,7 @@ import type {
   ProviderConfigStatus,
   ProviderSecretsInput,
 } from "../../types/providerConfig";
+import "./ProviderSecretsPanel.css";
 
 type ProviderSecretsPanelProps = {
   configStatus: ProviderConfigStatus;
@@ -546,32 +547,30 @@ export function ProviderSecretsPanel({
   }
 
   return (
-    <div style={{ display: "grid", gap: 20 }}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 12,
-          flexWrap: "wrap",
-          alignItems: "center",
-        }}
-      >
-        <h2 style={{ margin: 0 }}>Provider secrets</h2>
+    <div className="provider-secrets">
+      <div className="provider-secrets__header">
+        <h2 className="provider-secrets__header-title">Provider secrets</h2>
 
         <button type="button" onClick={handleRefresh} disabled={isRefreshing}>
           {isRefreshing ? "Verversen..." : "Ververs status"}
         </button>
       </div>
 
-      <p style={{ opacity: 0.78, margin: 0 }}>
+      <p className="provider-secrets__description">
         Alle provider values zijn redacted. Je kunt labels wel terugzien, maar
         de echte values nooit.
       </p>
 
-      {panelMessage ? <p style={{ color: "#b8ffb8", margin: 0 }}>{panelMessage}</p> : null}
-      {panelError ? <p style={{ color: "#ffb3b3", margin: 0 }}>{panelError}</p> : null}
+      {panelMessage ? (
+        <p className="provider-secrets__message">{panelMessage}</p>
+      ) : null}
+      {panelError ? (
+        <p className="provider-secrets__message provider-secrets__message--error">
+          {panelError}
+        </p>
+      ) : null}
 
-      <div style={{ display: "grid", gap: 20 }}>
+      <div className="provider-secrets__groups">
         {(Object.entries(FIXED_PROVIDER_DEFINITIONS) as Array<
           [FixedProviderId, (typeof FIXED_PROVIDER_DEFINITIONS)[FixedProviderId]]
         >).map(([providerId, providerDefinition]) => {
@@ -590,30 +589,17 @@ export function ProviderSecretsPanel({
           const missingFields = fields.filter((item) => !item.summary.hasValue);
 
           return (
-            <details key={providerId} open style={{ display: "grid", gap: 12 }}>
-              <summary
-                style={{
-                  cursor: "pointer",
-                  listStylePosition: "inside",
-                  fontWeight: 700,
-                  marginBottom: 6,
-                }}
-              >
+            <details key={providerId} open className="provider-secrets__group">
+              <summary className="provider-secrets__summary">
                 {providerDefinition.title}
               </summary>
 
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  flexWrap: "wrap",
-                  alignItems: "center",
-                }}
-              >
-                <h3 style={{ margin: 0 }}>{providerDefinition.title}</h3>
+              <div className="provider-secrets__group-header">
+                <h3 className="provider-secrets__group-title">
+                  {providerDefinition.title}
+                </h3>
 
-                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <div className="provider-secrets__group-actions">
                   {providerId === "spotify" ? (
                     <a
                       href={
@@ -623,12 +609,11 @@ export function ProviderSecretsPanel({
                       }
                       target={canStartSpotifyLink ? "_blank" : undefined}
                       rel={canStartSpotifyLink ? "noreferrer" : undefined}
-                      className="admin-link"
-                      style={{
-                        padding: "8px 12px",
-                        opacity: canStartSpotifyLink ? 1 : 0.45,
-                        pointerEvents: canStartSpotifyLink ? "auto" : "none",
-                      }}
+                      className={`provider-secrets__link ${
+                        canStartSpotifyLink
+                          ? ""
+                          : "provider-secrets__link--disabled"
+                      }`.trim()}
                       aria-disabled={!canStartSpotifyLink}
                     >
                       Koppel Spotify
@@ -656,54 +641,36 @@ export function ProviderSecretsPanel({
               </div>
 
               {missingFields.length === 0 ? (
-                <p style={{ margin: 0, opacity: 0.72 }}>
+                <p className="provider-secrets__empty">
                   Alle beschikbare fields voor {providerDefinition.title} hebben
                   al een waarde.
                 </p>
               ) : null}
 
               {providerId === "weather" ? (
-                <p style={{ margin: 0, opacity: 0.72 }}>
+                <p className="provider-secrets__muted">
                   Weather gebruikt WeatherAPI met provider-icons en uitgebreide
                   condities voor nauwkeurige weergave over de dag.
                 </p>
               ) : null}
 
               {fields.map(({ fieldKey, fieldMeta, summary }) => (
-                <div
-                  key={`${providerId}-${fieldKey}`}
-                  style={{
-                    padding: 14,
-                    borderRadius: 14,
-                    border: "1px solid rgba(255,255,255,0.08)",
-                    background: "rgba(255,255,255,0.02)",
-                    display: "grid",
-                    gap: 8,
-                  }}
-                >
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: 12,
-                      flexWrap: "wrap",
-                    }}
-                  >
+                <div key={`${providerId}-${fieldKey}`} className="provider-secrets__card">
+                  <div className="provider-secrets__card-header">
                     <strong>{fieldMeta.title}</strong>
-                    <span style={{ opacity: 0.72, fontSize: 14 }}>
+                    <span className="provider-secrets__inline-status">
                       {summary.hasValue ? "waarde ingesteld" : "nog geen waarde"}
                     </span>
                   </div>
 
-                  <div style={{ opacity: 0.8, fontSize: 14 }}>
+                  <div className="provider-secrets__status">
                     Label: {summary.label}
                   </div>
-                  <div style={{ opacity: 0.72, fontSize: 14 }}>
+                  <div className="provider-secrets__meta">
                     Laatst bijgewerkt: {formatUpdatedAt(summary.updatedAt)}
                   </div>
 
-                  <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                  <div className="provider-secrets__actions">
                     <button
                       type="button"
                       onClick={() => openFixedEdit(providerId, fieldKey)}
@@ -718,77 +685,44 @@ export function ProviderSecretsPanel({
           );
         })}
 
-        <details open style={{ display: "grid", gap: 12 }}>
-          <summary
-            style={{
-              cursor: "pointer",
-              listStylePosition: "inside",
-              fontWeight: 700,
-              marginBottom: 6,
-            }}
-          >
+        <details open className="provider-secrets__group">
+          <summary className="provider-secrets__summary">
             Calendar
           </summary>
 
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 12,
-              flexWrap: "wrap",
-              alignItems: "center",
-            }}
-          >
-            <h3 style={{ margin: 0 }}>Calendar</h3>
+          <div className="provider-secrets__group-header">
+            <h3 className="provider-secrets__group-title">Calendar</h3>
 
             <button type="button" onClick={openCalendarAdd} disabled={isSaving}>
               + ICS feed
             </button>
           </div>
 
-          <p style={{ margin: 0, opacity: 0.72 }}>
+          <p className="provider-secrets__muted">
             Voeg onbeperkt feeds toe. Elke feed krijgt een eigen label voor jouw
             overzicht. Waarden blijven altijd verborgen.
           </p>
 
           {configStatus.calendar.entries.length === 0 ? (
-            <p style={{ margin: 0, opacity: 0.72 }}>
+            <p className="provider-secrets__empty">
               Nog geen calendar feeds toegevoegd.
             </p>
           ) : null}
 
           {configStatus.calendar.entries.map((entry) => (
-            <div
-              key={entry.id}
-              style={{
-                padding: 14,
-                borderRadius: 14,
-                border: "1px solid rgba(255,255,255,0.08)",
-                background: "rgba(255,255,255,0.02)",
-                display: "grid",
-                gap: 8,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  gap: 12,
-                  flexWrap: "wrap",
-                }}
-              >
+            <div key={entry.id} className="provider-secrets__card">
+              <div className="provider-secrets__card-header">
                 <strong>{entry.label}</strong>
-                <span style={{ opacity: 0.72, fontSize: 14 }}>
+                <span className="provider-secrets__inline-status">
                   {entry.hasValue ? "waarde ingesteld" : "nog geen waarde"}
                 </span>
               </div>
 
-              <div style={{ opacity: 0.72, fontSize: 14 }}>
+              <div className="provider-secrets__meta">
                 Laatst bijgewerkt: {formatUpdatedAt(entry.updatedAt)}
               </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <div className="provider-secrets__actions provider-secrets__actions--split">
                 <button
                   type="button"
                   onClick={() => openCalendarEdit(entry.id, entry.label)}
@@ -809,28 +743,20 @@ export function ProviderSecretsPanel({
         </details>
 
         {editorState ? (
-          <section
-            style={{
-              display: "grid",
-              gap: 12,
-              border: "1px solid rgba(255,255,255,0.12)",
-              borderRadius: 16,
-              padding: 16,
-              background: "rgba(255,255,255,0.03)",
-            }}
-          >
-            <h3 style={{ margin: 0 }}>
+          <section className="provider-secrets__editor">
+            <h3 className="provider-secrets__editor-title">
               {editorState.mode === "fixed-add" && "Nieuw provider secret"}
               {editorState.mode === "fixed-edit" && "Bewerk provider secret"}
               {editorState.mode === "calendar-add" && "Nieuwe calendar feed"}
               {editorState.mode === "calendar-edit" && "Bewerk calendar feed"}
             </h3>
 
-            <form onSubmit={handleEditorSubmit} style={{ display: "grid", gap: 10 }}>
+            <form onSubmit={handleEditorSubmit} className="provider-secrets__form">
               {editorState.mode === "fixed-add" ? (
                 <label>
                   Secret veld
                   <select
+                    className="provider-secrets__field-control"
                     value={editorState.fieldKey}
                     onChange={(event) => {
                       const nextFieldKey = event.target.value;
@@ -850,7 +776,6 @@ export function ProviderSecretsPanel({
                           : editorState,
                       );
                     }}
-                    style={{ display: "block", width: "100%", marginTop: 6 }}
                   >
                     {Object.entries(
                       FIXED_PROVIDER_DEFINITIONS[editorState.provider].fields,
@@ -873,7 +798,7 @@ export function ProviderSecretsPanel({
               ) : null}
 
               {editorState.mode === "fixed-edit" ? (
-                <p style={{ margin: 0, opacity: 0.8 }}>
+                <p className="provider-secrets__status">
                   Veld: {FIXED_PROVIDER_DEFINITIONS[editorState.provider].fields[editorState.fieldKey]?.title ?? editorState.fieldKey}
                 </p>
               ) : null}
@@ -881,13 +806,13 @@ export function ProviderSecretsPanel({
               <label>
                 Label
                 <input
+                  className="provider-secrets__field-control"
                   type="text"
                   value={editorState.label}
                   onChange={(event) =>
                     setEditorState({ ...editorState, label: event.target.value })
                   }
                   placeholder="Alleen voor jezelf"
-                  style={{ display: "block", width: "100%", marginTop: 6 }}
                 />
               </label>
 
@@ -896,7 +821,7 @@ export function ProviderSecretsPanel({
               FIXED_PROVIDER_DEFINITIONS[editorState.provider].fields[
                 editorState.fieldKey
               ]?.helperText ? (
-                <p style={{ margin: 0, opacity: 0.72, fontSize: 14 }}>
+                <p className="provider-secrets__field-note">
                   {
                     FIXED_PROVIDER_DEFINITIONS[editorState.provider].fields[
                       editorState.fieldKey
@@ -911,6 +836,7 @@ export function ProviderSecretsPanel({
                   ? "ICS URL"
                   : "Secret value"}
                 <input
+                  className="provider-secrets__field-control"
                   type={
                     editorState.mode === "fixed-add" ||
                     editorState.mode === "fixed-edit"
@@ -931,23 +857,15 @@ export function ProviderSecretsPanel({
                         ]?.placeholder ?? ""
                       : "https://example.com/calendar.ics"
                   }
-                  style={{ display: "block", width: "100%", marginTop: 6 }}
                 />
               </label>
 
-              <p style={{ margin: 0, opacity: 0.72, fontSize: 14 }}>
+              <p className="provider-secrets__field-note">
                 Value wordt nooit teruggestuurd naar de browser. Laat de value
                 leeg bij edit als je alleen het label wilt aanpassen.
               </p>
 
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  gap: 10,
-                  flexWrap: "wrap",
-                }}
-              >
+              <div className="provider-secrets__actions provider-secrets__actions--split">
                 <button
                   type="button"
                   onClick={() => setEditorState(null)}

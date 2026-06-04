@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import "./CommitRange.css";
 
 type CommitRangeProps = {
   label: string;
@@ -54,9 +55,10 @@ export function CommitRange({
   }
 
   return (
-    <label style={{ display: "block", marginTop: "1rem" }}>
+    <label className="commit-range">
       {label} (<span ref={labelValueRef}>{value}{suffix}</span>)
       <input
+        className="commit-range__input"
         ref={inputRef}
         type="range"
         min={min}
@@ -71,11 +73,6 @@ export function CommitRange({
         onKeyUp={commitValue}
         onBlur={commitValue}
         disabled={disabled}
-        style={{
-          display: "block",
-          marginTop: "0.5rem",
-          width: "100%",
-        }}
       />
     </label>
   );
