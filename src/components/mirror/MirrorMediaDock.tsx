@@ -83,7 +83,7 @@ type ProgressAnchor = {
 
 const PAUSED_RECENTLY_PLAYED_AFTER_MS = 45 * 1000;
 const LYRICS_AUTO_HIDE_AFTER_MS = 3500;
-const TRIVIA_TIMED_EARLY_WINDOW_MS = 8000;
+const TRIVIA_TIMED_EARLY_WINDOW_MS = 10000;
 const TRIVIA_TIMED_LATE_WINDOW_MS = 12000;
 const TRIVIA_UNTIMED_EDGE_MARGIN_MS = 3 * 60 * 1000;
 
@@ -1176,19 +1176,45 @@ export function MirrorMediaDock({
   ]);
 
   useEffect(() => {
+    if (!activeTriviaPopup) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(
+      () => {
+        setActiveTriviaPopup(null);
+      },
+      Math.max(0, activeTriviaPopup.hideAt - Date.now()),
+    );
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [activeTriviaPopup]);
+
+  useEffect(() => {
     const previousProgressMs = previousTriviaProgressRef.current;
     previousTriviaProgressRef.current = liveProgressMs;
 
-    if (
-      !activeTriviaPopup ||
-      liveProgressMs === null ||
-      previousProgressMs === null
-    ) {
+    if (liveProgressMs === null || previousProgressMs === null) {
       return;
     }
 
     const progressDeltaMs = liveProgressMs - previousProgressMs;
     const didSeek = progressDeltaMs < -5000 || progressDeltaMs > 12000;
+
+    if (didSeek) {
+      setActiveTriviaPopup(null);
+
+      // Belangrijk voor testen/rewatch:
+      // na seek mogen timed trivia opnieuw triggeren.
+      setShownTriviaIds(new Set());
+      return;
+    }
+
+    if (!activeTriviaPopup) {
+      return;
+    }
 
     const timedPopupIsNoLongerRelevant =
       activeTriviaPopup.item.startMs !== null &&
@@ -1197,7 +1223,7 @@ export function MirrorMediaDock({
         liveProgressMs >
           activeTriviaPopup.item.startMs + TRIVIA_TIMED_LATE_WINDOW_MS + 5000);
 
-    if (didSeek || timedPopupIsNoLongerRelevant) {
+    if (timedPopupIsNoLongerRelevant) {
       setActiveTriviaPopup(null);
     }
   }, [activeTriviaPopup, liveProgressMs]);
@@ -1214,25 +1240,44 @@ export function MirrorMediaDock({
       return;
     }
 
-    const timedCandidate = jellyfinTriviaState.items.find(
-      (item) =>
-        item.startMs !== null &&
-        !shownTriviaIds.has(item.id) &&
-        liveProgressMs >= item.startMs - TRIVIA_TIMED_EARLY_WINDOW_MS &&
-        liveProgressMs <= item.startMs + TRIVIA_TIMED_LATE_WINDOW_MS,
+    const timedCandidate =
+      jellyfinTriviaState.items
+        .filter(
+          (item) =>
+            item.startMs !== null &&
+            !shownTriviaIds.has(item.id) &&
+            liveProgressMs >= item.startMs - TRIVIA_TIMED_EARLY_WINDOW_MS &&
+            liveProgressMs <= item.startMs + TRIVIA_TIMED_LATE_WINDOW_MS,
+        )
+        .sort((a, b) => {
+          const aDistance = Math.abs((a.startMs ?? 0) - liveProgressMs);
+          const bDistance = Math.abs((b.startMs ?? 0) - liveProgressMs);
+
+          return aDistance - bDistance;
+        })[0] ?? null;
+
+    const dueUntimedSlots = scheduledTriviaSlots.filter(
+      (slot) => liveProgressMs >= slot.startMs,
     );
 
-    const dueSlot = scheduledTriviaSlots.find(
-      (slot) =>
-        !shownTriviaIds.has(slot.itemId) &&
-        liveProgressMs >= slot.startMs &&
-        liveProgressMs <= slot.startMs + 30000,
-    );
+    let dueSlot: { itemId: string; startMs: number } | null = null;
+
+    for (const slot of dueUntimedSlots) {
+      if (!shownTriviaIds.has(slot.itemId)) {
+        dueSlot = slot;
+      }
+    }
+
     const untimedCandidate = dueSlot
       ? (jellyfinTriviaState.items.find((item) => item.id === dueSlot.itemId) ??
         null)
       : null;
+
     const nextTrivia = timedCandidate ?? untimedCandidate;
+    const consumedUntimedSlotIds =
+      !timedCandidate && dueSlot
+        ? dueUntimedSlots.map((slot) => slot.itemId)
+        : [];
 
     if (!nextTrivia) {
       return;
@@ -1241,6 +1286,11 @@ export function MirrorMediaDock({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setShownTriviaIds((previousIds) => {
       const nextIds = new Set(previousIds);
+
+      for (const itemId of consumedUntimedSlotIds) {
+        nextIds.add(itemId);
+      }
+
       nextIds.add(nextTrivia.id);
       return nextIds;
     });
