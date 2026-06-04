@@ -272,9 +272,9 @@ const defaultState = {
   settings: {
     showSeconds: true,
     mirrorMode: "normal",
-    autoSleepEnabled: false,
+    autoSleepEnabled: true,
     sleepTimeoutSeconds: 180,
-    showStatusBar: true,
+    showStatusBar: false,
     layoutPaddingPx: 32,
     layoutPaddingTopPx: 32,
     layoutPaddingRightPx: 32,

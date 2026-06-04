@@ -242,7 +242,7 @@ function getScreenLabel(display: DisplayState) {
     case "clock":
       return "CLOCK";
     default:
-      return "MAIN";
+      return null;
   }
 }
 
@@ -283,12 +283,18 @@ export function MirrorPage({
   const showClock = enabledWidgetIds.has("clock");
   const showCalendar = enabledWidgetIds.has("calendar");
   const showMedia = enabledWidgetIds.has("media");
-  const isMediaFocused = showMedia && display.focusedWidgetId === "media";
 
-  const upcomingItems = sortCalendarItems(dashboardData.calendar.items).slice(
-    0,
-    3,
-  );
+  const focusedWidgetId = display.focusedWidgetId;
+  const isClockFocused = showClock && focusedWidgetId === "clock";
+  const isWeatherFocused = showWeather && focusedWidgetId === "weather";
+  const isCalendarFocused = showCalendar && focusedWidgetId === "calendar";
+  const isMediaFocused = showMedia && focusedWidgetId === "media";
+  const isAnyWidgetFocused =
+    isClockFocused || isWeatherFocused || isCalendarFocused || isMediaFocused;
+
+  const sortedCalendarItems = sortCalendarItems(dashboardData.calendar.items);
+  const upcomingItems = sortedCalendarItems.slice(0, 3);
+  const focusAgendaItems = sortedCalendarItems.slice(0, 6);
   const screenLabel = getScreenLabel(display);
 
   const formattedTime = formatMeridiemTime(currentTime);
@@ -302,21 +308,16 @@ export function MirrorPage({
       className={`mirror-page mirror-page--mode-${settings.mirrorMode} mirror-page--${presence.mode} mirror-page--display-${display.mode}`}
       style={mirrorStyle}
     >
-      {settings.showStatusBar ? (
-        <div className="mirror-status">
-          Presence: {presence.mode} · Display: {display.mode} · Reason:{" "}
-          {display.reason}
-        </div>
-      ) : null}
-
       <div
         className={`mirror-portrait-shell ${
-          isMediaFocused ? "mirror-portrait-shell--media-focus" : ""
-        }`}
+          isAnyWidgetFocused ? "mirror-portrait-shell--widget-focus" : ""
+        } ${isMediaFocused ? "mirror-portrait-shell--media-focus" : ""}`}
       >
-        <div className="mirror-edge-indicator">{screenLabel}</div>
+        {screenLabel ? (
+          <div className="mirror-edge-indicator">{screenLabel}</div>
+        ) : null}
 
-        {showWeather && !isMediaFocused ? (
+        {showWeather && !isAnyWidgetFocused ? (
           <section className="mirror-compact-weather">
             <p className="mirror-compact-weather__location">
               {dashboardData.weather.location}
@@ -434,7 +435,7 @@ export function MirrorPage({
           </section>
         ) : null}
 
-        {(showClock || showCalendar || showMedia) && !isMediaFocused ? (
+        {(showClock || showCalendar || showMedia) && !isAnyWidgetFocused ? (
           <section className="mirror-compact-time-stack">
             {showClock ? (
               <div className="mirror-compact-time">
@@ -483,6 +484,158 @@ export function MirrorPage({
           </section>
         ) : null}
 
+        {isClockFocused ? (
+          <section className="mirror-widget-focus-zone mirror-widget-focus-zone--clock">
+            <div className="mirror-focus-clock">
+              <p className="mirror-focus-clock__weekday">{weekdayLabel}</p>
+              <p className="mirror-focus-clock__date">{fullDateLabel}</p>
+              <p className="mirror-focus-clock__value">
+                <span className="mirror-focus-clock__digits">
+                  {formattedTime.time}
+                </span>
+                <span className="mirror-focus-clock__meridiem">
+                  {formattedTime.meridiem}
+                </span>
+              </p>
+            </div>
+          </section>
+        ) : null}
+
+        {isWeatherFocused ? (
+          <section className="mirror-widget-focus-zone mirror-widget-focus-zone--weather">
+            <div className="mirror-focus-weather">
+              <div className="mirror-focus-weather__hero">
+                <div>
+                  <p className="mirror-focus-weather__location">
+                    {dashboardData.weather.location}
+                  </p>
+                  {dashboardData.weather.locationSubtitle ? (
+                    <p className="mirror-focus-weather__subtitle">
+                      {dashboardData.weather.locationSubtitle}
+                    </p>
+                  ) : null}
+                </div>
+
+                <div className="mirror-focus-weather__main">
+                  <div className="mirror-focus-weather__icon">
+                    {renderWeatherIcon(
+                      dashboardData.weather.iconKey,
+                      dashboardData.weather.iconUrl,
+                      "animated",
+                    )}
+                  </div>
+                  <div>
+                    <p className="mirror-focus-weather__temp">
+                      {dashboardData.weather.temperature}
+                    </p>
+                    <p className="mirror-focus-weather__condition">
+                      {dashboardData.weather.condition}
+                    </p>
+                  </div>
+                </div>
+
+                <p className="mirror-focus-weather__detail">
+                  {dashboardData.weather.detailLine}
+                </p>
+
+                <div className="mirror-focus-weather__stats">
+                  <span>Wind: {dashboardData.weather.windSpeed}</span>
+                  <span>Max: {dashboardData.weather.highTemperature}</span>
+                  <span>Min: {dashboardData.weather.lowTemperature}</span>
+                </div>
+              </div>
+
+              <div className="mirror-focus-weather__tables">
+                <section>
+                  <p className="mirror-focus-weather__section-label">
+                    Aankomende uren
+                  </p>
+                  <div className="mirror-focus-weather__list">
+                    {dashboardData.weather.hourlyTrend.map((item) => (
+                      <div
+                        key={`${item.time}-${item.temperature}-${item.precipitationChance}`}
+                        className="mirror-focus-weather__row"
+                      >
+                        <span>{item.time}</span>
+                        <span className="mirror-focus-weather__row-icon">
+                          {renderWeatherIcon(
+                            item.iconKey,
+                            item.iconUrl,
+                            "static",
+                          )}
+                        </span>
+                        <strong>{item.temperature}</strong>
+                        <span>{item.precipitationChance}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section>
+                  <p className="mirror-focus-weather__section-label">
+                    Komende dagen
+                  </p>
+                  <div className="mirror-focus-weather__list">
+                    {dashboardData.weather.forecast.map((item) => (
+                      <div
+                        key={`${item.day}-${item.highTemperature}-${item.lowTemperature}`}
+                        className="mirror-focus-weather__row"
+                      >
+                        <span>{item.day}</span>
+                        <span className="mirror-focus-weather__row-icon">
+                          {renderWeatherIcon(
+                            item.iconKey,
+                            item.iconUrl,
+                            "static",
+                          )}
+                        </span>
+                        <strong>
+                          {formatDegreeLabel(item.highTemperature)}
+                        </strong>
+                        <span>{formatDegreeLabel(item.lowTemperature)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {isCalendarFocused ? (
+          <section className="mirror-widget-focus-zone mirror-widget-focus-zone--calendar">
+            <div className="mirror-focus-agenda">
+              <p className="mirror-focus-agenda__label">Agenda</p>
+              <h2 className="mirror-focus-agenda__title">
+                {focusAgendaItems.length > 0
+                  ? "Aankomende afspraken"
+                  : "Geen afspraken"}
+              </h2>
+
+              <div className="mirror-focus-agenda__list">
+                {focusAgendaItems.map((item) => (
+                  <div
+                    key={`${item.date ?? "today"}-${item.time}-${item.title}`}
+                    className="mirror-focus-agenda__item"
+                  >
+                    <div>
+                      {item.date ? (
+                        <span className="mirror-focus-agenda__date">
+                          {item.date}
+                        </span>
+                      ) : null}
+                      <span className="mirror-focus-agenda__time">
+                        {getAgendaTimeLabel(item)}
+                      </span>
+                    </div>
+                    <strong>{item.title}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
         {showMedia ? (
           isMediaFocused ? (
             <div className="mirror-media-focus-zone">
@@ -490,9 +643,7 @@ export function MirrorPage({
                 media={media}
                 showLyrics={display.mediaLyricsVisible}
                 showJellyfinTrivia={display.mediaJellyfinTriviaVisible}
-                jellyfinTriviaSessionKey={
-                  display.mediaJellyfinTriviaSessionKey
-                }
+                jellyfinTriviaSessionKey={display.mediaJellyfinTriviaSessionKey}
                 variant="focus"
               />
             </div>

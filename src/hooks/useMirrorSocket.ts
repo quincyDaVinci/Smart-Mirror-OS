@@ -164,9 +164,9 @@ export function useMirrorSocket() {
   const [settings, setSettings] = useState<MirrorSettings>({
     showSeconds: true,
     mirrorMode: "normal",
-    autoSleepEnabled: false,
+    autoSleepEnabled: true,
     sleepTimeoutSeconds: 180,
-    showStatusBar: true,
+    showStatusBar: false,
     layoutPaddingPx: 0,
     layoutPaddingTopPx: 0,
     layoutPaddingRightPx: 0,

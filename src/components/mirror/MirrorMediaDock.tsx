@@ -501,21 +501,6 @@ function getProviderMessage(media: MediaState, source: MediaState["source"]) {
   return null;
 }
 
-function getKindLabel(kind: MediaState["kind"]) {
-  switch (kind) {
-    case "movie":
-      return "Film";
-    case "episode":
-      return "Aflevering";
-    case "track":
-      return "Track";
-    case "podcast":
-      return "Podcast";
-    default:
-      return null;
-  }
-}
-
 function DetailIcon({ name }: { name: DetailIconName }) {
   switch (name) {
     case "calendar":
@@ -793,10 +778,8 @@ export function MirrorMediaDock({
     displayMedia.durationMs > liveProgressMs
       ? `Eindigt ${formatClockTime(nowMs + displayMedia.durationMs - liveProgressMs)}`
       : null;
-  const kindLabel = getKindLabel(displayMedia.kind);
 
   const videoDetailPillCandidates: Array<DetailPill | null> = [
-    kindLabel ? { icon: "film" as const, label: kindLabel } : null,
     displayMedia.productionYear
       ? {
           icon: "calendar" as const,

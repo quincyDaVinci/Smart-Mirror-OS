@@ -626,7 +626,6 @@ export function AdminPage({
         <AccordionSection
           title="Widgets"
           subtitle="Widgets aanzetten, uitzetten en herschikken"
-          defaultOpen
         >
           <LayoutControls
             layout={layout}
@@ -640,7 +639,6 @@ export function AdminPage({
         <AccordionSection
           title="Gebruik & sleep"
           subtitle="Klok, auto-sleep en focus timing"
-          defaultOpen
         >
           <label style={{ display: "block", marginBottom: "1rem" }}>
             <input
@@ -730,7 +728,6 @@ export function AdminPage({
         <AccordionSection
           title="Display & kalibratie"
           subtitle="Rotatie, zoom, safe-area en spacing"
-          defaultOpen
         >
           <div style={{ marginBottom: "1rem" }}>
             <button

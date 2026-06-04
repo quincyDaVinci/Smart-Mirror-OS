@@ -481,7 +481,7 @@ export function RemoteControlPage({
 
           <button
             type="button"
-            className="remote-action-button"
+            className="remote-action-button remote-action-button--stacked"
             onClick={() => {
               onSetMediaJellyfinTriviaVisible(
                 !display.mediaJellyfinTriviaVisible,
@@ -494,13 +494,16 @@ export function RemoteControlPage({
                 !remoteTriviaAvailability.available)
             }
           >
-            Jellyfin Trivia{" "}
-            {display.mediaJellyfinTriviaVisible ? "uitzetten" : "aanzetten"}
+            <span>
+              Jellyfin Trivia{" "}
+              {display.mediaJellyfinTriviaVisible ? "uitzetten" : "aanzetten"}
+            </span>
+            <small className="remote-action-button__hint">
+              {getRemoteTriviaAvailabilityLabel(
+                remoteTriviaAvailability,
+              ).replace("Trivia: ", "")}
+            </small>
           </button>
-
-          <span className="remote-status-pill">
-            {getRemoteTriviaAvailabilityLabel(remoteTriviaAvailability)}
-          </span>
 
           <button
             type="button"
