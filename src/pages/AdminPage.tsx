@@ -162,6 +162,123 @@ function formatLux(lux: number | null) {
   return lux === null ? "geen meting" : `${lux.toFixed(1)} lux`;
 }
 
+const TRIVIA_TIMED_EARLY_WINDOW_MS = 10000;
+const TRIVIA_UNTIMED_EDGE_MARGIN_MS = 3 * 60 * 1000;
+
+type AdminTriviaSlot = {
+  itemId: string;
+  startMs: number;
+};
+
+function getTriviaBudget(
+  kind: MediaState["kind"],
+  durationMs: number | null,
+  strongUntimedItemCount: number,
+) {
+  if (durationMs === null || durationMs <= 0) {
+    return kind === "movie" ? 5 : 1;
+  }
+
+  const durationMinutes = durationMs / 60000;
+
+  if (kind === "episode") {
+    if (durationMinutes <= 25) {
+      return strongUntimedItemCount >= 2 && durationMinutes >= 22 ? 2 : 1;
+    }
+
+    if (durationMinutes <= 44) return 2;
+    if (durationMinutes <= 64) return 3;
+    return 4;
+  }
+
+  if (durationMinutes <= 99) return 5;
+  if (durationMinutes <= 129) return 6;
+  if (durationMinutes <= 159) return 7;
+  return 8;
+}
+
+function getDeterministicJitterMs(value: string, maxJitterMs: number) {
+  let hash = 0;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash = (hash * 31 + value.charCodeAt(index)) >>> 0;
+  }
+
+  return Math.round((hash / 0xffffffff - 0.5) * maxJitterMs * 2);
+}
+
+function getUntimedTriviaWindow(durationMs: number | null) {
+  if (durationMs === null || durationMs <= TRIVIA_UNTIMED_EDGE_MARGIN_MS * 2) {
+    return null;
+  }
+
+  const startMs = Math.max(durationMs * 0.1, TRIVIA_UNTIMED_EDGE_MARGIN_MS);
+  const endMs = Math.min(
+    durationMs * 0.9,
+    durationMs - TRIVIA_UNTIMED_EDGE_MARGIN_MS,
+  );
+
+  return endMs > startMs ? { startMs, endMs } : null;
+}
+
+function buildAdminUntimedTriviaSlots(
+  items: AdminTriviaItem[],
+  durationMs: number | null,
+  kind: MediaState["kind"],
+): AdminTriviaSlot[] {
+  const window = getUntimedTriviaWindow(durationMs);
+
+  if (!window) {
+    return [];
+  }
+
+  const untimedItems = items
+    .filter((item) => item.startMs === null)
+    .sort((a, b) => b.score - a.score);
+
+  const budget = getTriviaBudget(kind, durationMs, untimedItems.length);
+  const selectedItems = untimedItems.slice(0, budget);
+
+  if (selectedItems.length === 0) {
+    return [];
+  }
+
+  const spacing = (window.endMs - window.startMs) / (selectedItems.length + 1);
+
+  return selectedItems.map((item, index) => {
+    const baseStartMs = window.startMs + spacing * (index + 1);
+    const jitterMs = getDeterministicJitterMs(
+      item.id,
+      Math.min(45000, spacing * 0.28),
+    );
+    const startMs = Math.min(
+      window.endMs,
+      Math.max(window.startMs, Math.round(baseStartMs + jitterMs)),
+    );
+
+    return { itemId: item.id, startMs };
+  });
+}
+
+function getTriviaAdminTimingLabel(
+  item: AdminTriviaItem,
+  scheduledSlots: AdminTriviaSlot[],
+) {
+  if (item.startMs !== null) {
+    return `Timestamp ${formatTriviaTime(item.startMs)} · popup vanaf ${formatTriviaTime(
+      Math.max(0, item.startMs - TRIVIA_TIMED_EARLY_WINDOW_MS),
+    )}`;
+  }
+
+  const slot = scheduledSlots.find((candidate) => candidate.itemId === item.id);
+
+  if (!slot) {
+    return "Geen timestamp · niet ingepland";
+  }
+
+  return `Geen timestamp · gepland rond ${formatTriviaTime(slot.startMs)}`;
+}
+
 function formatTriviaTime(ms: number | null) {
   if (ms === null || !Number.isFinite(ms)) {
     return "Geen timestamp";
@@ -406,6 +523,11 @@ export function AdminPage({
   const triviaData = triviaState.data;
   const triviaItems = triviaData?.items ?? [];
   const triviaTitleUrl = triviaData ? getTriviaTitleUrl(triviaData) : null;
+  const adminTriviaSlots = buildAdminUntimedTriviaSlots(
+    triviaItems,
+    media.durationMs,
+    media.kind,
+  );
 
   return (
     <main className="admin-page">
@@ -995,7 +1117,7 @@ export function AdminPage({
                     <span>{getTriviaSourceLabel(item.source)}</span>
                     <span>Score {item.score}</span>
                     <span>{item.kind}</span>
-                    <span>{formatTriviaTime(item.startMs)}</span>
+                    <span>{getTriviaAdminTimingLabel(item, adminTriviaSlots)}</span>
                     {item.helpfulVotes !== null ? (
                       <span>
                         {item.helpfulVotes}
