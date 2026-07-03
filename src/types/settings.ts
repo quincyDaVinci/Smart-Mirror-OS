@@ -19,6 +19,8 @@ export type MirrorSettings = {
   lightOffLuxThreshold: number;
   lightOnLuxThreshold: number;
   calibrationModeEnabled: boolean;
+  mediaLyricsDefaultVisible: boolean;
+  mediaJellyfinTriviaDefaultVisible: boolean;
 };
 
 export const defaultMirrorSettings: MirrorSettings = {
@@ -40,4 +42,6 @@ export const defaultMirrorSettings: MirrorSettings = {
   lightOnLuxThreshold: 20,
   lightOffLuxThreshold: 13.5,
   calibrationModeEnabled: false,
+  mediaLyricsDefaultVisible: false,
+  mediaJellyfinTriviaDefaultVisible: false,
 };

@@ -706,6 +706,49 @@ export function AdminPage({
         </AccordionSection>
 
         <AccordionSection
+          title="Media playback defaults"
+          subtitle="Bepaal wat automatisch zichtbaar wordt bij media focus"
+        >
+          <label className="admin-checkbox-row">
+            <input
+              type="checkbox"
+              checked={settings.mediaLyricsDefaultVisible}
+              onChange={(event) => {
+                onUpdateSettings({
+                  mediaLyricsDefaultVisible: event.target.checked,
+                });
+              }}
+            />
+            <span>
+              <strong>Lyrics standaard tonen bij muziek</strong>
+              <small>
+                Zet lyrics automatisch aan zodra Spotify/muziek media focus
+                krijgt.
+              </small>
+            </span>
+          </label>
+
+          <label className="admin-checkbox-row">
+            <input
+              type="checkbox"
+              checked={settings.mediaJellyfinTriviaDefaultVisible}
+              onChange={(event) => {
+                onUpdateSettings({
+                  mediaJellyfinTriviaDefaultVisible: event.target.checked,
+                });
+              }}
+            />
+            <span>
+              <strong>Jellyfin trivia standaard tonen</strong>
+              <small>
+                Zet trivia automatisch aan zodra een Jellyfin film of aflevering
+                media focus krijgt.
+              </small>
+            </span>
+          </label>
+        </AccordionSection>
+
+        <AccordionSection
           title="Display & kalibratie"
           subtitle="Rotatie, zoom, safe-area en spacing"
         >
@@ -1083,7 +1126,9 @@ export function AdminPage({
                     <span>{getTriviaSourceLabel(item.source)}</span>
                     <span>Score {item.score}</span>
                     <span>{item.kind}</span>
-                    <span>{getTriviaAdminTimingLabel(item, adminTriviaSlots)}</span>
+                    <span>
+                      {getTriviaAdminTimingLabel(item, adminTriviaSlots)}
+                    </span>
                     {item.helpfulVotes !== null ? (
                       <span>
                         {item.helpfulVotes}
@@ -1128,7 +1173,9 @@ export function AdminPage({
                     {log.source}
                   </div>
                   <div>{log.message}</div>
-                  {log.meta ? <div className="admin-log-meta">{log.meta}</div> : null}
+                  {log.meta ? (
+                    <div className="admin-log-meta">{log.meta}</div>
+                  ) : null}
                 </div>
               ))
             )}
@@ -1150,7 +1197,9 @@ export function AdminPage({
                     {log.source}
                   </div>
                   <div>{log.message}</div>
-                  {log.meta ? <div className="admin-log-meta">{log.meta}</div> : null}
+                  {log.meta ? (
+                    <div className="admin-log-meta">{log.meta}</div>
+                  ) : null}
                 </div>
               ))
             )}

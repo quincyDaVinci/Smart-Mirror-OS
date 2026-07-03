@@ -1,4 +1,5 @@
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
 
@@ -7,15 +8,17 @@ const util = require("util");
 
 const execAsync = util.promisify(exec);
 
-const STATE_FILE = path.join(__dirname, "state.json");
+const LEGACY_STATE_FILE = path.join(__dirname, "state.json");
+
+const STATE_FILE =
+  process.env.SMART_MIRROR_STATE_FILE ||
+  path.join(os.homedir(), ".local", "share", "smart-mirror-os", "state.json");
 
 const express = require("express");
 const http = require("http");
 const { WebSocketServer } = require("ws");
 const { fetchJellyfinNowPlaying } = require("./providers/jellyfinNowPlaying");
-const {
-  fetchJellyfinTriviaForMedia,
-} = require("./providers/jellyfinTrivia");
+const { fetchJellyfinTriviaForMedia } = require("./providers/jellyfinTrivia");
 const {
   fetchSpotifyNowPlaying,
   resetSpotifyAccessTokenCache,
@@ -288,6 +291,8 @@ const defaultState = {
     lightOffLuxThreshold: 13.5,
     lightOnLuxThreshold: 28,
     calibrationModeEnabled: false,
+    mediaLyricsDefaultVisible: false,
+    mediaJellyfinTriviaDefaultVisible: false,
   },
   presence: {
     mode: "idle",
@@ -408,6 +413,8 @@ function normalizeSettings(input = {}) {
     focusIdleTimeoutSeconds,
     mediaFocusExitDelaySeconds,
     calibrationModeEnabled,
+    mediaLyricsDefaultVisible,
+    mediaJellyfinTriviaDefaultVisible,
   } = input;
 
   return {
@@ -441,6 +448,16 @@ function normalizeSettings(input = {}) {
       typeof calibrationModeEnabled === "boolean"
         ? calibrationModeEnabled
         : defaultState.settings.calibrationModeEnabled,
+
+    mediaLyricsDefaultVisible:
+      typeof mediaLyricsDefaultVisible === "boolean"
+        ? mediaLyricsDefaultVisible
+        : defaultState.settings.mediaLyricsDefaultVisible,
+
+    mediaJellyfinTriviaDefaultVisible:
+      typeof mediaJellyfinTriviaDefaultVisible === "boolean"
+        ? mediaJellyfinTriviaDefaultVisible
+        : defaultState.settings.mediaJellyfinTriviaDefaultVisible,
 
     layoutPaddingPx: clampNumber(
       layoutPaddingPx,
@@ -902,36 +919,55 @@ function normalizeMediaState(mediaInput = {}) {
   };
 }
 
+function normalizeLoadedState(parsedState = {}) {
+  const baseState = structuredClone(defaultState);
+
+  return {
+    ...baseState,
+    ...parsedState,
+    layout: normalizeLayout(parsedState.layout ?? []),
+    settings: normalizeSettings(parsedState.settings ?? {}),
+    presence: {
+      ...baseState.presence,
+      ...parsedState.presence,
+    },
+    light: {
+      ...baseState.light,
+      ...parsedState.light,
+    },
+    display: normalizeDisplay(parsedState.display ?? {}),
+    deployment: {
+      ...baseState.deployment,
+      ...parsedState.deployment,
+    },
+    media: normalizeMediaState(parsedState.media ?? {}),
+  };
+}
+
 function loadState() {
+  const sourceFile = fs.existsSync(STATE_FILE)
+    ? STATE_FILE
+    : fs.existsSync(LEGACY_STATE_FILE)
+      ? LEGACY_STATE_FILE
+      : null;
+
   try {
-    if (!fs.existsSync(STATE_FILE)) {
+    if (!sourceFile) {
       return structuredClone(defaultState);
     }
 
-    const raw = fs.readFileSync(STATE_FILE, "utf-8");
+    const raw = fs.readFileSync(sourceFile, "utf-8");
     const parsedState = JSON.parse(raw);
-    const baseState = structuredClone(defaultState);
+    const normalizedState = normalizeLoadedState(parsedState);
 
-    return {
-      ...baseState,
-      ...parsedState,
-      layout: normalizeLayout(parsedState.layout ?? []),
-      settings: normalizeSettings(parsedState.settings ?? {}),
-      presence: {
-        ...baseState.presence,
-        ...parsedState.presence,
-      },
-      light: {
-        ...baseState.light,
-        ...parsedState.light,
-      },
-      display: normalizeDisplay(parsedState.display ?? {}),
-      deployment: {
-        ...baseState.deployment,
-        ...parsedState.deployment,
-      },
-      media: normalizeMediaState(parsedState.media ?? {}),
-    };
+    if (sourceFile === LEGACY_STATE_FILE && !fs.existsSync(STATE_FILE)) {
+      saveState(normalizedState);
+      console.log(
+        `[state] migrated legacy state from ${LEGACY_STATE_FILE} to ${STATE_FILE}`,
+      );
+    }
+
+    return normalizedState;
   } catch (error) {
     console.error("failed to load state, using default", error);
     return structuredClone(defaultState);
@@ -941,12 +977,18 @@ function loadState() {
 function saveState(nextState) {
   try {
     const { logs, ...persistableState } = nextState;
+    const stateDirectory = path.dirname(STATE_FILE);
+    const temporaryStateFile = `${STATE_FILE}.${process.pid}.tmp`;
+
+    fs.mkdirSync(stateDirectory, { recursive: true });
 
     fs.writeFileSync(
-      STATE_FILE,
+      temporaryStateFile,
       JSON.stringify(persistableState, null, 2),
       "utf-8",
     );
+
+    fs.renameSync(temporaryStateFile, STATE_FILE);
   } catch (error) {
     console.error("failed to save state", error);
   }
@@ -1161,6 +1203,76 @@ function getJellyfinTriviaSessionKey(mediaState) {
   ].join("\n");
 }
 
+function shouldShowMediaLyricsByDefault() {
+  return (
+    state.settings.mediaLyricsDefaultVisible === true &&
+    state.media.kind === "track" &&
+    (state.media.status === "playing" || state.media.status === "paused")
+  );
+}
+
+function getDefaultJellyfinTriviaSessionKey() {
+  const sessionKey = getJellyfinTriviaSessionKey(state.media);
+
+  if (
+    state.settings.mediaJellyfinTriviaDefaultVisible !== true ||
+    sessionKey === null
+  ) {
+    return null;
+  }
+
+  return sessionKey;
+}
+
+function applyMediaVisibilityDefaults(reason = "media:defaults") {
+  if (state.display.focusedWidgetId !== "media") {
+    return false;
+  }
+
+  const nextTriviaSessionKey = getDefaultJellyfinTriviaSessionKey();
+  const shouldShowTrivia = nextTriviaSessionKey !== null;
+  const shouldShowLyrics = shouldShowMediaLyricsByDefault();
+
+  const nextDisplay = {
+    ...state.display,
+  };
+
+  let changed = false;
+
+  if (!nextDisplay.mediaLyricsVisible && shouldShowLyrics) {
+    nextDisplay.mediaLyricsVisible = true;
+    changed = true;
+  }
+
+  if (!nextDisplay.mediaJellyfinTriviaVisible && shouldShowTrivia) {
+    nextDisplay.mediaJellyfinTriviaVisible = true;
+    nextDisplay.mediaJellyfinTriviaSessionKey = nextTriviaSessionKey;
+    changed = true;
+  }
+
+  if (!changed) {
+    return false;
+  }
+
+  state.display = {
+    ...nextDisplay,
+    reason,
+    updatedAt: Date.now(),
+  };
+
+  appendLog(
+    "info",
+    "focus",
+    "Media defaults toegepast",
+    JSON.stringify({
+      lyrics: state.display.mediaLyricsVisible,
+      jellyfinTrivia: state.display.mediaJellyfinTriviaVisible,
+    }),
+  );
+
+  return true;
+}
+
 function setFocusedWidget(
   widgetId,
   focusSource = "manual",
@@ -1178,6 +1290,17 @@ function setFocusedWidget(
   const nextFocusUntil =
     normalizedSource === "media-auto" ? null : now + getFocusIdleTimeoutMs();
 
+  const isMediaFocus = normalizedWidgetId === "media";
+  const nextTriviaSessionKey = isMediaFocus
+    ? getDefaultJellyfinTriviaSessionKey()
+    : null;
+  const currentTriviaSessionStillValid =
+    isMediaFocus &&
+    state.display.mediaJellyfinTriviaVisible &&
+    state.display.mediaJellyfinTriviaSessionKey !== null &&
+    state.display.mediaJellyfinTriviaSessionKey ===
+      getJellyfinTriviaSessionKey(state.media);
+
   const changed =
     state.display.focusedWidgetId !== normalizedWidgetId ||
     state.display.focusSource !== normalizedSource;
@@ -1193,14 +1316,16 @@ function setFocusedWidget(
     mediaAutoFocusSuppressedAt: null,
     mediaAutoFocusSuppressionSawActive: false,
     mediaLyricsVisible:
-      normalizedWidgetId === "media" ? state.display.mediaLyricsVisible : false,
+      isMediaFocus &&
+      (state.display.mediaLyricsVisible || shouldShowMediaLyricsByDefault()),
     mediaJellyfinTriviaVisible:
-      normalizedWidgetId === "media"
-        ? state.display.mediaJellyfinTriviaVisible
-        : false,
+      isMediaFocus &&
+      (currentTriviaSessionStillValid || nextTriviaSessionKey !== null),
     mediaJellyfinTriviaSessionKey:
-      normalizedWidgetId === "media"
-        ? state.display.mediaJellyfinTriviaSessionKey
+      isMediaFocus && (currentTriviaSessionStillValid || nextTriviaSessionKey)
+        ? currentTriviaSessionStillValid
+          ? state.display.mediaJellyfinTriviaSessionKey
+          : nextTriviaSessionKey
         : null,
     reason,
     updatedAt: now,
@@ -1608,6 +1733,7 @@ function updateRuntimeMedia(nextMedia) {
   const mediaReason = getMediaDisplayReason(state.media);
 
   const jellyfinTriviaChanged = syncMediaJellyfinTriviaSession();
+  const mediaDefaultsChanged = applyMediaVisibilityDefaults(mediaReason);
   const focusChanged = reconcileFocusState(mediaReason);
   const spotifyContextChanged = syncSpotifyContextKeepAwakeSession();
   const presenceChanged = syncPresenceFromEnvironment();
@@ -1617,6 +1743,7 @@ function updateRuntimeMedia(nextMedia) {
     !mediaChanged &&
     !jellyfinTriviaChanged &&
     !spotifyContextChanged &&
+    !mediaDefaultsChanged &&
     !focusChanged &&
     !presenceChanged &&
     !displayChanged
@@ -1628,6 +1755,7 @@ function updateRuntimeMedia(nextMedia) {
     focusChanged ||
     lastPlayedChanged ||
     jellyfinTriviaChanged ||
+    mediaDefaultsChanged ||
     spotifyContextChanged ||
     presenceChanged ||
     displayChanged
@@ -2535,6 +2663,7 @@ function updateSettings(partialSettings = {}) {
     JSON.stringify(partialSettings),
   );
   updateDisplayState("settings:update");
+  applyMediaVisibilityDefaults("settings:media-defaults");
 
   if (reconcileFocusState("settings:update")) {
     appendLog(

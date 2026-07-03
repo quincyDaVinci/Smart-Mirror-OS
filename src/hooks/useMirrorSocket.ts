@@ -180,6 +180,8 @@ export function useMirrorSocket() {
     lightOnLuxThreshold: 50,
     lightOffLuxThreshold: 70,
     calibrationModeEnabled: false,
+    mediaLyricsDefaultVisible: false,
+    mediaJellyfinTriviaDefaultVisible: false,
   });
   const [presence, setPresence] = useState<PresenceState>({
     mode: "idle",
