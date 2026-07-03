@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type {
+  ProviderSecretFieldInput,
   ProviderSecretFieldStatus,
   ProviderConfigStatus,
   ProviderSecretsInput,
@@ -72,13 +73,13 @@ const FIXED_PROVIDER_DEFINITIONS: Record<
         title: "User filter",
         placeholder: "Exacte Jellyfin username, bijvoorbeeld admin",
         helperText:
-          "Als dit veld gevuld is, worden alleen Jellyfin sessies van deze user meegenomen.",
+          "Privacyfilter voor gedeelde servers. Alleen activiteit van deze exacte Jellyfin user verschijnt dan op de mirror.",
       },
       deviceName: {
         title: "Device filter",
         placeholder: "Exacte Jellyfin device name, bijvoorbeeld LG_C9_Quincy",
         helperText:
-          "Als dit veld gevuld is, worden alleen Jellyfin sessies van dit device meegenomen.",
+          "Optioneel extra filter bovenop de user filter. Alleen sessies van dit exacte device worden dan meegenomen.",
       },
     },
   },
@@ -241,7 +242,7 @@ function getFixedFieldSummary(
 function buildFixedPayload(
   provider: FixedProviderId,
   fieldKey: string,
-  input: { label?: string; value?: string },
+  input: ProviderSecretFieldInput,
 ): ProviderSecretsInput {
   if (provider === "jellyfin") {
     return { jellyfin: { [fieldKey]: input } };
@@ -252,6 +253,13 @@ function buildFixedPayload(
   }
 
   return { weather: { [fieldKey]: input } };
+}
+
+function isClearableFixedField(provider: FixedProviderId, fieldKey: string) {
+  return (
+    provider === "jellyfin" &&
+    (fieldKey === "userName" || fieldKey === "deviceName")
+  );
 }
 
 export function ProviderSecretsPanel({
@@ -369,6 +377,39 @@ export function ProviderSecretsPanel({
       );
     } finally {
       setDeletingCalendarId(null);
+    }
+  }
+
+  async function handleFixedFieldClear(
+    provider: FixedProviderId,
+    fieldKey: string,
+  ) {
+    const summary = getFixedFieldSummary(configStatus, provider, fieldKey);
+
+    if (!summary || !isClearableFixedField(provider, fieldKey)) {
+      return;
+    }
+
+    setIsSaving(true);
+    setPanelError(null);
+    setPanelMessage(null);
+
+    try {
+      await onSaveSecrets(
+        buildFixedPayload(provider, fieldKey, {
+          clear: true,
+        }),
+      );
+
+      const fieldTitle =
+        FIXED_PROVIDER_DEFINITIONS[provider].fields[fieldKey]?.title ?? fieldKey;
+      setPanelMessage(`${fieldTitle} verwijderd.`);
+    } catch (saveError) {
+      setPanelError(
+        saveError instanceof Error ? saveError.message : "Verwijderen mislukt.",
+      );
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -654,6 +695,14 @@ export function ProviderSecretsPanel({
                 </p>
               ) : null}
 
+              {providerId === "jellyfin" ? (
+                <p className="provider-secrets__muted">
+                  Gebruik vooral de user filter als privacy-instelling op een
+                  gedeelde Jellyfin server. Alleen activiteit van die exacte
+                  username komt dan op de mirror terecht.
+                </p>
+              ) : null}
+
               {fields.map(({ fieldKey, fieldMeta, summary }) => (
                 <div key={`${providerId}-${fieldKey}`} className="provider-secrets__card">
                   <div className="provider-secrets__card-header">
@@ -678,6 +727,15 @@ export function ProviderSecretsPanel({
                     >
                       Edit
                     </button>
+                    {isClearableFixedField(providerId, fieldKey) ? (
+                      <button
+                        type="button"
+                        onClick={() => handleFixedFieldClear(providerId, fieldKey)}
+                        disabled={isSaving || !summary.hasValue}
+                      >
+                        Verwijder filter
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               ))}
@@ -864,6 +922,17 @@ export function ProviderSecretsPanel({
                 Value wordt nooit teruggestuurd naar de browser. Laat de value
                 leeg bij edit als je alleen het label wilt aanpassen.
               </p>
+
+              {editorState.mode === "fixed-edit" &&
+              isClearableFixedField(
+                editorState.provider,
+                editorState.fieldKey,
+              ) ? (
+                <p className="provider-secrets__field-note">
+                  Gebruik "Verwijder filter" op de kaart om deze Jellyfin
+                  filter echt leeg te maken.
+                </p>
+              ) : null}
 
               <div className="provider-secrets__actions provider-secrets__actions--split">
                 <button

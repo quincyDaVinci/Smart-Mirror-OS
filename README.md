@@ -160,10 +160,12 @@ cp server/secrets.local.example.json server/secrets.local.json
 
 Supported provider settings:
 
-- Jellyfin base URL and API key
+- Jellyfin base URL, API key, optional exact `userName` filter, and optional exact `deviceName` filter
 - Spotify client ID, client secret, refresh token, and redirect URI
 - Weather location, country code, API key, latitude, and longitude
 - Calendar feed URLs
+
+For shared Jellyfin servers, set `userName` to your own exact Jellyfin username so other users' activity never appears on the mirror. `deviceName` is an optional second exact-match filter if you also want to pin the mirror to one client device.
 
 ## Security notes
 

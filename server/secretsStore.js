@@ -28,6 +28,13 @@ const PROVIDER_FIELD_LABELS = {
 
 const FIXED_PROVIDERS = ["jellyfin", "spotify", "weather"];
 const CALENDAR_DEFAULT_ENTRY_LABEL = "Calendar feed";
+const CLEARABLE_PROVIDER_FIELDS = {
+  jellyfin: new Set(["userName", "deviceName"]),
+};
+
+function isClearableProviderField(sectionName, fieldKey) {
+  return CLEARABLE_PROVIDER_FIELDS[sectionName]?.has(fieldKey) ?? false;
+}
 
 function readSecretsFile() {
   try {
@@ -177,6 +184,19 @@ function saveProviderSection(sectionName, partialSection) {
         typeof incomingValue.value === "string"
           ? incomingValue.value.trim()
           : "";
+      const wantsClear =
+        incomingValue.clear === true &&
+        isClearableProviderField(sectionName, fieldKey);
+
+      if (wantsClear) {
+        nextSection[fieldKey] = {
+          label: nextLabel,
+          value: "",
+          updatedAt: now,
+        };
+
+        continue;
+      }
 
       nextSection[fieldKey] = {
         label: nextLabel,

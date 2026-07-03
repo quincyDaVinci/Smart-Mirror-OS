@@ -7,6 +7,7 @@ export type ProviderSecretFieldStatus = {
 export type ProviderSecretFieldInput = {
   label?: string;
   value?: string;
+  clear?: boolean;
 };
 
 export type CalendarSecretEntryStatus = {

@@ -2948,6 +2948,37 @@ app.post("/config/providers/secrets", async (req, res) => {
     return;
   }
 
+  if (jellyfinInput !== undefined) {
+    const jellyfinClearableFields = new Set(["userName", "deviceName"]);
+
+    for (const [fieldKey, fieldValue] of Object.entries(jellyfinInput)) {
+      if (
+        !fieldValue ||
+        typeof fieldValue !== "object" ||
+        Array.isArray(fieldValue) ||
+        !Object.prototype.hasOwnProperty.call(fieldValue, "clear")
+      ) {
+        continue;
+      }
+
+      if (!jellyfinClearableFields.has(fieldKey)) {
+        res.status(400).json({
+          ok: false,
+          error: `Jellyfin veld ${fieldKey} ondersteunt geen clear-operatie.`,
+        });
+        return;
+      }
+
+      if (fieldValue.clear !== true) {
+        res.status(400).json({
+          ok: false,
+          error: `Jellyfin veld ${fieldKey}.clear moet true zijn.`,
+        });
+        return;
+      }
+    }
+  }
+
   if (
     spotifyInput !== undefined &&
     (typeof spotifyInput !== "object" ||
