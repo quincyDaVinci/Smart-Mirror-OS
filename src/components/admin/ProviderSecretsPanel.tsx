@@ -630,7 +630,7 @@ export function ProviderSecretsPanel({
           const missingFields = fields.filter((item) => !item.summary.hasValue);
 
           return (
-            <details key={providerId} open className="provider-secrets__group">
+            <details key={providerId} className="provider-secrets__group">
               <summary className="provider-secrets__summary">
                 {providerDefinition.title}
               </summary>
@@ -743,7 +743,7 @@ export function ProviderSecretsPanel({
           );
         })}
 
-        <details open className="provider-secrets__group">
+        <details className="provider-secrets__group">
           <summary className="provider-secrets__summary">
             Calendar
           </summary>
