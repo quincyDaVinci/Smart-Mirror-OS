@@ -277,7 +277,7 @@ export function AnimatedAlbumArtwork({
     key: string;
     url: string | null;
   } | null>(null);
-  const [failedPlaybackUrl, setFailedPlaybackUrl] = useState<string | null>(
+  const [failedPlaybackKey, setFailedPlaybackKey] = useState<string | null>(
     null,
   );
 
@@ -318,8 +318,11 @@ export function AnimatedAlbumArtwork({
     lookupKey && resolvedArtwork?.key === lookupKey
       ? resolvedArtwork.url
       : cachedUrl;
+  const playbackKey = resolvedUrl
+    ? `${resolvedUrl}::${maxResolutionPx}`
+    : null;
   const animatedUrl =
-    resolvedUrl && failedPlaybackUrl !== resolvedUrl ? resolvedUrl : null;
+    resolvedUrl && failedPlaybackKey !== playbackKey ? resolvedUrl : null;
 
   useEffect(() => {
     const video = videoRef.current;
@@ -333,7 +336,7 @@ export function AnimatedAlbumArtwork({
 
     const failPlayback = () => {
       if (!cancelled) {
-        setFailedPlaybackUrl(animatedUrl);
+        setFailedPlaybackKey(`${animatedUrl}::${maxResolutionPx}`);
       }
     };
 
