@@ -8,6 +8,7 @@ type MirrorMediaDockProps = {
   media: MediaState;
   showLyrics?: boolean;
   lyricsUpdateIntervalMs?: number;
+  animatedArtworkMaxResolutionPx?: number;
   showJellyfinTrivia?: boolean;
   jellyfinTriviaSessionKey?: string | null;
   variant?: "compact" | "focus";
@@ -647,6 +648,7 @@ export function MirrorMediaDock({
   media,
   showLyrics = false,
   lyricsUpdateIntervalMs = 1000,
+  animatedArtworkMaxResolutionPx = 640,
   showJellyfinTrivia = false,
   jellyfinTriviaSessionKey = null,
   variant = "compact",
@@ -1533,6 +1535,7 @@ export function MirrorMediaDock({
           artist={displayMedia.subtitle}
           album={displayMedia.secondaryText}
           artworkUrl={displayMedia.artworkUrl}
+          maxResolutionPx={animatedArtworkMaxResolutionPx}
           alt={displayMedia.title}
           className="mirror-main-media__art-image"
         />
