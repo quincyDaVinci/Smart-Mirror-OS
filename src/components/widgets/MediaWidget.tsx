@@ -6,6 +6,7 @@ type MediaWidgetProps = {
   media: MediaState;
   variant?: "edge" | "focus";
   preferLastPlayed?: boolean;
+  animatedArtworkMaxResolutionPx?: number;
 };
 
 type MetaChipProps = {
@@ -286,6 +287,7 @@ export function MediaWidget({
   media,
   variant = "edge",
   preferLastPlayed = false,
+  animatedArtworkMaxResolutionPx = 640,
 }: MediaWidgetProps) {
   const [nowMs, setNowMs] = useState(0);
 
@@ -437,6 +439,7 @@ export function MediaWidget({
               artist={media.subtitle}
               album={media.secondaryText}
                   artworkUrl={media.artworkUrl}
+              maxResolutionPx={animatedArtworkMaxResolutionPx}
               alt={media.title}
               style={{
                 width: "100%",
