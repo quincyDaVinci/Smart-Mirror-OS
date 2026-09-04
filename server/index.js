@@ -119,11 +119,13 @@ const NOW_PLAYING_IDLE_POLL_INTERVAL_MS = 10000;
 const NOW_PLAYING_ACTIVE_POLL_INTERVAL_MS = 2500;
 const LYRICS_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const LYRICS_NOT_FOUND_CACHE_TTL_MS = 15 * 60 * 1000;
+const ANIMATED_ARTWORK_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const ANIMATED_ARTWORK_NOT_FOUND_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 const SPOTIFY_AUTHORIZE_URL = "https://accounts.spotify.com/authorize";
 const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
 const LRCLIB_GET_URL = "https://lrclib.net/api/get";
-const APPLE_MOTION_ARTWORK_DEBUG_URL =
+const APPLE_MOTION_ARTWORK_URL =
   "https://artwork.m8tec.top/api/v1/artwork/search";
 const SPOTIFY_SCOPES = [
   "user-read-currently-playing",
@@ -135,6 +137,8 @@ const SPOTIFY_STATE_TTL_MS = 10 * 60 * 1000;
 const pendingSpotifyStates = new Map();
 const lyricsCache = new Map();
 const lyricsPendingRequests = new Map();
+const animatedArtworkCache = new Map();
+const animatedArtworkPendingRequests = new Map();
 
 function cleanupPendingSpotifyStates() {
   const now = Date.now();
@@ -3352,23 +3356,40 @@ app.get("/state", (_req, res) => {
   res.json(state);
 });
 
-app.get("/debug/apple-motion-artwork", async (req, res) => {
-  const artist =
-    typeof req.query.artist === "string" ? req.query.artist.trim().slice(0, 180) : "";
-  const album =
-    typeof req.query.album === "string" ? req.query.album.trim().slice(0, 180) : "";
-  const title =
-    typeof req.query.title === "string" ? req.query.title.trim().slice(0, 180) : "";
+function normalizeAnimatedArtworkKeyPart(value) {
+  return typeof value === "string"
+    ? value.trim().toLowerCase().replace(/\\s+/g, " ")
+    : "";
+}
 
-  if (!artist || !album) {
-    res.status(400).json({
-      ok: false,
-      error: "artist en album zijn verplicht.",
-    });
-    return;
+function getAnimatedArtworkCacheKey(artist, album) {
+  return `${normalizeAnimatedArtworkKeyPart(artist)}::${normalizeAnimatedArtworkKeyPart(album)}`;
+}
+
+function getCachedAnimatedArtwork(key) {
+  const cached = animatedArtworkCache.get(key);
+
+  if (!cached) {
+    return null;
   }
 
-  const url = new URL(APPLE_MOTION_ARTWORK_DEBUG_URL);
+  if (Date.now() >= cached.expiresAt) {
+    animatedArtworkCache.delete(key);
+    return null;
+  }
+
+  return cached.value;
+}
+
+function setCachedAnimatedArtwork(key, value, ttlMs) {
+  animatedArtworkCache.set(key, {
+    value,
+    expiresAt: Date.now() + ttlMs,
+  });
+}
+
+async function fetchAppleMotionArtwork({ artist, album, title }) {
+  const url = new URL(APPLE_MOTION_ARTWORK_URL);
   url.searchParams.set("artist", artist);
   url.searchParams.set("album", album);
 
@@ -3384,7 +3405,7 @@ app.get("/debug/apple-motion-artwork", async (req, res) => {
       headers: {
         Accept: "application/json",
         "User-Agent":
-          "Smart-Mirror-OS/0.0.0 animated-artwork-debug (github.com/quincyDaVinci/Smart-Mirror-OS)",
+          "Smart-Mirror-OS/0.0.0 animated-artwork (github.com/quincyDaVinci/Smart-Mirror-OS)",
       },
       signal: controller.signal,
     });
@@ -3398,22 +3419,197 @@ app.get("/debug/apple-motion-artwork", async (req, res) => {
       data = raw;
     }
 
+    return {
+      responseOk: response.ok,
+      upstreamStatus: response.status,
+      data,
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+function normalizeAppleMotionArtworkResult(upstream) {
+  const data =
+    upstream.data && typeof upstream.data === "object" ? upstream.data : null;
+  const squareUrl =
+    data && typeof data.url === "string" && data.url.length > 0
+      ? data.url
+      : null;
+  const tallUrl =
+    data && typeof data.url_tall === "string" && data.url_tall.length > 0
+      ? data.url_tall
+      : null;
+  const notFound = upstream.upstreamStatus === 404 || squareUrl === null;
+
+  return {
+    ok: upstream.responseOk || notFound,
+    found: squareUrl !== null,
+    url: squareUrl,
+    urlTall: tallUrl,
+    providerArtist:
+      data && typeof data.artist === "string" ? data.artist : null,
+    providerAlbum:
+      data && typeof data.album === "string" ? data.album : null,
+    upstreamStatus: upstream.upstreamStatus,
+  };
+}
+
+async function getAnimatedArtwork({ artist, album, title }) {
+  const key = getAnimatedArtworkCacheKey(artist, album);
+  const cached = getCachedAnimatedArtwork(key);
+
+  if (cached) {
+    return {
+      ...cached,
+      cache: "hit",
+    };
+  }
+
+  const pending = animatedArtworkPendingRequests.get(key);
+
+  if (pending) {
+    const result = await pending;
+    return {
+      ...result,
+      cache: "shared-pending",
+    };
+  }
+
+  const request = (async () => {
+    const upstream = await fetchAppleMotionArtwork({ artist, album, title });
+    const result = normalizeAppleMotionArtworkResult(upstream);
+
+    if (result.ok) {
+      setCachedAnimatedArtwork(
+        key,
+        result,
+        result.found
+          ? ANIMATED_ARTWORK_CACHE_TTL_MS
+          : ANIMATED_ARTWORK_NOT_FOUND_CACHE_TTL_MS,
+      );
+    }
+
+    return result;
+  })();
+
+  animatedArtworkPendingRequests.set(key, request);
+
+  try {
+    const result = await request;
+    return {
+      ...result,
+      cache: "miss",
+    };
+  } finally {
+    animatedArtworkPendingRequests.delete(key);
+  }
+}
+
+app.get("/media/animated-artwork", async (req, res) => {
+  const artist =
+    typeof req.query.artist === "string"
+      ? req.query.artist.trim().slice(0, 180)
+      : "";
+  const album =
+    typeof req.query.album === "string"
+      ? req.query.album.trim().slice(0, 180)
+      : "";
+  const title =
+    typeof req.query.title === "string"
+      ? req.query.title.trim().slice(0, 180)
+      : "";
+
+  if (!artist || !album) {
+    res.status(400).json({
+      ok: false,
+      found: false,
+      url: null,
+      urlTall: null,
+      error: "artist en album zijn verplicht.",
+    });
+    return;
+  }
+
+  try {
+    const result = await getAnimatedArtwork({
+      artist,
+      album,
+      title: title || null,
+    });
+
+    console.log("[animated-artwork]", {
+      artist,
+      album,
+      title: title || null,
+      found: result.found,
+      upstreamStatus: result.upstreamStatus,
+      cache: result.cache,
+    });
+
+    res.status(result.ok ? 200 : 502).json(result);
+  } catch (error) {
+    const isTimeout = error?.name === "AbortError";
+
+    res.status(isTimeout ? 504 : 502).json({
+      ok: false,
+      found: false,
+      url: null,
+      urlTall: null,
+      error: isTimeout
+        ? "Animated artwork lookup duurde langer dan 15 seconden."
+        : error instanceof Error
+          ? error.message
+          : "Animated artwork lookup mislukt.",
+    });
+  }
+});
+
+app.get("/debug/apple-motion-artwork", async (req, res) => {
+  const artist =
+    typeof req.query.artist === "string"
+      ? req.query.artist.trim().slice(0, 180)
+      : "";
+  const album =
+    typeof req.query.album === "string"
+      ? req.query.album.trim().slice(0, 180)
+      : "";
+  const title =
+    typeof req.query.title === "string"
+      ? req.query.title.trim().slice(0, 180)
+      : "";
+
+  if (!artist || !album) {
+    res.status(400).json({
+      ok: false,
+      error: "artist en album zijn verplicht.",
+    });
+    return;
+  }
+
+  try {
+    const upstream = await fetchAppleMotionArtwork({
+      artist,
+      album,
+      title: title || null,
+    });
+
     console.log("[apple-motion-debug]", {
       artist,
       album,
       title: title || null,
-      upstreamStatus: response.status,
+      upstreamStatus: upstream.upstreamStatus,
     });
 
     res.json({
-      ok: response.ok,
-      upstreamStatus: response.status,
+      ok: upstream.responseOk,
+      upstreamStatus: upstream.upstreamStatus,
       query: {
         artist,
         album,
         title: title || null,
       },
-      data,
+      data: upstream.data,
     });
   } catch (error) {
     const isTimeout = error?.name === "AbortError";
@@ -3426,8 +3622,6 @@ app.get("/debug/apple-motion-artwork", async (req, res) => {
           ? error.message
           : "Animated artwork lookup mislukt.",
     });
-  } finally {
-    clearTimeout(timeoutId);
   }
 });
 
