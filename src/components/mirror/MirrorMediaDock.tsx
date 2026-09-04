@@ -679,6 +679,7 @@ export function MirrorMediaDock({
   >(null);
   const sectionRef = useRef<HTMLElement | null>(null);
   const artworkRef = useRef<HTMLDivElement | null>(null);
+  const artworkImageRef = useRef<HTMLImageElement | null>(null);
   const lyricViewportRef = useRef<HTMLDivElement | null>(null);
   const lyricLineRefs = useRef<Array<HTMLParagraphElement | null>>([]);
 
@@ -1422,24 +1423,71 @@ export function MirrorMediaDock({
   useEffect(() => {
     const section = sectionRef.current;
     const artwork = artworkRef.current;
+    const image = artworkImageRef.current;
 
     if (!section || !artwork) {
       return;
     }
 
     const syncArtworkWidth = () => {
+      const artworkRect = artwork.getBoundingClientRect();
+
+      if (
+        !image ||
+        image.naturalWidth <= 0 ||
+        image.naturalHeight <= 0
+      ) {
+        section.style.setProperty(
+          "--media-image-width",
+          `${artworkRect.width}px`,
+        );
+        return;
+      }
+
+      const imageRect = image.getBoundingClientRect();
+      const objectFit = window.getComputedStyle(image).objectFit;
+      const naturalRatio = image.naturalWidth / image.naturalHeight;
+      const boxRatio =
+        imageRect.height > 0 ? imageRect.width / imageRect.height : naturalRatio;
+
+      let renderedImageWidth = imageRect.width;
+
+      if (objectFit === "contain") {
+        renderedImageWidth =
+          naturalRatio >= boxRatio
+            ? imageRect.width
+            : imageRect.height * naturalRatio;
+      } else if (objectFit === "cover") {
+        renderedImageWidth =
+          naturalRatio >= boxRatio
+            ? imageRect.height * naturalRatio
+            : imageRect.width;
+      }
+
+      const visibleImageWidth = Math.min(
+        artworkRect.width,
+        renderedImageWidth,
+      );
+
       section.style.setProperty(
-        "--media-art-width",
-        `${artwork.getBoundingClientRect().width}px`,
+        "--media-image-width",
+        `${visibleImageWidth}px`,
       );
     };
 
     syncArtworkWidth();
 
+    image?.addEventListener("load", syncArtworkWidth);
+
     const resizeObserver = new ResizeObserver(syncArtworkWidth);
     resizeObserver.observe(artwork);
 
+    if (image) {
+      resizeObserver.observe(image);
+    }
+
     return () => {
+      image?.removeEventListener("load", syncArtworkWidth);
       resizeObserver.disconnect();
     };
   }, [variant, lyricsEnabled, displayMedia.artworkUrl]);
@@ -1484,6 +1532,7 @@ export function MirrorMediaDock({
             src={displayMedia.artworkUrl}
             alt={displayMedia.title}
             className="mirror-main-media__art-image"
+            ref={artworkImageRef}
           />
         ) : (
           <div className="mirror-main-media__art-fallback">♪</div>
