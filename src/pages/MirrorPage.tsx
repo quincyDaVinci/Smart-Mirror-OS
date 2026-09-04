@@ -643,6 +643,7 @@ export function MirrorPage({
               <MirrorMediaDock
                 media={media}
                 showLyrics={display.mediaLyricsVisible}
+                lyricsUpdateIntervalMs={settings.mediaLyricsUpdateIntervalMs}
                 showJellyfinTrivia={display.mediaJellyfinTriviaVisible}
                 jellyfinTriviaSessionKey={display.mediaJellyfinTriviaSessionKey}
                 variant="focus"
