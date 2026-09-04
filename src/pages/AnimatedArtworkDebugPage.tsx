@@ -235,7 +235,17 @@ export function AnimatedArtworkDebugPage({
     [result],
   );
 
-  const hlsUrl = urls.find((url) => /\.m3u8(?:$|\?)/i.test(url)) ?? null;
+  const squareHlsUrl =
+    result?.data &&
+    typeof result.data === "object" &&
+    "url" in result.data &&
+    typeof (result.data as { url?: unknown }).url === "string"
+      ? (result.data as { url: string }).url
+      : null;
+  const hlsUrl =
+    squareHlsUrl ??
+    urls.find((url) => /\.m3u8(?:$|\?)/i.test(url)) ??
+    null;
   const mp4Url = urls.find((url) => /\.mp4(?:$|\?)/i.test(url)) ?? null;
 
   function fillCurrentSpotifyMedia() {
