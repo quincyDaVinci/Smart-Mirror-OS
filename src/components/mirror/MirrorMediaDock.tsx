@@ -1460,7 +1460,6 @@ export function MirrorMediaDock({
           kind={displayMedia.kind}
           artist={displayMedia.subtitle}
           album={displayMedia.secondaryText}
-          title={displayMedia.title}
           artworkUrl={displayMedia.artworkUrl}
           alt={displayMedia.title}
           className="mirror-main-media__art-image"
