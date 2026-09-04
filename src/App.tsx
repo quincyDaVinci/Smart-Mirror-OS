@@ -3,6 +3,7 @@ import { useMirrorSocket } from "./hooks/useMirrorSocket";
 import { MirrorPage } from "./pages/MirrorPage";
 import { AdminPage } from "./pages/AdminPage";
 import { RemoteControlPage } from "./pages/RemoteControlPage";
+import { AnimatedArtworkDebugPage } from "./pages/AnimatedArtworkDebugPage";
 
 function App() {
   const {
@@ -105,6 +106,12 @@ function App() {
               onUpdateSettings={updateSettings}
               apiBaseUrl={apiBaseUrl}
             />
+          }
+        />
+        <Route
+          path="/debug/animated-artwork"
+          element={
+            <AnimatedArtworkDebugPage media={media} apiBaseUrl={apiBaseUrl} />
           }
         />
       </Routes>
