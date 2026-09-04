@@ -730,6 +730,29 @@ export function AdminPage({
             </small>
           </label>
 
+          <label className="admin-form-group admin-form-group--spaced">
+            Animated cover max resolutie
+            <select
+              className="admin-form-control"
+              value={settings.mediaAnimatedArtworkMaxResolutionPx}
+              onChange={(event) => {
+                onUpdateSettings({
+                  mediaAnimatedArtworkMaxResolutionPx: Number(event.target.value),
+                });
+              }}
+            >
+              <option value={360}>360×360 — laagste belasting</option>
+              <option value={640}>640×640 — standaard</option>
+              <option value={1080}>1080×1080 — scherper</option>
+              <option value={2160}>2160×2160 — zwaar / testen</option>
+            </select>
+            <small>
+              Dit is een maximum voor focus-artwork. Compact artwork blijft
+              maximaal 360×360. HLS kiest de hoogste beschikbare H.264-variant
+              onder deze limiet en kan bij frame drops terugschakelen.
+            </small>
+          </label>
+
           <label className="admin-checkbox-row admin-form-group--spaced">
             <input
               type="checkbox"
