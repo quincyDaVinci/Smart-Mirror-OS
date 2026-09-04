@@ -3358,7 +3358,7 @@ app.get("/state", (_req, res) => {
 
 function normalizeAnimatedArtworkKeyPart(value) {
   return typeof value === "string"
-    ? value.trim().toLowerCase().replace(/\\s+/g, " ")
+    ? value.trim().toLowerCase().replace(/\s+/g, " ")
     : "";
 }
 
@@ -3440,7 +3440,9 @@ function normalizeAppleMotionArtworkResult(upstream) {
     data && typeof data.url_tall === "string" && data.url_tall.length > 0
       ? data.url_tall
       : null;
-  const notFound = upstream.upstreamStatus === 404 || squareUrl === null;
+  const notFound =
+    upstream.upstreamStatus === 404 ||
+    (upstream.responseOk && squareUrl === null);
 
   return {
     ok: upstream.responseOk || notFound,
