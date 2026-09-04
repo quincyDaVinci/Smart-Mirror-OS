@@ -709,7 +709,28 @@ export function AdminPage({
           title="Media playback defaults"
           subtitle="Bepaal wat automatisch zichtbaar wordt bij media focus"
         >
-          <label className="admin-checkbox-row">
+          <label className="admin-form-group">
+            Lyrics update interval (ms)
+            <input
+              className="admin-form-control"
+              type="number"
+              min={250}
+              max={1000}
+              step={250}
+              value={settings.mediaLyricsUpdateIntervalMs}
+              onChange={(event) => {
+                onUpdateSettings({
+                  mediaLyricsUpdateIntervalMs: Number(event.target.value),
+                });
+              }}
+            />
+            <small>
+              1000 ms geeft de laagste renderbelasting; 250 ms geeft de snelste
+              lyrics-omschakeling.
+            </small>
+          </label>
+
+          <label className="admin-checkbox-row admin-form-group--spaced">
             <input
               type="checkbox"
               checked={settings.mediaLyricsDefaultVisible}
