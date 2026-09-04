@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { MediaState } from "../../types/media";
+import { AnimatedAlbumArtwork } from "../media/AnimatedAlbumArtwork";
 import { getWebSocketUrl } from "../../utils/getWebSocketUrl";
 import "./MirrorMediaDock.css";
 
@@ -1455,8 +1456,12 @@ export function MirrorMediaDock({
   const artworkBlock = (
     <div className="mirror-main-media__art">
       {displayMedia.artworkUrl ? (
-        <img
-          src={displayMedia.artworkUrl}
+        <AnimatedAlbumArtwork
+          kind={displayMedia.kind}
+          artist={displayMedia.subtitle}
+          album={displayMedia.secondaryText}
+          title={displayMedia.title}
+          artworkUrl={displayMedia.artworkUrl}
           alt={displayMedia.title}
           className="mirror-main-media__art-image"
         />
