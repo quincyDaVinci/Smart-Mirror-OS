@@ -479,7 +479,12 @@ export function MirrorPage({
 
             {showMedia ? (
               <div className="mirror-compact-media-card">
-                <MirrorMediaDock media={media} />
+                <MirrorMediaDock
+                  media={media}
+                  animatedArtworkMaxResolutionPx={
+                    settings.mediaAnimatedArtworkMaxResolutionPx
+                  }
+                />
               </div>
             ) : null}
           </section>
@@ -644,6 +649,9 @@ export function MirrorPage({
                 media={media}
                 showLyrics={display.mediaLyricsVisible}
                 lyricsUpdateIntervalMs={settings.mediaLyricsUpdateIntervalMs}
+                animatedArtworkMaxResolutionPx={
+                  settings.mediaAnimatedArtworkMaxResolutionPx
+                }
                 showJellyfinTrivia={display.mediaJellyfinTriviaVisible}
                 jellyfinTriviaSessionKey={display.mediaJellyfinTriviaSessionKey}
                 variant="focus"
