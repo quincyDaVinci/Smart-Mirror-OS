@@ -212,9 +212,9 @@
 .mirror-main-media--focus .mirror-main-media__progress-label {
   font-size: clamp(1.35rem, 2vw, 1.7rem);
   font-weight: 700;
-  color: var(--accent-green);
+  color: #62c982;
   letter-spacing: 0.02em;
-  text-shadow: 0 0 14px rgba(142, 240, 167, 0.16);
+  text-shadow: 0 0 12px rgba(98, 201, 130, 0.12);
 }
 
 .mirror-main-media--focus .mirror-main-media__progress-track {
@@ -440,7 +440,7 @@
 
 .mirror-main-media--focus.mirror-main-media--spotify
   .mirror-main-media__lyrics-line--active {
-  font-size: clamp(2.1rem, 4.6vw, 5.25rem);
+  font-size: clamp(1.79rem, 3.91vw, 4.46rem);
 }
 
 .mirror-main-media--focus.mirror-main-media--spotify:not(
@@ -735,7 +735,7 @@
   text-align: center;
   color: rgba(255, 255, 255, 0.24);
   opacity: 0.18;
-  font-size: clamp(2rem, 4.4vw, 5.1rem);
+  font-size: clamp(1.7rem, 3.74vw, 4.34rem);
   font-weight: 760;
   line-height: 1.06;
   letter-spacing: 0;
@@ -924,8 +924,8 @@
 .mirror-main-media__progress-fill {
   height: 100%;
   border-radius: 999px;
-  background: var(--accent-green);
-  box-shadow: 0 0 10px rgba(142, 240, 167, 0.2);
+  background: #62c982;
+  box-shadow: 0 0 8px rgba(98, 201, 130, 0.16);
 }
 
 .mirror-main-media__progress-finish {
@@ -1186,19 +1186,19 @@
 
   .mirror-main-media__lyrics-line {
     max-width: min(84vw, 17ch);
-    font-size: clamp(1.4rem, 4.8vw, 3.3rem);
+    font-size: clamp(1.19rem, 4.08vw, 2.81rem);
   }
 
   .mirror-main-media__lyrics-line--active {
-    font-size: clamp(2.35rem, 7.4vw, 4.9rem);
+    font-size: clamp(2rem, 6.29vw, 4.17rem);
   }
 
   .mirror-main-media__lyrics-line--edge {
-    font-size: clamp(1.45rem, 4.9vw, 3.4rem);
+    font-size: clamp(1.23rem, 4.17vw, 2.89rem);
   }
 
   .mirror-main-media__lyrics-line--near {
-    font-size: clamp(1.65rem, 5.4vw, 3.75rem);
+    font-size: clamp(1.4rem, 4.59vw, 3.19rem);
   }
 
   .mirror-main-media__lyrics-viewport {
