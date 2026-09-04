@@ -568,6 +568,57 @@ function AlbumIcon() {
   );
 }
 
+function ScrollingMetadataText({ text }: { text: string }) {
+  const viewportRef = useRef<HTMLSpanElement | null>(null);
+  const contentRef = useRef<HTMLSpanElement | null>(null);
+
+  useEffect(() => {
+    const viewport = viewportRef.current;
+    const content = contentRef.current;
+
+    if (!viewport || !content) {
+      return;
+    }
+
+    const updateOverflowState = () => {
+      const scrollDistance = Math.max(
+        0,
+        content.scrollWidth - viewport.clientWidth,
+      );
+
+      viewport.style.setProperty(
+        "--metadata-scroll-distance",
+        `${scrollDistance}px`,
+      );
+      viewport.classList.toggle(
+        "mirror-main-media__metadata-scroll--overflowing",
+        scrollDistance > 2,
+      );
+    };
+
+    updateOverflowState();
+
+    const resizeObserver = new ResizeObserver(updateOverflowState);
+    resizeObserver.observe(viewport);
+    resizeObserver.observe(content);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [text]);
+
+  return (
+    <span className="mirror-main-media__metadata-scroll" ref={viewportRef}>
+      <span
+        className="mirror-main-media__metadata-scroll-content"
+        ref={contentRef}
+      >
+        {text}
+      </span>
+    </span>
+  );
+}
+
 export function MirrorMediaDock({
   media,
   showLyrics = false,
@@ -1366,7 +1417,7 @@ export function MirrorMediaDock({
           <span className="mirror-main-media__metadata-icon">
             <ArtistIcon />
           </span>
-          <span>{displayMedia.subtitle}</span>
+          <ScrollingMetadataText text={displayMedia.subtitle} />
         </p>
 
         {displayMedia.secondaryText ? (
