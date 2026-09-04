@@ -123,6 +123,8 @@ const LYRICS_NOT_FOUND_CACHE_TTL_MS = 15 * 60 * 1000;
 const SPOTIFY_AUTHORIZE_URL = "https://accounts.spotify.com/authorize";
 const SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token";
 const LRCLIB_GET_URL = "https://lrclib.net/api/get";
+const APPLE_MOTION_ARTWORK_DEBUG_URL =
+  "https://artwork.m8tec.top/api/v1/artwork/search";
 const SPOTIFY_SCOPES = [
   "user-read-currently-playing",
   "user-read-playback-state",
@@ -3348,6 +3350,85 @@ app.get("/health", (_req, res) => {
 console.log("[boot] registering state route");
 app.get("/state", (_req, res) => {
   res.json(state);
+});
+
+app.get("/debug/apple-motion-artwork", async (req, res) => {
+  const artist =
+    typeof req.query.artist === "string" ? req.query.artist.trim().slice(0, 180) : "";
+  const album =
+    typeof req.query.album === "string" ? req.query.album.trim().slice(0, 180) : "";
+  const title =
+    typeof req.query.title === "string" ? req.query.title.trim().slice(0, 180) : "";
+
+  if (!artist || !album) {
+    res.status(400).json({
+      ok: false,
+      error: "artist en album zijn verplicht.",
+    });
+    return;
+  }
+
+  const url = new URL(APPLE_MOTION_ARTWORK_DEBUG_URL);
+  url.searchParams.set("artist", artist);
+  url.searchParams.set("album", album);
+
+  if (title) {
+    url.searchParams.set("title", title);
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        Accept: "application/json",
+        "User-Agent":
+          "Smart-Mirror-OS/0.0.0 animated-artwork-debug (github.com/quincyDaVinci/Smart-Mirror-OS)",
+      },
+      signal: controller.signal,
+    });
+
+    const raw = await response.text();
+    let data;
+
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      data = raw;
+    }
+
+    console.log("[apple-motion-debug]", {
+      artist,
+      album,
+      title: title || null,
+      upstreamStatus: response.status,
+    });
+
+    res.json({
+      ok: response.ok,
+      upstreamStatus: response.status,
+      query: {
+        artist,
+        album,
+        title: title || null,
+      },
+      data,
+    });
+  } catch (error) {
+    const isTimeout = error?.name === "AbortError";
+
+    res.status(isTimeout ? 504 : 502).json({
+      ok: false,
+      error: isTimeout
+        ? "Animated artwork lookup duurde langer dan 15 seconden."
+        : error instanceof Error
+          ? error.message
+          : "Animated artwork lookup mislukt.",
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
 });
 
 app.get("/media/lyrics", async (req, res) => {
