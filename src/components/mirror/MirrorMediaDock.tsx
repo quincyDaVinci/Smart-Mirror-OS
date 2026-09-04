@@ -1141,7 +1141,7 @@ export function MirrorMediaDock({
       return lyricLines.map((line, index) => ({ line, index }));
     }
 
-    const windowSize = 2;
+    const windowSize = 1;
     const centerIndex = visibleLyricCenterIndex ?? activeLyricIndex;
     const startIndex = Math.max(0, centerIndex - windowSize);
     const endIndex = Math.min(
@@ -1177,7 +1177,7 @@ export function MirrorMediaDock({
 
     const distance = Math.abs(activeLyricIndex - visibleLyricCenterIndex);
 
-    if (distance > 2) {
+    if (distance > 1) {
       // Seek/jump: keep the active line visible immediately.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisibleLyricCenterIndex(activeLyricIndex);
