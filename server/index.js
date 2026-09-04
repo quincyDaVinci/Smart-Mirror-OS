@@ -292,6 +292,7 @@ const defaultState = {
     lightOnLuxThreshold: 28,
     calibrationModeEnabled: false,
     mediaLyricsDefaultVisible: false,
+    mediaLyricsUpdateIntervalMs: 1000,
     mediaJellyfinTriviaDefaultVisible: false,
   },
   presence: {
@@ -414,6 +415,7 @@ function normalizeSettings(input = {}) {
     mediaFocusExitDelaySeconds,
     calibrationModeEnabled,
     mediaLyricsDefaultVisible,
+    mediaLyricsUpdateIntervalMs,
     mediaJellyfinTriviaDefaultVisible,
   } = input;
 
@@ -453,6 +455,16 @@ function normalizeSettings(input = {}) {
       typeof mediaLyricsDefaultVisible === "boolean"
         ? mediaLyricsDefaultVisible
         : defaultState.settings.mediaLyricsDefaultVisible,
+
+    mediaLyricsUpdateIntervalMs:
+      Math.round(
+        clampNumber(
+          mediaLyricsUpdateIntervalMs,
+          250,
+          1000,
+          defaultState.settings.mediaLyricsUpdateIntervalMs,
+        ) / 250,
+      ) * 250,
 
     mediaJellyfinTriviaDefaultVisible:
       typeof mediaJellyfinTriviaDefaultVisible === "boolean"
