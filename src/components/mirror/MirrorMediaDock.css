@@ -349,7 +349,18 @@
 }
 
 .mirror-main-media--focus.mirror-main-media--spotify {
+  --media-cover-progress-shift: clamp(10px, 1.5vh, 18px);
+
   align-items: center;
+}
+
+.mirror-main-media--focus.mirror-main-media--spotify .mirror-main-media__meta {
+  margin-top: calc(-1 * var(--media-cover-progress-shift));
+}
+
+.mirror-main-media--focus.mirror-main-media--spotify
+  .mirror-main-media__progress {
+  margin-bottom: var(--media-cover-progress-shift);
 }
 
 .mirror-main-media--focus.mirror-main-media--spotify .mirror-main-media__album {
@@ -673,8 +684,8 @@
   will-change: transform, opacity;
   contain: paint;
   transition:
-    color 100ms ease,
-    opacity 100ms ease,
+    color 80ms linear,
+    opacity 80ms linear,
     transform 180ms ease 100ms,
     font-size 180ms ease 100ms;
 }
@@ -790,23 +801,53 @@
 .mirror-main-media__metadata-scroll {
   --metadata-scroll-distance: 0px;
 
+  position: relative;
   display: block;
   flex: 1 1 auto;
   min-width: 0;
   max-width: 100%;
   overflow: hidden;
-  white-space: nowrap;
+}
+
+.mirror-main-media__metadata-scroll-measure {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.mirror-main-media__metadata-scroll-static {
+  display: -webkit-box;
+  overflow: hidden;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .mirror-main-media__metadata-scroll-content {
-  display: inline-block;
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
   min-width: max-content;
   transform: translateX(0);
   will-change: transform;
 }
 
 .mirror-main-media__metadata-scroll--overflowing
+  .mirror-main-media__metadata-scroll-static {
+  display: none;
+}
+
+.mirror-main-media__metadata-scroll--overflowing
   .mirror-main-media__metadata-scroll-content {
+  position: static;
+  display: inline-block;
+  visibility: visible;
   animation: metadata-scroll 12s ease-in-out infinite;
 }
 
