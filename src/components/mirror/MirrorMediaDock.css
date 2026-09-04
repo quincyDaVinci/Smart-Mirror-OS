@@ -101,6 +101,63 @@
   text-align: center;
 }
 
+.mirror-main-media--focus.mirror-main-media--spotify
+  .mirror-main-media__visual {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-end;
+  gap: clamp(6px, 0.8vh, 10px);
+  min-width: 0;
+}
+
+.mirror-main-media--focus.mirror-main-media--spotify
+  .mirror-main-media__visual
+  .mirror-main-media__progress {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  align-self: stretch;
+}
+
+.mirror-main-media--focus.mirror-main-media--spotify.mirror-main-media--lyrics
+  .mirror-main-media__visual {
+  grid-column: 1;
+  grid-row: 2;
+  align-self: start;
+  justify-self: center;
+  width: min(52vw, 36vh, 420px);
+}
+
+.mirror-main-media--focus.mirror-main-media--spotify.mirror-main-media--lyrics
+  .mirror-main-media__visual
+  .mirror-main-media__art {
+  grid-column: auto;
+  grid-row: auto;
+  width: 100%;
+  align-self: stretch;
+  justify-self: auto;
+}
+
+.mirror-main-media--focus.mirror-main-media--spotify:not(
+    .mirror-main-media--lyrics
+  ):not(.mirror-main-media--video)
+  .mirror-main-media__visual {
+  grid-row: 1;
+  align-self: end;
+  justify-self: center;
+  width: 100%;
+  transform: translateY(clamp(-16px, -2vh, -8px));
+}
+
+.mirror-main-media--focus.mirror-main-media--spotify:not(
+    .mirror-main-media--lyrics
+  ):not(.mirror-main-media--video)
+  .mirror-main-media__visual
+  .mirror-main-media__art {
+  transform: none;
+}
+
 .mirror-main-media--focus .mirror-main-media__art {
   position: relative;
   z-index: 1;
@@ -345,20 +402,7 @@
 }
 
 .mirror-main-media--focus.mirror-main-media--spotify {
-  --media-cover-progress-shift: clamp(18px, 2.4vh, 30px);
-
   align-items: center;
-}
-
-.mirror-main-media--focus.mirror-main-media--spotify .mirror-main-media__meta {
-  margin-top: calc(-1 * var(--media-cover-progress-shift));
-}
-
-.mirror-main-media--focus.mirror-main-media--spotify
-  .mirror-main-media__progress {
-  max-width: none;
-  align-self: center;
-  margin-bottom: var(--media-cover-progress-shift);
 }
 
 .mirror-main-media--focus.mirror-main-media--spotify .mirror-main-media__album {
@@ -1098,7 +1142,7 @@
   .mirror-main-media--focus.mirror-main-media--spotify:not(
       .mirror-main-media--lyrics
     ):not(.mirror-main-media--video)
-    .mirror-main-media__art {
+    .mirror-main-media__visual {
     transform: translateY(clamp(-12px, -1.4vh, -4px));
   }
 
