@@ -677,9 +677,9 @@ export function MirrorMediaDock({
   const [visibleLyricCenterIndex, setVisibleLyricCenterIndex] = useState<
     number | null
   >(null);
-  const sectionRef = useRef<HTMLElement | null>(null);
   const artworkRef = useRef<HTMLDivElement | null>(null);
   const artworkImageRef = useRef<HTMLImageElement | null>(null);
+  const progressRef = useRef<HTMLDivElement | null>(null);
   const lyricViewportRef = useRef<HTMLDivElement | null>(null);
   const lyricLineRefs = useRef<Array<HTMLParagraphElement | null>>([]);
 
@@ -1421,15 +1421,15 @@ export function MirrorMediaDock({
   ]);
 
   useEffect(() => {
-    const section = sectionRef.current;
     const artwork = artworkRef.current;
     const image = artworkImageRef.current;
+    const progress = progressRef.current;
 
-    if (!section || !artwork) {
+    if (!artwork || !progress) {
       return;
     }
 
-    const syncArtworkWidth = () => {
+    const syncProgressWidth = () => {
       const artworkRect = artwork.getBoundingClientRect();
 
       if (
@@ -1437,10 +1437,7 @@ export function MirrorMediaDock({
         image.naturalWidth <= 0 ||
         image.naturalHeight <= 0
       ) {
-        section.style.setProperty(
-          "--media-image-width",
-          `${artworkRect.width}px`,
-        );
+        progress.style.width = `${artworkRect.width}px`;
         return;
       }
 
@@ -1450,36 +1447,28 @@ export function MirrorMediaDock({
       const boxRatio =
         imageRect.height > 0 ? imageRect.width / imageRect.height : naturalRatio;
 
-      let renderedImageWidth = imageRect.width;
+      let visibleImageWidth = imageRect.width;
 
       if (objectFit === "contain") {
-        renderedImageWidth =
+        visibleImageWidth =
           naturalRatio >= boxRatio
             ? imageRect.width
             : imageRect.height * naturalRatio;
       } else if (objectFit === "cover") {
-        renderedImageWidth =
-          naturalRatio >= boxRatio
-            ? imageRect.height * naturalRatio
-            : imageRect.width;
+        visibleImageWidth = imageRect.width;
       }
 
-      const visibleImageWidth = Math.min(
+      progress.style.width = `${Math.min(
         artworkRect.width,
-        renderedImageWidth,
-      );
-
-      section.style.setProperty(
-        "--media-image-width",
-        `${visibleImageWidth}px`,
-      );
+        visibleImageWidth,
+      )}px`;
     };
 
-    syncArtworkWidth();
+    syncProgressWidth();
 
-    image?.addEventListener("load", syncArtworkWidth);
+    image?.addEventListener("load", syncProgressWidth);
 
-    const resizeObserver = new ResizeObserver(syncArtworkWidth);
+    const resizeObserver = new ResizeObserver(syncProgressWidth);
     resizeObserver.observe(artwork);
 
     if (image) {
@@ -1487,10 +1476,15 @@ export function MirrorMediaDock({
     }
 
     return () => {
-      image?.removeEventListener("load", syncArtworkWidth);
+      image?.removeEventListener("load", syncProgressWidth);
       resizeObserver.disconnect();
     };
-  }, [variant, lyricsEnabled, displayMedia.artworkUrl]);
+  }, [
+    variant,
+    lyricsEnabled,
+    displayMedia.artworkUrl,
+    displayMedia.source,
+  ]);
 
   const className = [
     "mirror-main-media",
@@ -1510,7 +1504,7 @@ export function MirrorMediaDock({
     .join(" ");
 
   const progressBlock = showProgress ? (
-    <div className="mirror-main-media__progress">
+    <div className="mirror-main-media__progress" ref={progressRef}>
       <div className="mirror-main-media__progress-track">
         <div
           className="mirror-main-media__progress-fill"
@@ -1525,7 +1519,7 @@ export function MirrorMediaDock({
   ) : null;
 
   return (
-    <section className={className} ref={sectionRef}>
+    <section className={className}>
       <div className="mirror-main-media__art" ref={artworkRef}>
         {displayMedia.artworkUrl ? (
           <img
