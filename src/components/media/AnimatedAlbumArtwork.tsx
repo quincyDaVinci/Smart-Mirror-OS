@@ -11,6 +11,7 @@ type AnimatedAlbumArtworkProps = {
   artist: string | null | undefined;
   album: string | null | undefined;
   artworkUrl: string;
+  maxResolutionPx?: number;
   alt: string;
   className?: string;
   style?: CSSProperties;
@@ -88,12 +89,19 @@ function getWindowHls() {
 function selectAnimatedArtworkLevel(
   levels: HlsLevel[],
   video: HTMLVideoElement,
+  maxResolutionPx: number,
 ) {
   if (levels.length === 0) {
     return null;
   }
 
-  const targetDimension = video.clientWidth <= 200 ? 360 : 640;
+  const safeMaxResolutionPx = Number.isFinite(maxResolutionPx)
+    ? Math.max(360, maxResolutionPx)
+    : 640;
+  const targetDimension =
+    video.clientWidth <= 200
+      ? Math.min(360, safeMaxResolutionPx)
+      : safeMaxResolutionPx;
   const indexedLevels = levels.map((level, index) => ({
     level,
     index,
@@ -258,6 +266,7 @@ export function AnimatedAlbumArtwork({
   artist,
   album,
   artworkUrl,
+  maxResolutionPx = 640,
   alt,
   className,
   style,
@@ -360,7 +369,11 @@ export function AnimatedAlbumArtwork({
               Array.isArray((data as HlsManifestParsedData).levels)
                 ? ((data as HlsManifestParsedData).levels ?? [])
                 : [];
-            const selectedLevel = selectAnimatedArtworkLevel(levels, video);
+            const selectedLevel = selectAnimatedArtworkLevel(
+              levels,
+              video,
+              maxResolutionPx,
+            );
 
             if (selectedLevel !== null) {
               hls!.autoLevelCapping = selectedLevel;
@@ -372,6 +385,7 @@ export function AnimatedAlbumArtwork({
                 height: selected?.height ?? null,
                 bitrate: selected?.bitrate ?? null,
                 codec: selected?.videoCodec ?? selected?.codecSet ?? null,
+                maxResolutionPx,
               });
             }
 
@@ -414,7 +428,7 @@ export function AnimatedAlbumArtwork({
       video.removeAttribute("src");
       video.load();
     };
-  }, [animatedUrl]);
+  }, [animatedUrl, maxResolutionPx]);
 
   if (!animatedUrl) {
     return (
