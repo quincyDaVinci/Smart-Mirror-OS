@@ -349,7 +349,7 @@
 }
 
 .mirror-main-media--focus.mirror-main-media--spotify {
-  --media-cover-progress-shift: clamp(10px, 1.5vh, 18px);
+  --media-cover-progress-shift: clamp(18px, 2.4vh, 30px);
 
   align-items: center;
 }
