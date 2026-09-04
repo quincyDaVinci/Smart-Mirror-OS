@@ -146,19 +146,20 @@ function HlsPreview({ url }: { url: string }) {
     const nativeHlsSupport =
       video.canPlayType("application/vnd.apple.mpegurl") !== "";
 
-    if (nativeHlsSupport) {
-      video.src = url;
-      setStatus("Native HLS");
-      void video.play().catch(() => {
-        setStatus("Native HLS geladen; autoplay geblokkeerd.");
-      });
+    const handlePlaying = () => {
+      setStatus(hls ? "HLS.js speelt" : "Native HLS speelt");
+    };
+    const handleLoadedData = () => {
+      setStatus(hls ? "HLS.js video geladen" : "Native HLS video geladen");
+    };
+    const handleMediaError = () => {
+      console.error("[animated-artwork:video-error]", video.error);
+      setStatus("Video-element playback error — zie browserconsole.");
+    };
 
-      return () => {
-        video.pause();
-        video.removeAttribute("src");
-        video.load();
-      };
-    }
+    video.addEventListener("playing", handlePlaying);
+    video.addEventListener("loadeddata", handleLoadedData);
+    video.addEventListener("error", handleMediaError);
 
     void loadHlsJs()
       .then((Hls) => {
@@ -166,26 +167,39 @@ function HlsPreview({ url }: { url: string }) {
           return;
         }
 
-        if (!Hls.isSupported()) {
-          setStatus("Deze browser ondersteunt geen MediaSource/HLS.js.");
+        if (Hls.isSupported()) {
+          setStatus("HLS.js initialiseren...");
+          hls = new Hls();
+          hls.loadSource(url);
+          hls.attachMedia(video);
+
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            setStatus("HLS.js manifest geladen");
+            video.muted = true;
+            void video.play().catch(() => {
+              setStatus("HLS.js geladen; klik op Play.");
+            });
+          });
+
+          hls.on(Hls.Events.ERROR, (_event, data) => {
+            console.error("[animated-artwork:hls]", data);
+            setStatus("HLS.js playback error — zie browserconsole.");
+          });
+
           return;
         }
 
-        hls = new Hls();
-        hls.loadSource(url);
-        hls.attachMedia(video);
-
-        hls.on(Hls.Events.MANIFEST_PARSED, () => {
-          setStatus("HLS manifest geladen");
+        if (nativeHlsSupport) {
+          setStatus("HLS.js niet ondersteund; native HLS fallback.");
+          video.src = url;
+          video.muted = true;
           void video.play().catch(() => {
-            setStatus("HLS geladen; autoplay geblokkeerd.");
+            setStatus("Native HLS geladen; klik op Play.");
           });
-        });
+          return;
+        }
 
-        hls.on(Hls.Events.ERROR, (_event, data) => {
-          console.error("[animated-artwork:hls]", data);
-          setStatus("HLS playback error — zie browserconsole.");
-        });
+        setStatus("Browser ondersteunt HLS.js noch native HLS.");
       })
       .catch((error) => {
         if (!cancelled) {
@@ -198,6 +212,9 @@ function HlsPreview({ url }: { url: string }) {
     return () => {
       cancelled = true;
       hls?.destroy();
+      video.removeEventListener("playing", handlePlaying);
+      video.removeEventListener("loadeddata", handleLoadedData);
+      video.removeEventListener("error", handleMediaError);
       video.pause();
       video.removeAttribute("src");
       video.load();
