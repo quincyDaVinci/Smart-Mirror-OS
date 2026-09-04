@@ -673,9 +673,10 @@
   will-change: transform, opacity;
   contain: paint;
   transition:
-    color 180ms ease,
-    opacity 180ms ease,
-    transform 220ms ease;
+    color 100ms ease,
+    opacity 100ms ease,
+    transform 180ms ease 100ms,
+    font-size 180ms ease 100ms;
 }
 
 .mirror-main-media__lyrics-line--active {
