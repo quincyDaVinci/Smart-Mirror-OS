@@ -326,10 +326,6 @@
   text-align: left;
 }
 
-.mirror-main-media--focus.mirror-main-media--lyrics .mirror-main-media__progress {
-  max-width: 100%;
-}
-
 .mirror-main-media--focus.mirror-main-media--lyrics .mirror-main-media__title {
   font-size: clamp(2rem, 3.2vw, 3rem);
   line-height: 1;
@@ -360,6 +356,9 @@
 
 .mirror-main-media--focus.mirror-main-media--spotify
   .mirror-main-media__progress {
+  width: min(var(--media-art-width, 100%), 100vw);
+  max-width: none;
+  align-self: center;
   margin-bottom: var(--media-cover-progress-shift);
 }
 
