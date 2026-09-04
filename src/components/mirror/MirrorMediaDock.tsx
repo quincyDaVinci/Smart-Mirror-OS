@@ -721,7 +721,7 @@ export function MirrorMediaDock({
 
     const intervalId = window.setInterval(() => {
       setNowMs(Date.now());
-    }, 1000);
+    }, 250);
 
     return () => {
       window.clearInterval(intervalId);
@@ -1363,6 +1363,21 @@ export function MirrorMediaDock({
     .filter(Boolean)
     .join(" ");
 
+  const progressBlock = showProgress ? (
+    <div className="mirror-main-media__progress">
+      <div className="mirror-main-media__progress-track">
+        <div
+          className="mirror-main-media__progress-fill"
+          style={{ width: `${progressPercentage}%` }}
+        />
+      </div>
+
+      <div className="mirror-main-media__progress-label">
+        <span>{progressLabel}</span>
+      </div>
+    </div>
+  ) : null;
+
   return (
     <section className={className}>
       <div className="mirror-main-media__art">
@@ -1378,6 +1393,8 @@ export function MirrorMediaDock({
       </div>
 
       <div className="mirror-main-media__meta">
+        {variant === "focus" ? progressBlock : null}
+
         {showStatusRow ? (
           <div className="mirror-main-media__status-row">
             <span
@@ -1449,20 +1466,7 @@ export function MirrorMediaDock({
           <p className="mirror-main-media__finish-time">{finishTimeLabel}</p>
         ) : null}
 
-        {showProgress ? (
-          <div className="mirror-main-media__progress">
-            <div className="mirror-main-media__progress-track">
-              <div
-                className="mirror-main-media__progress-fill"
-                style={{ width: `${progressPercentage}%` }}
-              />
-            </div>
-
-            <div className="mirror-main-media__progress-label">
-              <span>{progressLabel}</span>
-            </div>
-          </div>
-        ) : null}
+        {variant !== "focus" ? progressBlock : null}
 
         {isStoredLastPlayed && providerMessage ? (
           <p className="mirror-main-media__message">{providerMessage}</p>
