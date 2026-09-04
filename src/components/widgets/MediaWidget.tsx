@@ -436,8 +436,7 @@ export function MediaWidget({
               kind={media.kind}
               artist={media.subtitle}
               album={media.secondaryText}
-              title={media.title}
-              artworkUrl={media.artworkUrl}
+                  artworkUrl={media.artworkUrl}
               alt={media.title}
               style={{
                 width: "100%",
