@@ -3442,7 +3442,7 @@ function normalizeAppleMotionArtworkResult(upstream) {
       : null;
   const notFound =
     upstream.upstreamStatus === 404 ||
-    (upstream.responseOk && squareUrl === null);
+    (upstream.responseOk && data !== null && squareUrl === null);
 
   return {
     ok: upstream.responseOk || notFound,
