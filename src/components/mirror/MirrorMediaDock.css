@@ -335,7 +335,7 @@
 .mirror-main-media--focus.mirror-main-media--lyrics {
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows:
-    minmax(clamp(500px, 45vh, 640px), max-content)
+    minmax(clamp(380px, 36vh, 520px), max-content)
     minmax(clamp(24px, 3vh, 40px), 1fr)
     auto;
   row-gap: 0;
@@ -1125,7 +1125,7 @@
   .mirror-main-media--focus.mirror-main-media--lyrics {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows:
-      minmax(clamp(420px, 44vh, 560px), max-content)
+      minmax(clamp(340px, 34vh, 480px), max-content)
       minmax(clamp(24px, 3vh, 40px), 1fr)
       auto;
     align-content: stretch;
