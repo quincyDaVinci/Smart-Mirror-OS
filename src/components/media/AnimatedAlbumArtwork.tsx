@@ -10,7 +10,6 @@ type AnimatedAlbumArtworkProps = {
   kind: string | null;
   artist: string | null | undefined;
   album: string | null | undefined;
-  title?: string | null;
   artworkUrl: string;
   alt: string;
   className?: string;
@@ -133,12 +132,10 @@ async function lookupAnimatedArtwork({
   key,
   artist,
   album,
-  title,
 }: {
   key: string;
   artist: string;
   album: string;
-  title?: string | null;
 }) {
   if (animatedArtworkCache.has(key)) {
     return animatedArtworkCache.get(key) ?? null;
@@ -156,9 +153,6 @@ async function lookupAnimatedArtwork({
       album: album.trim(),
     });
 
-    if (title?.trim()) {
-      query.set("title", title.trim());
-    }
 
     const response = await fetch(
       `${getApiBaseUrl()}/media/animated-artwork?${query.toString()}`,
@@ -193,7 +187,6 @@ export function AnimatedAlbumArtwork({
   kind,
   artist,
   album,
-  title,
   artworkUrl,
   alt,
   className,
@@ -220,7 +213,6 @@ export function AnimatedAlbumArtwork({
       key: lookupKey,
       artist,
       album,
-      title,
     })
       .then((url) => {
         if (!cancelled) {
@@ -237,7 +229,7 @@ export function AnimatedAlbumArtwork({
     return () => {
       cancelled = true;
     };
-  }, [lookupKey, artist, album, title]);
+  }, [lookupKey, artist, album]);
 
   const cachedUrl =
     lookupKey && animatedArtworkCache.has(lookupKey)
