@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { MediaState } from "../../types/media";
 import { AnimatedAlbumArtwork } from "../media/AnimatedAlbumArtwork";
 import { getWebSocketUrl } from "../../utils/getWebSocketUrl";
@@ -681,7 +681,10 @@ export function MirrorMediaDock({
     number | null
   >(null);
   const lyricViewportRef = useRef<HTMLDivElement | null>(null);
+  const lyricTrackRef = useRef<HTMLDivElement | null>(null);
   const lyricLineRefs = useRef<Array<HTMLParagraphElement | null>>([]);
+  const lyricFlipFromTopRef = useRef<number | null>(null);
+  const lyricTrackAnimationFrameRef = useRef<number | null>(null);
 
   const previousActiveLyricIndexRef = useRef<number | null>(null);
   const previousTriviaProgressRef = useRef<number | null>(null);
@@ -1164,8 +1167,22 @@ export function MirrorMediaDock({
     visibleLyricCenterIndex,
   ]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const track = lyricTrackRef.current;
+
     if (!lyricsEnabled || activeLyricIndex < 0) {
+      lyricFlipFromTopRef.current = null;
+
+      if (lyricTrackAnimationFrameRef.current !== null) {
+        window.cancelAnimationFrame(lyricTrackAnimationFrameRef.current);
+        lyricTrackAnimationFrameRef.current = null;
+      }
+
+      if (track) {
+        track.style.transition = "none";
+        track.style.transform = "translate3d(0, 0, 0)";
+      }
+
       return;
     }
 
@@ -1176,25 +1193,80 @@ export function MirrorMediaDock({
     }
 
     if (visibleLyricCenterIndex === activeLyricIndex) {
+      const fromTop = lyricFlipFromTopRef.current;
+      lyricFlipFromTopRef.current = null;
+
+      if (fromTop === null || !track) {
+        return;
+      }
+
+      const activeLine = lyricLineRefs.current[activeLyricIndex];
+
+      if (!activeLine) {
+        return;
+      }
+
+      const toTop = activeLine.getBoundingClientRect().top;
+      const deltaY = fromTop - toTop;
+
+      if (Math.abs(deltaY) < 0.5) {
+        track.style.transition = "";
+        track.style.transform = "translate3d(0, 0, 0)";
+        return;
+      }
+
+      if (lyricTrackAnimationFrameRef.current !== null) {
+        window.cancelAnimationFrame(lyricTrackAnimationFrameRef.current);
+      }
+
+      track.style.transition = "none";
+      track.style.transform = `translate3d(0, ${deltaY}px, 0)`;
+
+      lyricTrackAnimationFrameRef.current = window.requestAnimationFrame(() => {
+        lyricTrackAnimationFrameRef.current = window.requestAnimationFrame(() => {
+          track.style.transition = "";
+          track.style.transform = "translate3d(0, 0, 0)";
+          lyricTrackAnimationFrameRef.current = null;
+        });
+      });
+
       return;
     }
 
     const distance = Math.abs(activeLyricIndex - visibleLyricCenterIndex);
 
     if (distance > 1) {
+      lyricFlipFromTopRef.current = null;
+
+      if (lyricTrackAnimationFrameRef.current !== null) {
+        window.cancelAnimationFrame(lyricTrackAnimationFrameRef.current);
+        lyricTrackAnimationFrameRef.current = null;
+      }
+
+      if (track) {
+        track.style.transition = "none";
+        track.style.transform = "translate3d(0, 0, 0)";
+      }
+
       // Seek/jump: keep the active line visible immediately.
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setVisibleLyricCenterIndex(activeLyricIndex);
       return;
     }
 
-    const timeoutId = window.setTimeout(() => {
-      setVisibleLyricCenterIndex(activeLyricIndex);
-    }, 110);
+    const activeLine = lyricLineRefs.current[activeLyricIndex];
 
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
+    if (!activeLine) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setVisibleLyricCenterIndex(activeLyricIndex);
+      return;
+    }
+
+    lyricFlipFromTopRef.current = activeLine.getBoundingClientRect().top;
+
+    // Recenter before paint, then invert the track position on the next layout pass.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setVisibleLyricCenterIndex(activeLyricIndex);
   }, [lyricsEnabled, activeLyricIndex, visibleLyricCenterIndex]);
 
   useFpsPerfLogger(lyricsEnabled);
@@ -1605,7 +1677,10 @@ export function MirrorMediaDock({
               className="mirror-main-media__lyrics-viewport"
               ref={lyricViewportRef}
             >
-              <div className="mirror-main-media__lyrics-lines">
+              <div
+                className="mirror-main-media__lyrics-lines"
+                ref={lyricTrackRef}
+              >
                 {visibleLyricLines.map(({ line, index }) => {
                   const distance =
                     activeLyricIndex >= 0
