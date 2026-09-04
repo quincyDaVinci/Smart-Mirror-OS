@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { MediaState } from "../../types/media";
+import { AnimatedAlbumArtwork } from "../media/AnimatedAlbumArtwork";
 
 type MediaWidgetProps = {
   media: MediaState;
@@ -431,8 +432,12 @@ export function MediaWidget({
               boxSizing: "border-box",
             }}
           >
-            <img
-              src={media.artworkUrl}
+            <AnimatedAlbumArtwork
+              kind={media.kind}
+              artist={media.subtitle}
+              album={media.secondaryText}
+              title={media.title}
+              artworkUrl={media.artworkUrl}
               alt={media.title}
               style={{
                 width: "100%",
