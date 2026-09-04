@@ -10,12 +10,15 @@ type AnimatedArtworkDebugPageProps = {
 type DebugResponse = {
   ok?: boolean;
   upstreamStatus?: number;
+  httpStatus?: number;
+  contentType?: string;
   query?: {
     artist?: string;
     album?: string;
     title?: string;
   };
   data?: unknown;
+  rawResponse?: string;
   error?: string;
 };
 
@@ -105,9 +108,29 @@ export function AnimatedArtworkDebugPage({
         `${apiBaseUrl}/debug/apple-motion-artwork?${query.toString()}`,
         { cache: "no-store" },
       );
-      const payload = (await response.json()) as DebugResponse;
+      const rawResponse = await response.text();
+      const contentType = response.headers.get("content-type") ?? "";
 
-      setResult(payload);
+      let payload: DebugResponse;
+
+      try {
+        payload = JSON.parse(rawResponse) as DebugResponse;
+      } catch {
+        payload = {
+          ok: false,
+          httpStatus: response.status,
+          contentType,
+          rawResponse,
+          error:
+            "Backend gaf geen JSON terug. Controleer of de nieuwste backend draait.",
+        };
+      }
+
+      setResult({
+        ...payload,
+        httpStatus: response.status,
+        contentType,
+      });
     } catch (error) {
       setResult({
         ok: false,
@@ -145,6 +168,28 @@ export function AnimatedArtworkDebugPage({
             disabled={!canUseCurrentSpotify}
           >
             Vul huidige Spotify track
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setArtist("Linkin Park");
+              setAlbum("Living Things");
+              setTitle("");
+            }}
+          >
+            Test: Linkin Park — Living Things
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setArtist("Phoebe Bridgers");
+              setAlbum("Punisher");
+              setTitle("Kyoto");
+            }}
+          >
+            Test: Phoebe Bridgers — Punisher
           </button>
         </div>
 
@@ -195,6 +240,14 @@ export function AnimatedArtworkDebugPage({
                 <dd>{String(result.ok === true)}</dd>
               </div>
               <div>
+                <dt>Backend HTTP</dt>
+                <dd>{result.httpStatus ?? "-"}</dd>
+              </div>
+              <div>
+                <dt>Content-Type</dt>
+                <dd>{result.contentType || "-"}</dd>
+              </div>
+              <div>
                 <dt>Upstream status</dt>
                 <dd>{result.upstreamStatus ?? "-"}</dd>
               </div>
@@ -243,8 +296,10 @@ export function AnimatedArtworkDebugPage({
           </section>
 
           <section className="animated-artwork-debug__panel">
-            <h2>Ruwe JSON</h2>
-            <pre>{JSON.stringify(result, null, 2)}</pre>
+            <h2>Ruwe response</h2>
+            <pre>
+              {result.rawResponse ?? JSON.stringify(result, null, 2)}
+            </pre>
           </section>
         </>
       ) : null}
