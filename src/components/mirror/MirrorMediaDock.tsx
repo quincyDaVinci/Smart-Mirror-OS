@@ -570,29 +570,39 @@ function AlbumIcon() {
 
 function ScrollingMetadataText({ text }: { text: string }) {
   const viewportRef = useRef<HTMLSpanElement | null>(null);
+  const measureRef = useRef<HTMLSpanElement | null>(null);
   const contentRef = useRef<HTMLSpanElement | null>(null);
 
   useEffect(() => {
     const viewport = viewportRef.current;
+    const measure = measureRef.current;
     const content = contentRef.current;
 
-    if (!viewport || !content) {
+    if (!viewport || !measure || !content) {
       return;
     }
 
     const updateOverflowState = () => {
-      const scrollDistance = Math.max(
-        0,
-        content.scrollWidth - viewport.clientWidth,
+      const styles = window.getComputedStyle(measure);
+      const fontSize = Number.parseFloat(styles.fontSize) || 16;
+      const parsedLineHeight = Number.parseFloat(styles.lineHeight);
+      const lineHeight = Number.isFinite(parsedLineHeight)
+        ? parsedLineHeight
+        : fontSize * 1.2;
+      const exceedsTwoLines = measure.scrollHeight > lineHeight * 2 + 2;
+
+      viewport.classList.toggle(
+        "mirror-main-media__metadata-scroll--overflowing",
+        exceedsTwoLines,
       );
+
+      const scrollDistance = exceedsTwoLines
+        ? Math.max(0, content.scrollWidth - viewport.clientWidth)
+        : 0;
 
       viewport.style.setProperty(
         "--metadata-scroll-distance",
         `${scrollDistance}px`,
-      );
-      viewport.classList.toggle(
-        "mirror-main-media__metadata-scroll--overflowing",
-        scrollDistance > 2,
       );
     };
 
@@ -600,6 +610,7 @@ function ScrollingMetadataText({ text }: { text: string }) {
 
     const resizeObserver = new ResizeObserver(updateOverflowState);
     resizeObserver.observe(viewport);
+    resizeObserver.observe(measure);
     resizeObserver.observe(content);
 
     return () => {
@@ -610,8 +621,19 @@ function ScrollingMetadataText({ text }: { text: string }) {
   return (
     <span className="mirror-main-media__metadata-scroll" ref={viewportRef}>
       <span
+        className="mirror-main-media__metadata-scroll-measure"
+        ref={measureRef}
+        aria-hidden
+      >
+        {text}
+      </span>
+
+      <span className="mirror-main-media__metadata-scroll-static">{text}</span>
+
+      <span
         className="mirror-main-media__metadata-scroll-content"
         ref={contentRef}
+        aria-hidden
       >
         {text}
       </span>
@@ -652,6 +674,9 @@ export function MirrorMediaDock({
   const [progressAnchor, setProgressAnchor] = useState<ProgressAnchor | null>(
     null,
   );
+  const [visibleLyricCenterIndex, setVisibleLyricCenterIndex] = useState<
+    number | null
+  >(null);
   const lyricViewportRef = useRef<HTMLDivElement | null>(null);
   const lyricLineRefs = useRef<Array<HTMLParagraphElement | null>>([]);
 
@@ -719,14 +744,21 @@ export function MirrorMediaDock({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setNowMs(Date.now());
 
+    const tickIntervalMs = lyricsEnabled ? 250 : 1000;
     const intervalId = window.setInterval(() => {
       setNowMs(Date.now());
-    }, 250);
+    }, tickIntervalMs);
 
     return () => {
       window.clearInterval(intervalId);
     };
-  }, [hasLiveMedia, media.progressMs, media.lastUpdatedAt, media.status]);
+  }, [
+    hasLiveMedia,
+    lyricsEnabled,
+    media.progressMs,
+    media.lastUpdatedAt,
+    media.status,
+  ]);
 
   useEffect(() => {
     const incomingProgressMs = media.progressMs;
@@ -1110,17 +1142,56 @@ export function MirrorMediaDock({
     }
 
     const windowSize = 2;
-    const startIndex = Math.max(0, activeLyricIndex - windowSize);
+    const centerIndex = visibleLyricCenterIndex ?? activeLyricIndex;
+    const startIndex = Math.max(0, centerIndex - windowSize);
     const endIndex = Math.min(
       lyricLines.length,
-      activeLyricIndex + windowSize + 1,
+      centerIndex + windowSize + 1,
     );
 
     return lyricLines.slice(startIndex, endIndex).map((line, offset) => ({
       line,
       index: startIndex + offset,
     }));
-  }, [hasLyricLines, lyricLines, activeLyricIndex]);
+  }, [
+    hasLyricLines,
+    lyricLines,
+    activeLyricIndex,
+    visibleLyricCenterIndex,
+  ]);
+
+  useEffect(() => {
+    if (!lyricsEnabled || activeLyricIndex < 0) {
+      return;
+    }
+
+    if (visibleLyricCenterIndex === null) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setVisibleLyricCenterIndex(activeLyricIndex);
+      return;
+    }
+
+    if (visibleLyricCenterIndex === activeLyricIndex) {
+      return;
+    }
+
+    const distance = Math.abs(activeLyricIndex - visibleLyricCenterIndex);
+
+    if (distance > 2) {
+      // Seek/jump: keep the active line visible immediately.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setVisibleLyricCenterIndex(activeLyricIndex);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setVisibleLyricCenterIndex(activeLyricIndex);
+    }, 110);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [lyricsEnabled, activeLyricIndex, visibleLyricCenterIndex]);
 
   useFpsPerfLogger(lyricsEnabled);
 
