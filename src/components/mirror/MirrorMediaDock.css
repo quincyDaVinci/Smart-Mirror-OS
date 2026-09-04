@@ -336,7 +336,7 @@
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows:
     minmax(clamp(500px, 45vh, 640px), max-content)
-    minmax(0, 1fr)
+    minmax(clamp(24px, 3vh, 40px), 1fr)
     auto;
   row-gap: 0;
   align-content: stretch;
@@ -1126,7 +1126,7 @@
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows:
       minmax(clamp(420px, 44vh, 560px), max-content)
-      minmax(0, 1fr)
+      minmax(clamp(24px, 3vh, 40px), 1fr)
       auto;
     align-content: stretch;
     max-width: none;
