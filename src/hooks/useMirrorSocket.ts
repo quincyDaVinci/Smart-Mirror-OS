@@ -182,6 +182,7 @@ export function useMirrorSocket() {
     calibrationModeEnabled: false,
     mediaLyricsDefaultVisible: false,
     mediaLyricsUpdateIntervalMs: 1000,
+    mediaAnimatedArtworkMaxResolutionPx: 640,
     mediaJellyfinTriviaDefaultVisible: false,
   });
   const [presence, setPresence] = useState<PresenceState>({
