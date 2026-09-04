@@ -88,6 +88,10 @@
   border-radius: 8px;
 }
 
+.mirror-main-media__content-stack {
+  display: contents;
+}
+
 .mirror-main-media--focus {
   position: relative;
   display: grid;
@@ -122,10 +126,7 @@
 
 .mirror-main-media--focus.mirror-main-media--spotify.mirror-main-media--lyrics
   .mirror-main-media__visual {
-  grid-column: 1;
-  grid-row: 2;
-  align-self: start;
-  justify-self: center;
+  align-self: center;
   width: min(52vw, 36vh, 420px);
 }
 
@@ -335,13 +336,26 @@
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows:
     minmax(clamp(500px, 45vh, 640px), max-content)
-    auto
+    minmax(0, 1fr)
     auto;
-  row-gap: clamp(22px, 3vh, 40px);
-  align-content: start;
+  row-gap: 0;
+  align-content: stretch;
   align-items: stretch;
   justify-items: center;
   text-align: center;
+}
+
+.mirror-main-media--focus.mirror-main-media--spotify.mirror-main-media--lyrics
+  .mirror-main-media__content-stack {
+  grid-column: 1;
+  grid-row: 3;
+  align-self: end;
+  justify-self: stretch;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(22px, 3vh, 40px);
 }
 
 .mirror-main-media--focus.mirror-main-media--lyrics .mirror-main-media__art {
@@ -376,11 +390,8 @@
 }
 
 .mirror-main-media--focus.mirror-main-media--lyrics .mirror-main-media__meta {
-  grid-column: 1;
-  grid-row: 3;
-  align-self: start;
+  align-self: center;
   align-items: flex-start;
-  justify-self: center;
   width: min(74vw, 560px);
   max-width: 100%;
   padding-bottom: 0;
@@ -1115,25 +1126,19 @@
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows:
       minmax(clamp(420px, 44vh, 560px), max-content)
-      auto
+      minmax(0, 1fr)
       auto;
-    align-content: start;
+    align-content: stretch;
     max-width: none;
     text-align: center;
   }
 
   .mirror-main-media--focus.mirror-main-media--lyrics .mirror-main-media__art {
-    grid-column: 1;
-    grid-row: 2;
     width: min(52vw, 36vh, 420px);
-    align-self: start;
-    justify-self: center;
   }
 
   .mirror-main-media--focus.mirror-main-media--lyrics .mirror-main-media__meta {
-    grid-column: 1;
-    grid-row: 3;
-    align-self: start;
+    align-self: center;
     align-items: flex-start;
     width: min(74vw, 560px);
     max-width: 100%;
