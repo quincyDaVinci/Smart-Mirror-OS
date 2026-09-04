@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { MediaState } from "../types/media";
 import "./AnimatedArtworkDebugPage.css";
 
@@ -63,6 +63,163 @@ function getUrlKind(url: string) {
   return "URL";
 }
 
+type HlsInstance = {
+  loadSource: (url: string) => void;
+  attachMedia: (media: HTMLMediaElement) => void;
+  destroy: () => void;
+  on: (event: string, callback: (_event: string, data: unknown) => void) => void;
+};
+
+type HlsConstructor = {
+  new (): HlsInstance;
+  isSupported: () => boolean;
+  Events: {
+    MANIFEST_PARSED: string;
+    ERROR: string;
+  };
+};
+
+declare global {
+  interface Window {
+    Hls?: HlsConstructor;
+  }
+}
+
+function loadHlsJs(): Promise<HlsConstructor> {
+  if (window.Hls) {
+    return Promise.resolve(window.Hls);
+  }
+
+  return new Promise((resolve, reject) => {
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      'script[data-smart-mirror-hls="true"]',
+    );
+
+    if (existingScript) {
+      existingScript.addEventListener("load", () => {
+        if (window.Hls) {
+          resolve(window.Hls);
+        } else {
+          reject(new Error("HLS.js script geladen, maar window.Hls ontbreekt."));
+        }
+      });
+      existingScript.addEventListener("error", () => {
+        reject(new Error("HLS.js script kon niet geladen worden."));
+      });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js";
+    script.async = true;
+    script.dataset.smartMirrorHls = "true";
+
+    script.addEventListener("load", () => {
+      if (window.Hls) {
+        resolve(window.Hls);
+      } else {
+        reject(new Error("HLS.js script geladen, maar window.Hls ontbreekt."));
+      }
+    });
+    script.addEventListener("error", () => {
+      reject(new Error("HLS.js script kon niet geladen worden."));
+    });
+
+    document.head.appendChild(script);
+  });
+}
+
+function HlsPreview({ url }: { url: string }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [status, setStatus] = useState("HLS initialiseren...");
+
+  useEffect(() => {
+    const video = videoRef.current;
+
+    if (!video) {
+      return;
+    }
+
+    let hls: HlsInstance | null = null;
+    let cancelled = false;
+
+    const nativeHlsSupport =
+      video.canPlayType("application/vnd.apple.mpegurl") !== "";
+
+    if (nativeHlsSupport) {
+      video.src = url;
+      setStatus("Native HLS");
+      void video.play().catch(() => {
+        setStatus("Native HLS geladen; autoplay geblokkeerd.");
+      });
+
+      return () => {
+        video.pause();
+        video.removeAttribute("src");
+        video.load();
+      };
+    }
+
+    void loadHlsJs()
+      .then((Hls) => {
+        if (cancelled) {
+          return;
+        }
+
+        if (!Hls.isSupported()) {
+          setStatus("Deze browser ondersteunt geen MediaSource/HLS.js.");
+          return;
+        }
+
+        hls = new Hls();
+        hls.loadSource(url);
+        hls.attachMedia(video);
+
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          setStatus("HLS manifest geladen");
+          void video.play().catch(() => {
+            setStatus("HLS geladen; autoplay geblokkeerd.");
+          });
+        });
+
+        hls.on(Hls.Events.ERROR, (_event, data) => {
+          console.error("[animated-artwork:hls]", data);
+          setStatus("HLS playback error — zie browserconsole.");
+        });
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setStatus(
+            error instanceof Error ? error.message : "HLS.js laden mislukt.",
+          );
+        }
+      });
+
+    return () => {
+      cancelled = true;
+      hls?.destroy();
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+    };
+  }, [url]);
+
+  return (
+    <div>
+      <p className="animated-artwork-debug__playback-status">{status}</p>
+      <video
+        ref={videoRef}
+        className="animated-artwork-debug__video"
+        autoPlay
+        muted
+        loop
+        controls
+        playsInline
+      />
+    </div>
+  );
+}
+
 export function AnimatedArtworkDebugPage({
   media,
   apiBaseUrl,
@@ -78,6 +235,7 @@ export function AnimatedArtworkDebugPage({
     [result],
   );
 
+  const hlsUrl = urls.find((url) => /\.m3u8(?:$|\?)/i.test(url)) ?? null;
   const mp4Url = urls.find((url) => /\.mp4(?:$|\?)/i.test(url)) ?? null;
 
   function fillCurrentSpotifyMedia() {
@@ -261,6 +419,13 @@ export function AnimatedArtworkDebugPage({
               <p className="animated-artwork-debug__error">{result.error}</p>
             ) : null}
           </section>
+
+          {hlsUrl ? (
+            <section className="animated-artwork-debug__panel">
+              <h2>Square HLS motion preview</h2>
+              <HlsPreview url={hlsUrl} />
+            </section>
+          ) : null}
 
           {mp4Url ? (
             <section className="animated-artwork-debug__panel">
