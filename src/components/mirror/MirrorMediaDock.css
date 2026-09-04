@@ -29,7 +29,7 @@
 
 .mirror-main-media--compact .mirror-main-media__artist,
 .mirror-main-media--compact .mirror-main-media__album {
-  font-size: 0.84rem;
+  font-size: calc(0.84rem + 0.3rem);
   line-height: 1.2;
   justify-content: flex-start;
 }
@@ -56,7 +56,7 @@
 }
 
 .mirror-main-media--compact .mirror-main-media__progress-label {
-  font-size: 0.72rem;
+  font-size: calc(0.72rem + 0.3rem);
 }
 
 .mirror-main-media--compact .mirror-main-media__status-pill {
@@ -121,12 +121,12 @@
 }
 
 .mirror-main-media--focus .mirror-main-media__artist {
-  font-size: clamp(1.28rem, 2.25vw, 1.95rem);
+  font-size: calc(clamp(1.28rem, 2.25vw, 1.95rem) + 0.3rem);
   color: rgba(255, 255, 255, 0.92);
 }
 
 .mirror-main-media--focus .mirror-main-media__album {
-  font-size: clamp(1.02rem, 1.6vw, 1.32rem);
+  font-size: calc(clamp(1.02rem, 1.6vw, 1.32rem) + 0.3rem);
   color: rgba(255, 255, 255, 0.72);
 }
 
@@ -152,7 +152,7 @@
 }
 
 .mirror-main-media--focus .mirror-main-media__progress-label {
-  font-size: 0.9rem;
+  font-size: calc(0.9rem + 0.3rem);
 }
 
 .mirror-main-media--focus .mirror-main-media__progress-track {
@@ -203,12 +203,12 @@
 }
 
 .mirror-main-media--focus.mirror-main-media--jellyfin .mirror-main-media__artist {
-  font-size: clamp(1.18rem, 2vw, 1.82rem);
+  font-size: calc(clamp(1.18rem, 2vw, 1.82rem) + 0.3rem);
   color: rgba(255, 255, 255, 0.9);
 }
 
 .mirror-main-media--focus.mirror-main-media--jellyfin .mirror-main-media__album {
-  font-size: clamp(1rem, 1.62vw, 1.32rem);
+  font-size: calc(clamp(1rem, 1.62vw, 1.32rem) + 0.3rem);
   color: rgba(255, 255, 255, 0.68);
 }
 
@@ -260,8 +260,8 @@
 
 .mirror-main-media--focus.mirror-main-media--jellyfin .mirror-main-media__progress-label {
   justify-content: flex-start;
-  font-size: 1rem;
-  color: rgba(255, 255, 255, 0.78);
+  font-size: calc(1rem + 0.3rem);
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .mirror-main-media--focus.mirror-main-media--jellyfin .mirror-main-media__title {
@@ -300,12 +300,12 @@
 }
 
 .mirror-main-media--focus.mirror-main-media--lyrics .mirror-main-media__artist {
-  font-size: clamp(1.16rem, 1.95vw, 1.6rem);
+  font-size: calc(clamp(1.16rem, 1.95vw, 1.6rem) + 0.3rem);
   color: rgba(255, 255, 255, 0.9);
 }
 
 .mirror-main-media--focus.mirror-main-media--lyrics .mirror-main-media__album {
-  font-size: clamp(0.98rem, 1.34vw, 1.18rem);
+  font-size: calc(clamp(0.98rem, 1.34vw, 1.18rem) + 0.3rem);
   color: rgba(255, 255, 255, 0.72);
 }
 
@@ -353,12 +353,12 @@
 }
 
 .mirror-main-media--focus.mirror-main-media--spotify .mirror-main-media__album {
-  font-size: clamp(1.08rem, 1.75vw, 1.42rem);
+  font-size: calc(clamp(1.08rem, 1.75vw, 1.42rem) + 0.3rem);
   color: rgba(255, 255, 255, 0.84);
 }
 
 .mirror-main-media--focus.mirror-main-media--spotify .mirror-main-media__artist {
-  font-size: clamp(1.38rem, 2.45vw, 2.05rem);
+  font-size: calc(clamp(1.38rem, 2.45vw, 2.05rem) + 0.3rem);
   color: rgba(255, 255, 255, 0.96);
 }
 
@@ -420,7 +420,7 @@
 
 .mirror-main-media--focus.mirror-main-media--video .mirror-main-media__artist {
   color: rgba(255, 255, 255, 0.82);
-  font-size: clamp(1.05rem, 1.6vw, 1.42rem);
+  font-size: calc(clamp(1.05rem, 1.6vw, 1.42rem) + 0.3rem);
 }
 
 .mirror-main-media--focus.mirror-main-media--video .mirror-main-media__detail-pill {
@@ -502,7 +502,7 @@
 
 .mirror-main-media__album {
   margin: 0;
-  font-size: 0.94rem;
+  font-size: calc(0.94rem + 0.3rem);
   color: var(--text-secondary);
   overflow-wrap: anywhere;
 }
@@ -537,7 +537,7 @@
 
 .mirror-main-media__artist {
   margin: 0;
-  font-size: 1.02rem;
+  font-size: calc(1.02rem + 0.3rem);
   color: var(--text-primary);
   overflow-wrap: anywhere;
 }
@@ -781,7 +781,32 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
+  width: 100%;
   max-width: 100%;
+  min-width: 0;
+}
+
+.mirror-main-media__metadata-scroll {
+  --metadata-scroll-distance: 0px;
+
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.mirror-main-media__metadata-scroll-content {
+  display: inline-block;
+  min-width: max-content;
+  transform: translateX(0);
+  will-change: transform;
+}
+
+.mirror-main-media__metadata-scroll--overflowing
+  .mirror-main-media__metadata-scroll-content {
+  animation: metadata-scroll 12s ease-in-out infinite;
 }
 
 .mirror-main-media__progress {
@@ -795,7 +820,8 @@
 .mirror-main-media__progress-fill {
   height: 100%;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
+  background: var(--accent-green);
+  box-shadow: 0 0 10px rgba(142, 240, 167, 0.2);
 }
 
 .mirror-main-media__progress-finish {
@@ -807,9 +833,10 @@
   align-items: center;
   justify-content: center;
   gap: 16px;
-  font-size: 0.78rem;
-  color: var(--text-tertiary);
-  letter-spacing: 0.06em;
+  font-size: calc(0.78rem + 0.3rem);
+  color: rgba(255, 255, 255, 0.82);
+  letter-spacing: 0.04em;
+  font-variant-numeric: tabular-nums;
 }
 
 .mirror-main-media__progress-track {
@@ -817,7 +844,7 @@
   height: 4px;
   border-radius: 999px;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.24);
 }
 
 .mirror-main-media__status-pill {
@@ -922,6 +949,22 @@
 
 .mirror-main-media--poster .mirror-main-media__art {
   aspect-ratio: 2 / 3;
+}
+
+@keyframes metadata-scroll {
+  0%,
+  14% {
+    transform: translateX(0);
+  }
+
+  72%,
+  86% {
+    transform: translateX(calc(-1 * var(--metadata-scroll-distance)));
+  }
+
+  100% {
+    transform: translateX(0);
+  }
 }
 
 @keyframes trivia-pop {
