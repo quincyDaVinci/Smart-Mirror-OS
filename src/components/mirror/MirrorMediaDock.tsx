@@ -1413,22 +1413,22 @@ export function MirrorMediaDock({
 
         <div className="mirror-main-media__title-row">
           <h2 className="mirror-main-media__title">{displayMedia.title}</h2>
-        </div>
 
-        {showSpotifyLikedIcon ? (
-          <span
-            className={[
-              "mirror-main-media__liked",
-              displayMedia.isLiked === true
-                ? "mirror-main-media__liked--filled"
-                : "mirror-main-media__liked--outline",
-            ].join(" ")}
-            aria-label={displayMedia.isLiked ? "Geliked" : "Niet geliked"}
-            title={displayMedia.isLiked ? "Geliked" : "Niet geliked"}
-          >
-            <HeartIcon />
-          </span>
-        ) : null}
+          {showSpotifyLikedIcon ? (
+            <span
+              className={[
+                "mirror-main-media__liked",
+                displayMedia.isLiked === true
+                  ? "mirror-main-media__liked--filled"
+                  : "mirror-main-media__liked--outline",
+              ].join(" ")}
+              aria-label={displayMedia.isLiked ? "Geliked" : "Niet geliked"}
+              title={displayMedia.isLiked ? "Geliked" : "Niet geliked"}
+            >
+              <HeartIcon />
+            </span>
+          ) : null}
+        </div>
 
         <p className="mirror-main-media__artist mirror-main-media__metadata-line">
           <span className="mirror-main-media__metadata-icon">
