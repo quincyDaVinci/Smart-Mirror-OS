@@ -6,6 +6,7 @@ import "./MirrorMediaDock.css";
 type MirrorMediaDockProps = {
   media: MediaState;
   showLyrics?: boolean;
+  lyricsUpdateIntervalMs?: number;
   showJellyfinTrivia?: boolean;
   jellyfinTriviaSessionKey?: string | null;
   variant?: "compact" | "focus";
@@ -644,6 +645,7 @@ function ScrollingMetadataText({ text }: { text: string }) {
 export function MirrorMediaDock({
   media,
   showLyrics = false,
+  lyricsUpdateIntervalMs = 1000,
   showJellyfinTrivia = false,
   jellyfinTriviaSessionKey = null,
   variant = "compact",
@@ -886,7 +888,7 @@ export function MirrorMediaDock({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setNowMs(Date.now());
 
-    const tickIntervalMs = lyricsEnabled ? 250 : 1000;
+    const tickIntervalMs = lyricsEnabled ? lyricsUpdateIntervalMs : 1000;
     const intervalId = window.setInterval(() => {
       setNowMs(Date.now());
     }, tickIntervalMs);
@@ -897,6 +899,7 @@ export function MirrorMediaDock({
   }, [
     hasLiveMedia,
     lyricsEnabled,
+    lyricsUpdateIntervalMs,
     media.progressMs,
     media.lastUpdatedAt,
     media.status,
