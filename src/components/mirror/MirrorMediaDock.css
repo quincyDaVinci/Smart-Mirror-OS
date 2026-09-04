@@ -127,7 +127,7 @@
 .mirror-main-media--focus.mirror-main-media--spotify.mirror-main-media--lyrics
   .mirror-main-media__visual {
   align-self: center;
-  width: min(64vw, 42vh, 560px);
+  width: min(70vw, 46vh, 620px);
 }
 
 .mirror-main-media--focus.mirror-main-media--spotify.mirror-main-media--lyrics
@@ -363,7 +363,7 @@
   grid-row: 2;
   align-self: start;
   justify-self: center;
-  width: min(64vw, 42vh, 560px);
+  width: min(70vw, 46vh, 620px);
   height: auto;
   border-radius: clamp(14px, 1.8vw, 24px);
   box-shadow: 0 28px 70px rgba(0, 0, 0, 0.42);
@@ -1135,7 +1135,7 @@
   }
 
   .mirror-main-media--focus.mirror-main-media--lyrics .mirror-main-media__art {
-    width: min(64vw, 42vh, 560px);
+    width: min(70vw, 46vh, 620px);
   }
 
   .mirror-main-media--focus.mirror-main-media--lyrics .mirror-main-media__meta {
