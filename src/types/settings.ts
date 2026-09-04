@@ -21,6 +21,7 @@ export type MirrorSettings = {
   calibrationModeEnabled: boolean;
   mediaLyricsDefaultVisible: boolean;
   mediaLyricsUpdateIntervalMs: number;
+  mediaAnimatedArtworkMaxResolutionPx: number;
   mediaJellyfinTriviaDefaultVisible: boolean;
 };
 
@@ -45,5 +46,6 @@ export const defaultMirrorSettings: MirrorSettings = {
   calibrationModeEnabled: false,
   mediaLyricsDefaultVisible: false,
   mediaLyricsUpdateIntervalMs: 1000,
+  mediaAnimatedArtworkMaxResolutionPx: 640,
   mediaJellyfinTriviaDefaultVisible: false,
 };
