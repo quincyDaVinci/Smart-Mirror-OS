@@ -111,7 +111,7 @@
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-end;
-  gap: clamp(6px, 0.8vh, 10px);
+  gap: clamp(20px, 2.2vh, 28px);
   min-width: 0;
 }
 
@@ -127,7 +127,7 @@
 .mirror-main-media--focus.mirror-main-media--spotify.mirror-main-media--lyrics
   .mirror-main-media__visual {
   align-self: center;
-  width: min(70vw, 46vh, 620px);
+  width: min(80.5vw, 52.9vh, 713px);
 }
 
 .mirror-main-media--focus.mirror-main-media--spotify.mirror-main-media--lyrics
@@ -210,7 +210,11 @@
 }
 
 .mirror-main-media--focus .mirror-main-media__progress-label {
-  font-size: calc(0.9rem + 0.3rem);
+  font-size: clamp(1.35rem, 2vw, 1.7rem);
+  font-weight: 700;
+  color: var(--accent-green);
+  letter-spacing: 0.02em;
+  text-shadow: 0 0 14px rgba(142, 240, 167, 0.16);
 }
 
 .mirror-main-media--focus .mirror-main-media__progress-track {
@@ -363,7 +367,7 @@
   grid-row: 2;
   align-self: start;
   justify-self: center;
-  width: min(70vw, 46vh, 620px);
+  width: min(80.5vw, 52.9vh, 713px);
   height: auto;
   border-radius: clamp(14px, 1.8vw, 24px);
   box-shadow: 0 28px 70px rgba(0, 0, 0, 0.42);
@@ -421,7 +425,7 @@
 }
 
 .mirror-main-media--focus.mirror-main-media--spotify .mirror-main-media__album {
-  font-size: calc(clamp(1.08rem, 1.75vw, 1.42rem) + 0.3rem);
+  font-size: calc(clamp(1.38rem, 2.45vw, 2.05rem) + 0.3rem - 3px);
   color: rgba(255, 255, 255, 0.84);
 }
 
@@ -711,7 +715,7 @@
   align-self: stretch;
   justify-self: stretch;
   min-height: 0;
-  padding: 0;
+  padding: 20px 0 0;
   mask-image: linear-gradient(
     180deg,
     transparent,
@@ -1135,7 +1139,7 @@
   }
 
   .mirror-main-media--focus.mirror-main-media--lyrics .mirror-main-media__art {
-    width: min(70vw, 46vh, 620px);
+    width: min(80.5vw, 52.9vh, 713px);
   }
 
   .mirror-main-media--focus.mirror-main-media--lyrics .mirror-main-media__meta {
