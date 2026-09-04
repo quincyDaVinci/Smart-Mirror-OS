@@ -677,9 +677,6 @@ export function MirrorMediaDock({
   const [visibleLyricCenterIndex, setVisibleLyricCenterIndex] = useState<
     number | null
   >(null);
-  const artworkRef = useRef<HTMLDivElement | null>(null);
-  const artworkImageRef = useRef<HTMLImageElement | null>(null);
-  const progressRef = useRef<HTMLDivElement | null>(null);
   const lyricViewportRef = useRef<HTMLDivElement | null>(null);
   const lyricLineRefs = useRef<Array<HTMLParagraphElement | null>>([]);
 
@@ -1420,72 +1417,6 @@ export function MirrorMediaDock({
     shownTriviaIds,
   ]);
 
-  useEffect(() => {
-    const artwork = artworkRef.current;
-    const image = artworkImageRef.current;
-    const progress = progressRef.current;
-
-    if (!artwork || !progress) {
-      return;
-    }
-
-    const syncProgressWidth = () => {
-      const artworkRect = artwork.getBoundingClientRect();
-
-      if (
-        !image ||
-        image.naturalWidth <= 0 ||
-        image.naturalHeight <= 0
-      ) {
-        progress.style.width = `${artworkRect.width}px`;
-        return;
-      }
-
-      const imageRect = image.getBoundingClientRect();
-      const objectFit = window.getComputedStyle(image).objectFit;
-      const naturalRatio = image.naturalWidth / image.naturalHeight;
-      const boxRatio =
-        imageRect.height > 0 ? imageRect.width / imageRect.height : naturalRatio;
-
-      let visibleImageWidth = imageRect.width;
-
-      if (objectFit === "contain") {
-        visibleImageWidth =
-          naturalRatio >= boxRatio
-            ? imageRect.width
-            : imageRect.height * naturalRatio;
-      } else if (objectFit === "cover") {
-        visibleImageWidth = imageRect.width;
-      }
-
-      progress.style.width = `${Math.min(
-        artworkRect.width,
-        visibleImageWidth,
-      )}px`;
-    };
-
-    syncProgressWidth();
-
-    image?.addEventListener("load", syncProgressWidth);
-
-    const resizeObserver = new ResizeObserver(syncProgressWidth);
-    resizeObserver.observe(artwork);
-
-    if (image) {
-      resizeObserver.observe(image);
-    }
-
-    return () => {
-      image?.removeEventListener("load", syncProgressWidth);
-      resizeObserver.disconnect();
-    };
-  }, [
-    variant,
-    lyricsEnabled,
-    displayMedia.artworkUrl,
-    displayMedia.source,
-  ]);
-
   const className = [
     "mirror-main-media",
     `mirror-main-media--${variant}`,
@@ -1504,7 +1435,7 @@ export function MirrorMediaDock({
     .join(" ");
 
   const progressBlock = showProgress ? (
-    <div className="mirror-main-media__progress" ref={progressRef}>
+    <div className="mirror-main-media__progress">
       <div className="mirror-main-media__progress-track">
         <div
           className="mirror-main-media__progress-fill"
@@ -1518,23 +1449,39 @@ export function MirrorMediaDock({
     </div>
   ) : null;
 
+  const artworkBlock = (
+    <div className="mirror-main-media__art">
+      {displayMedia.artworkUrl ? (
+        <img
+          src={displayMedia.artworkUrl}
+          alt={displayMedia.title}
+          className="mirror-main-media__art-image"
+        />
+      ) : (
+        <div className="mirror-main-media__art-fallback">♪</div>
+      )}
+    </div>
+  );
+
+  const progressWithArtwork =
+    variant === "focus" &&
+    displayMedia.source === "spotify" &&
+    displayMedia.kind === "track" &&
+    !isVideo;
+
   return (
     <section className={className}>
-      <div className="mirror-main-media__art" ref={artworkRef}>
-        {displayMedia.artworkUrl ? (
-          <img
-            src={displayMedia.artworkUrl}
-            alt={displayMedia.title}
-            className="mirror-main-media__art-image"
-            ref={artworkImageRef}
-          />
-        ) : (
-          <div className="mirror-main-media__art-fallback">♪</div>
-        )}
-      </div>
+      {progressWithArtwork ? (
+        <div className="mirror-main-media__visual">
+          {artworkBlock}
+          {progressBlock}
+        </div>
+      ) : (
+        artworkBlock
+      )}
 
       <div className="mirror-main-media__meta">
-        {variant === "focus" ? progressBlock : null}
+        {variant === "focus" && !progressWithArtwork ? progressBlock : null}
 
         {showStatusRow ? (
           <div className="mirror-main-media__status-row">
