@@ -20,6 +20,7 @@ export type MirrorSettings = {
   lightOnLuxThreshold: number;
   calibrationModeEnabled: boolean;
   mediaLyricsDefaultVisible: boolean;
+  mediaLyricsUpdateIntervalMs: number;
   mediaJellyfinTriviaDefaultVisible: boolean;
 };
 
@@ -43,5 +44,6 @@ export const defaultMirrorSettings: MirrorSettings = {
   lightOffLuxThreshold: 13.5,
   calibrationModeEnabled: false,
   mediaLyricsDefaultVisible: false,
+  mediaLyricsUpdateIntervalMs: 1000,
   mediaJellyfinTriviaDefaultVisible: false,
 };
