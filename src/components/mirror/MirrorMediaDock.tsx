@@ -1471,16 +1471,17 @@ export function MirrorMediaDock({
 
   return (
     <section className={className}>
-      {progressWithArtwork ? (
-        <div className="mirror-main-media__visual">
-          {artworkBlock}
-          {progressBlock}
-        </div>
-      ) : (
-        artworkBlock
-      )}
+      <div className="mirror-main-media__content-stack">
+        {progressWithArtwork ? (
+          <div className="mirror-main-media__visual">
+            {artworkBlock}
+            {progressBlock}
+          </div>
+        ) : (
+          artworkBlock
+        )}
 
-      <div className="mirror-main-media__meta">
+        <div className="mirror-main-media__meta">
         {variant === "focus" && !progressWithArtwork ? progressBlock : null}
 
         {showStatusRow ? (
@@ -1559,6 +1560,7 @@ export function MirrorMediaDock({
         {isStoredLastPlayed && providerMessage ? (
           <p className="mirror-main-media__message">{providerMessage}</p>
         ) : null}
+        </div>
       </div>
 
       {lyricsEnabled ? (
