@@ -677,6 +677,8 @@ export function MirrorMediaDock({
   const [visibleLyricCenterIndex, setVisibleLyricCenterIndex] = useState<
     number | null
   >(null);
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const artworkRef = useRef<HTMLDivElement | null>(null);
   const lyricViewportRef = useRef<HTMLDivElement | null>(null);
   const lyricLineRefs = useRef<Array<HTMLParagraphElement | null>>([]);
 
@@ -1417,6 +1419,31 @@ export function MirrorMediaDock({
     shownTriviaIds,
   ]);
 
+  useEffect(() => {
+    const section = sectionRef.current;
+    const artwork = artworkRef.current;
+
+    if (!section || !artwork) {
+      return;
+    }
+
+    const syncArtworkWidth = () => {
+      section.style.setProperty(
+        "--media-art-width",
+        `${artwork.getBoundingClientRect().width}px`,
+      );
+    };
+
+    syncArtworkWidth();
+
+    const resizeObserver = new ResizeObserver(syncArtworkWidth);
+    resizeObserver.observe(artwork);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [variant, lyricsEnabled, displayMedia.artworkUrl]);
+
   const className = [
     "mirror-main-media",
     `mirror-main-media--${variant}`,
@@ -1450,8 +1477,8 @@ export function MirrorMediaDock({
   ) : null;
 
   return (
-    <section className={className}>
-      <div className="mirror-main-media__art">
+    <section className={className} ref={sectionRef}>
+      <div className="mirror-main-media__art" ref={artworkRef}>
         {displayMedia.artworkUrl ? (
           <img
             src={displayMedia.artworkUrl}
