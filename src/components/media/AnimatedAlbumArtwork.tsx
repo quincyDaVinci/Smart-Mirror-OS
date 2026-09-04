@@ -82,7 +82,7 @@ function loadHlsJs(): Promise<HlsConstructor> {
     return hlsScriptPromise;
   }
 
-  hlsScriptPromise = new Promise((resolve, reject) => {
+  hlsScriptPromise = new Promise<HlsConstructor>((resolve, reject) => {
     const existingScript = document.querySelector<HTMLScriptElement>(
       'script[data-smart-mirror-hls="true"]',
     );
