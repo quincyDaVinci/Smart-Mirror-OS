@@ -356,7 +356,7 @@
 
 .mirror-main-media--focus.mirror-main-media--spotify
   .mirror-main-media__progress {
-  width: min(var(--media-art-width, 100%), 100vw);
+  width: min(var(--media-image-width, 100%), 100vw);
   max-width: none;
   align-self: center;
   margin-bottom: var(--media-cover-progress-shift);
