@@ -22,10 +22,24 @@ type AnimatedArtworkResponse = {
   url?: string | null;
 };
 
+type HlsLevel = {
+  width?: number;
+  height?: number;
+  bitrate?: number;
+  videoCodec?: string;
+  codecSet?: string;
+};
+
+type HlsManifestParsedData = {
+  levels?: HlsLevel[];
+};
+
 type HlsInstance = {
   loadSource: (url: string) => void;
   attachMedia: (media: HTMLMediaElement) => void;
   destroy: () => void;
+  autoLevelCapping: number;
+  nextLoadLevel: number;
   on: (
     event: string,
     callback: (_event: string, data: unknown) => void,
@@ -33,7 +47,7 @@ type HlsInstance = {
 };
 
 type HlsConstructor = {
-  new (): HlsInstance;
+  new (config?: Record<string, unknown>): HlsInstance;
   isSupported: () => boolean;
   Events: {
     MANIFEST_PARSED: string;
@@ -69,6 +83,62 @@ function getLookupKey(
 
 function getWindowHls() {
   return (window as Window & { Hls?: HlsConstructor }).Hls;
+}
+
+function selectAnimatedArtworkLevel(
+  levels: HlsLevel[],
+  video: HTMLVideoElement,
+) {
+  if (levels.length === 0) {
+    return null;
+  }
+
+  const targetDimension = video.clientWidth <= 200 ? 360 : 640;
+  const indexedLevels = levels.map((level, index) => ({
+    level,
+    index,
+    dimension: Math.max(level.width ?? 0, level.height ?? 0),
+    codec: `${level.videoCodec ?? ""} ${level.codecSet ?? ""}`.toLowerCase(),
+  }));
+
+  const h264Levels = indexedLevels.filter(({ codec }) =>
+    codec.includes("avc1"),
+  );
+  const candidates = h264Levels.length > 0 ? h264Levels : indexedLevels;
+
+  const withinTarget = candidates.filter(
+    ({ dimension }) => dimension > 0 && dimension <= targetDimension,
+  );
+
+  if (withinTarget.length > 0) {
+    return withinTarget.reduce((best, candidate) => {
+      if (candidate.dimension !== best.dimension) {
+        return candidate.dimension > best.dimension ? candidate : best;
+      }
+
+      return (candidate.level.bitrate ?? 0) > (best.level.bitrate ?? 0)
+        ? candidate
+        : best;
+    }).index;
+  }
+
+  return candidates.reduce((best, candidate) => {
+    const bestDimension =
+      best.dimension > 0 ? best.dimension : Number.POSITIVE_INFINITY;
+    const candidateDimension =
+      candidate.dimension > 0
+        ? candidate.dimension
+        : Number.POSITIVE_INFINITY;
+
+    if (candidateDimension !== bestDimension) {
+      return candidateDimension < bestDimension ? candidate : best;
+    }
+
+    return (candidate.level.bitrate ?? Number.POSITIVE_INFINITY) <
+      (best.level.bitrate ?? Number.POSITIVE_INFINITY)
+      ? candidate
+      : best;
+  }).index;
 }
 
 function loadHlsJs(): Promise<HlsConstructor> {
@@ -272,11 +342,39 @@ export function AnimatedAlbumArtwork({
         }
 
         if (Hls.isSupported()) {
-          hls = new Hls();
+          hls = new Hls({
+            startLevel: 0,
+            capLevelToPlayerSize: true,
+            capLevelOnFPSDrop: true,
+            fpsDroppedMonitoringPeriod: 2000,
+            fpsDroppedMonitoringThreshold: 0.1,
+          });
           hls.loadSource(animatedUrl);
           hls.attachMedia(video);
 
-          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          hls.on(Hls.Events.MANIFEST_PARSED, (_event, data) => {
+            const levels =
+              typeof data === "object" &&
+              data !== null &&
+              "levels" in data &&
+              Array.isArray((data as HlsManifestParsedData).levels)
+                ? ((data as HlsManifestParsedData).levels ?? [])
+                : [];
+            const selectedLevel = selectAnimatedArtworkLevel(levels, video);
+
+            if (selectedLevel !== null) {
+              hls!.autoLevelCapping = selectedLevel;
+              hls!.nextLoadLevel = selectedLevel;
+
+              const selected = levels[selectedLevel];
+              console.info("[animated-artwork:quality]", {
+                width: selected?.width ?? null,
+                height: selected?.height ?? null,
+                bitrate: selected?.bitrate ?? null,
+                codec: selected?.videoCodec ?? selected?.codecSet ?? null,
+              });
+            }
+
             video.muted = true;
             void video.play().catch(failPlayback);
           });
