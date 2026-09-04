@@ -737,30 +737,6 @@ export function MirrorMediaDock({
   const isStaleLastPlayed = isStoredLastPlayed || isPausedRecentlyPlayed;
 
   useEffect(() => {
-    if (!hasLiveMedia) {
-      return;
-    }
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setNowMs(Date.now());
-
-    const tickIntervalMs = lyricsEnabled ? 250 : 1000;
-    const intervalId = window.setInterval(() => {
-      setNowMs(Date.now());
-    }, tickIntervalMs);
-
-    return () => {
-      window.clearInterval(intervalId);
-    };
-  }, [
-    hasLiveMedia,
-    lyricsEnabled,
-    media.progressMs,
-    media.lastUpdatedAt,
-    media.status,
-  ]);
-
-  useEffect(() => {
     const incomingProgressMs = media.progressMs;
     const now = Date.now();
 
@@ -901,6 +877,30 @@ export function MirrorMediaDock({
   ].join("\n");
   const lyricsEnabled =
     requestedLyricsEnabled && lyricsSuppressedKey !== lyricsQueryKey;
+
+  useEffect(() => {
+    if (!hasLiveMedia) {
+      return;
+    }
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setNowMs(Date.now());
+
+    const tickIntervalMs = lyricsEnabled ? 250 : 1000;
+    const intervalId = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, tickIntervalMs);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [
+    hasLiveMedia,
+    lyricsEnabled,
+    media.progressMs,
+    media.lastUpdatedAt,
+    media.status,
+  ]);
   const showSpotifyLikedIcon =
     displayMedia.source === "spotify" && displayMedia.kind === "track";
   const requestedJellyfinTriviaEnabled =
