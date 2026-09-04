@@ -747,8 +747,7 @@
   transition:
     color 80ms linear,
     opacity 80ms linear,
-    transform 180ms ease 100ms,
-    font-size 180ms ease 100ms;
+    transform 180ms ease 100ms;
 }
 
 .mirror-main-media__lyrics-line--active {
