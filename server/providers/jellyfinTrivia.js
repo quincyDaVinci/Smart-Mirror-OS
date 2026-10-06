@@ -51,7 +51,8 @@ function setCachedEntry(cache, key, value, ttlMs) {
 
 function isJellyfinVideoMedia(media) {
   return (
-    media?.source === "jellyfin" &&
+    (media?.source === "jellyfin" ||
+      (media?.source === "dune" && Boolean(media.sourceItemId))) &&
     (media.kind === "movie" || media.kind === "episode") &&
     (media.status === "playing" || media.status === "paused")
   );
@@ -995,7 +996,7 @@ async function fetchJellyfinTriviaForMedia({ media, sessionKey }) {
       sourceUrls: [],
       errorCode: null,
       items: [],
-      message: "Geen actieve Jellyfin video voor trivia.",
+      message: "Geen actieve Jellyfin- of Dune-video voor trivia.",
     };
   }
 
