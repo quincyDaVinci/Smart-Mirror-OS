@@ -715,6 +715,12 @@ export function ProviderSecretsPanel({
                   <div className="provider-secrets__status">
                     Label: {summary.label}
                   </div>
+                  {providerId === "jellyfin" &&
+                  (fieldKey === "userName" || fieldKey === "deviceName") ? (
+                    <div className="provider-secrets__status">
+                      Huidige waarde: {summary.value || "niet ingevuld"}
+                    </div>
+                  ) : null}
                   <div className="provider-secrets__meta">
                     Laatst bijgewerkt: {formatUpdatedAt(summary.updatedAt)}
                   </div>
@@ -919,8 +925,9 @@ export function ProviderSecretsPanel({
               </label>
 
               <p className="provider-secrets__field-note">
-                Value wordt nooit teruggestuurd naar de browser. Laat de value
-                leeg bij edit als je alleen het label wilt aanpassen.
+                API-keys en tokens worden nooit teruggestuurd naar de browser.
+                Alleen de Jellyfin User en Device Filter zijn zichtbaar in Admin.
+                Laat het veld leeg bij edit om de bestaande waarde te behouden.
               </p>
 
               {editorState.mode === "fixed-edit" &&
