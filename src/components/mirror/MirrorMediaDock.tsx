@@ -502,6 +502,10 @@ function getProviderMessage(media: MediaState, source: MediaState["source"]) {
     return media.sourceState.jellyfin.message;
   }
 
+  if (source === "dune") {
+    return media.sourceState.dune.message;
+  }
+
   return null;
 }
 
@@ -835,7 +839,8 @@ export function MirrorMediaDock({
 
   const showProgress = !isStaleLastPlayed && progressLabel !== null;
   const isPosterArtwork =
-    displayMedia.source === "jellyfin" &&
+    (displayMedia.source === "jellyfin" ||
+      displayMedia.source === "dune") &&
     (displayMedia.kind === "movie" || displayMedia.kind === "episode");
   const isVideo =
     displayMedia.kind === "movie" || displayMedia.kind === "episode";
@@ -917,7 +922,7 @@ export function MirrorMediaDock({
     showJellyfinTrivia &&
     jellyfinTriviaSessionKey !== null &&
     hasLiveMedia &&
-    media.source === "jellyfin" &&
+    (media.source === "jellyfin" || media.source === "dune") &&
     (media.kind === "movie" || media.kind === "episode") &&
     (media.status === "playing" || media.status === "paused");
   const jellyfinTriviaMediaKey = getTriviaMediaKey(media);
@@ -1500,7 +1505,7 @@ export function MirrorMediaDock({
     `mirror-main-media--${variant}`,
     displayMedia.source === "spotify"
       ? "mirror-main-media--spotify"
-      : displayMedia.source === "jellyfin"
+      : displayMedia.source === "jellyfin" || displayMedia.source === "dune"
         ? "mirror-main-media--jellyfin"
         : "",
     isPosterArtwork ? "mirror-main-media--poster" : "mirror-main-media--cover",
