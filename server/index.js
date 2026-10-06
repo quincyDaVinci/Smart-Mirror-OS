@@ -18,6 +18,7 @@ const express = require("express");
 const http = require("http");
 const { WebSocketServer } = require("ws");
 const { fetchJellyfinNowPlaying } = require("./providers/jellyfinNowPlaying");
+const { fetchDuneNowPlaying } = require("./providers/duneNowPlaying");
 const { fetchJellyfinTriviaForMedia } = require("./providers/jellyfinTrivia");
 const {
   fetchSpotifyNowPlaying,
@@ -250,7 +251,7 @@ const WIDGET_DEFAULT_EDGE_POSITIONS = {
 const FOCUS_SOURCES = ["manual", "media-auto"];
 const MEDIA_STATUSES = ["idle", "playing", "paused", "error"];
 const MEDIA_KINDS = ["movie", "episode", "track", "podcast", "unknown"];
-const MEDIA_SOURCES = ["jellyfin", "spotify"];
+const MEDIA_SOURCES = ["jellyfin", "spotify", "dune"];
 
 function isWidgetId(value) {
   return typeof value === "string" && WIDGET_IDS.includes(value);
@@ -383,6 +384,12 @@ const defaultState = {
         lastCheckedAt: null,
       },
       spotify: {
+        enabled: true,
+        status: "idle",
+        message: null,
+        lastCheckedAt: null,
+      },
+      dune: {
         enabled: true,
         status: "idle",
         message: null,
@@ -881,6 +888,11 @@ function normalizeMediaState(mediaInput = {}) {
       ? mediaInput.sourceState.spotify
       : undefined;
 
+  const duneInput =
+    mediaInput.sourceState && typeof mediaInput.sourceState === "object"
+      ? mediaInput.sourceState.dune
+      : undefined;
+
   return {
     ...defaultState.media,
     status: normalizeMediaStatus(mediaInput.status),
@@ -940,6 +952,10 @@ function normalizeMediaState(mediaInput = {}) {
       spotify: normalizeProviderRuntimeStatus(
         spotifyInput,
         defaultState.media.sourceState.spotify,
+      ),
+      dune: normalizeProviderRuntimeStatus(
+        duneInput,
+        defaultState.media.sourceState.dune,
       ),
     },
   };
@@ -1197,12 +1213,17 @@ function shouldRefreshLastPlayedSnapshot(previousSnapshot, nextMedia) {
 }
 
 function isMediaPlayableSource(mediaState) {
-  return mediaState.source === "jellyfin" || mediaState.source === "spotify";
+  return (
+    mediaState.source === "jellyfin" ||
+    mediaState.source === "spotify" ||
+    mediaState.source === "dune"
+  );
 }
 
 function isJellyfinTriviaEligible(mediaState) {
   return (
-    mediaState.source === "jellyfin" &&
+    (mediaState.source === "jellyfin" ||
+      (mediaState.source === "dune" && Boolean(mediaState.sourceItemId))) &&
     (mediaState.kind === "movie" || mediaState.kind === "episode") &&
     (mediaState.status === "playing" || mediaState.status === "paused")
   );
@@ -1797,19 +1818,25 @@ function buildResolvedMedia({
   jellyfinStatus,
   spotifyMedia,
   spotifyStatus,
+  duneMedia,
+  duneStatus,
 }) {
   const sourceState = {
     ...defaultState.media.sourceState,
     jellyfin: jellyfinStatus,
     spotify: spotifyStatus,
+    dune: duneStatus,
   };
 
+  // Dune takes priority while playing or paused.
   const resolvedMedia =
-    jellyfinMedia?.status === "playing"
-      ? jellyfinMedia
-      : spotifyMedia?.status === "playing"
-        ? spotifyMedia
-        : (jellyfinMedia ?? spotifyMedia);
+    duneMedia?.status === "playing" || duneMedia?.status === "paused"
+      ? duneMedia
+      : jellyfinMedia?.status === "playing"
+        ? jellyfinMedia
+        : spotifyMedia?.status === "playing"
+          ? spotifyMedia
+          : (jellyfinMedia ?? spotifyMedia);
 
   if (resolvedMedia) {
     return {
@@ -2119,6 +2146,7 @@ async function fetchLyricsFromLrclib({
 async function pollNowPlayingProviders() {
   let jellyfinResult;
   let spotifyResult;
+  let duneResult;
 
   try {
     jellyfinResult = await fetchJellyfinNowPlaying();
@@ -2142,6 +2170,16 @@ async function pollNowPlayingProviders() {
     };
   }
 
+  try {
+    duneResult = await fetchDuneNowPlaying();
+  } catch (error) {
+    console.error("failed to poll Dune now playing", error);
+    duneResult = {
+      media: null,
+      providerStatus: buildProviderErrorStatus("Dune polling mislukt."),
+    };
+  }
+
   if (
     !spotifyResult.media &&
     shouldKeepPreviousSpotifyMedia(spotifyResult.providerStatus)
@@ -2157,6 +2195,8 @@ async function pollNowPlayingProviders() {
     jellyfinStatus: jellyfinResult.providerStatus,
     spotifyMedia: spotifyResult.media,
     spotifyStatus: spotifyResult.providerStatus,
+    duneMedia: duneResult.media,
+    duneStatus: duneResult.providerStatus,
   });
 
   updateRuntimeMedia(nextMedia);
@@ -2413,7 +2453,7 @@ function markPresenceActive() {
 
 function isJellyfinVideoPlaying(media) {
   return (
-    media.source === "jellyfin" &&
+    (media.source === "jellyfin" || media.source === "dune") &&
     media.status === "playing" &&
     (media.kind === "movie" || media.kind === "episode")
   );
@@ -2483,15 +2523,17 @@ function getDisplayKeepAwakeReason() {
   }
 
   if (state.light.mode === "context" && isJellyfinVideoPlaying(state.media)) {
+    const player = state.media.source === "dune" ? "Dune" : "Jellyfin";
+
     if (state.media.kind === "movie") {
-      return "Jellyfin film speelt in context-zone";
+      return player + " film speelt in context-zone";
     }
 
     if (state.media.kind === "episode") {
-      return "Jellyfin aflevering speelt in context-zone";
+      return player + " aflevering speelt in context-zone";
     }
 
-    return "Jellyfin video speelt in context-zone";
+    return player + " video speelt in context-zone";
   }
 
   if (
