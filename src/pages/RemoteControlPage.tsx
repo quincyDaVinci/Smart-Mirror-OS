@@ -40,7 +40,7 @@ type FocusButtonDefinition = {
 const focusButtons: FocusButtonDefinition[] = [
   { id: "clock", label: "Klok", subtitle: "Tijd en datum" },
   { id: "weather", label: "Weer", subtitle: "Temperatuur en locatie" },
-  { id: "media", label: "Media", subtitle: "Jellyfin en Spotify" },
+  { id: "media", label: "Media", subtitle: "Jellyfin, Dune en Spotify" },
   { id: "calendar", label: "Agenda", subtitle: "Volgende afspraak" },
 ];
 
@@ -278,7 +278,7 @@ export function RemoteControlPage({
 
   const canToggleJellyfinTrivia =
     display.focusedWidgetId === "media" &&
-    media.source === "jellyfin" &&
+    (media.source === "jellyfin" || media.source === "dune") &&
     (media.kind === "movie" || media.kind === "episode") &&
     (media.status === "playing" || media.status === "paused");
 
