@@ -785,7 +785,7 @@ export function AdminPage({
             <span>
               <strong>Jellyfin trivia standaard tonen</strong>
               <small>
-                Zet trivia automatisch aan zodra een Jellyfin film of aflevering
+                Zet trivia automatisch aan zodra een Jellyfin- of Dune-film of aflevering
                 media focus krijgt.
               </small>
             </span>
@@ -1077,7 +1077,7 @@ export function AdminPage({
 
         <AccordionSection
           title="Jellyfin Trivia"
-          subtitle="Laatste opgehaalde MovieMistakes trivia voor de huidige Jellyfin media"
+          subtitle="Laatste opgehaalde MovieMistakes trivia voor Jellyfin- of Dune-media"
         >
           <div className="admin-trivia-toolbar">
             <div>
@@ -1158,7 +1158,7 @@ export function AdminPage({
 
           {triviaData && triviaItems.length === 0 ? (
             <p className="admin-muted">
-              Geen trivia gevonden voor de huidige Jellyfin media.
+              Geen trivia gevonden voor de huidige Jellyfin- of Dune-media.
             </p>
           ) : null}
 
