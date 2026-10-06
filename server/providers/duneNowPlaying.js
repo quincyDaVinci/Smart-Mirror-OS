@@ -77,7 +77,24 @@ function getJellyfinSearchTerms(playbackUrl) {
     if (episode[2].trim()) terms.push(episode[2].trim());
     if (episode[1].trim()) terms.push(episode[1].trim());
   } else {
-    terms.push(cleaned.replace(/\s*\(?\b(?:19|20)\d{2}\b\)?.*$/, "").trim());
+    const movieTitle = cleaned
+      .replace(/\s*\(?\b(?:19|20)\d{2}\b\)?.*$/, "")
+      .replace(/\s*\[(?:imdb|tmdb|tvdb)(?:id)?[-:\s][^\]]+\].*$/i, "")
+      .trim();
+
+    if (movieTitle) {
+      terms.push(movieTitle);
+
+      // Jellyfin may use punctuation absent from the release filename:
+      // "The Lord of the Rings The Fellowship of the Ring" versus
+      // "The Lord of the Rings: The Fellowship of the Ring".
+      // A distinctive suffix is only used to FIND candidates; metadata
+      // is never accepted without a matching path or embedded IMDb ID.
+      const words = movieTitle.split(/\s+/);
+      if (words.length > 5) {
+        terms.push(words.slice(-4).join(" "));
+      }
+    }
   }
   return [...new Set(terms.filter(Boolean))];
 }
@@ -88,6 +105,7 @@ async function searchJellyfinItems(baseUrl, apiKey, searchTerm) {
   url.searchParams.set("IncludeItemTypes", "Episode,Movie");
   url.searchParams.set("SearchTerm", searchTerm);
   url.searchParams.set("Fields", "Path,Genres,ProviderIds");
+  url.searchParams.set("EnableMediaSources", "true");
   url.searchParams.set("Limit", "100");
 
   const response = await fetch(url, {
@@ -97,6 +115,31 @@ async function searchJellyfinItems(baseUrl, apiKey, searchTerm) {
   if (!response.ok) throw new Error("Jellyfin lookup HTTP " + response.status);
   const data = await response.json();
   return Array.isArray(data.Items) ? data.Items : [];
+}
+
+function getFileImdbId(playbackUrl) {
+  const filename = playbackUrl.split(/[\\/]/).pop() ?? "";
+  return filename.match(/\bimdb(?:id)?[-_:\s]*(tt\d{6,10})\b/i)?.[1]?.toLowerCase() ?? null;
+}
+
+function findUniqueCandidate(items, playbackUrl) {
+  const byPath = items.filter((item) =>
+    [item.Path, ...(item.MediaSources ?? []).map((source) => source.Path)]
+      .some((path) => matchesJellyfinPath(playbackUrl, path)),
+  );
+  if (byPath.length > 1) return null;
+  if (byPath.length === 1) return byPath[0];
+
+  // Alternate editions/grouped media can have a different item.Path.
+  // Only accept this fallback when the file embeds an exact IMDb ID.
+  const imdbId = getFileImdbId(playbackUrl);
+  if (!imdbId) return null;
+
+  const byImdb = items.filter((item) =>
+    typeof item.ProviderIds?.Imdb === "string" &&
+    item.ProviderIds.Imdb.toLowerCase() === imdbId,
+  );
+  return byImdb.length === 1 ? byImdb[0] : null;
 }
 
 async function findLibraryMatch(playbackUrl) {
@@ -111,13 +154,8 @@ async function findLibraryMatch(playbackUrl) {
 
     for (const term of getJellyfinSearchTerms(playbackUrl)) {
       const items = await searchJellyfinItems(baseUrl, apiKey, term);
-      const matches = items.filter(item =>
-        typeof item.Path === "string" &&
-        matchesJellyfinPath(playbackUrl, item.Path)
-      );
-
-      if (matches.length === 1) return matches[0];
-      if (matches.length > 1) return null; // Ambiguous: never guess.
+      const match = findUniqueCandidate(items, playbackUrl);
+      if (match) return match;
     }
     return null;
   })();
@@ -259,4 +297,6 @@ module.exports = {
   getDuneRelativePath,
   matchesJellyfinPath,
   getJellyfinSearchTerms,
+  getFileImdbId,
+  findUniqueCandidate,
 };
