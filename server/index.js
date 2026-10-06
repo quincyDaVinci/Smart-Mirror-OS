@@ -2144,40 +2144,45 @@ async function fetchLyricsFromLrclib({
 }
 
 async function pollNowPlayingProviders() {
-  let jellyfinResult;
-  let spotifyResult;
-  let duneResult;
+  // Run device/network polling concurrently: an offline Dune must not delay
+  // Spotify or Jellyfin metadata and playback checks.
+  const [jellyfinResponse, spotifyResponse, duneResponse] =
+    await Promise.allSettled([
+      fetchJellyfinNowPlaying(),
+      fetchSpotifyNowPlaying(),
+      fetchDuneNowPlaying(),
+    ]);
 
-  try {
-    jellyfinResult = await fetchJellyfinNowPlaying();
-  } catch (error) {
-    console.error("failed to poll jellyfin now playing", error);
+  const jellyfinResult =
+    jellyfinResponse.status === "fulfilled"
+      ? jellyfinResponse.value
+      : {
+          media: null,
+          providerStatus: buildProviderErrorStatus("Jellyfin polling mislukt."),
+        };
+  let spotifyResult =
+    spotifyResponse.status === "fulfilled"
+      ? spotifyResponse.value
+      : {
+          media: null,
+          providerStatus: buildProviderErrorStatus("Spotify polling mislukt."),
+        };
+  const duneResult =
+    duneResponse.status === "fulfilled"
+      ? duneResponse.value
+      : {
+          media: null,
+          providerStatus: buildProviderErrorStatus("Dune polling mislukt."),
+        };
 
-    jellyfinResult = {
-      media: null,
-      providerStatus: buildProviderErrorStatus("Jellyfin polling mislukt."),
-    };
+  if (jellyfinResponse.status === "rejected") {
+    console.error("failed to poll jellyfin now playing", jellyfinResponse.reason);
   }
-
-  try {
-    spotifyResult = await fetchSpotifyNowPlaying();
-  } catch (error) {
-    console.error("failed to poll spotify now playing", error);
-
-    spotifyResult = {
-      media: null,
-      providerStatus: buildProviderErrorStatus("Spotify polling mislukt."),
-    };
+  if (spotifyResponse.status === "rejected") {
+    console.error("failed to poll spotify now playing", spotifyResponse.reason);
   }
-
-  try {
-    duneResult = await fetchDuneNowPlaying();
-  } catch (error) {
-    console.error("failed to poll Dune now playing", error);
-    duneResult = {
-      media: null,
-      providerStatus: buildProviderErrorStatus("Dune polling mislukt."),
-    };
+  if (duneResponse.status === "rejected") {
+    console.error("failed to poll Dune now playing", duneResponse.reason);
   }
 
   if (
@@ -2190,16 +2195,16 @@ async function pollNowPlayingProviders() {
     };
   }
 
-  const nextMedia = buildResolvedMedia({
-    jellyfinMedia: jellyfinResult.media,
-    jellyfinStatus: jellyfinResult.providerStatus,
-    spotifyMedia: spotifyResult.media,
-    spotifyStatus: spotifyResult.providerStatus,
-    duneMedia: duneResult.media,
-    duneStatus: duneResult.providerStatus,
-  });
-
-  updateRuntimeMedia(nextMedia);
+  updateRuntimeMedia(
+    buildResolvedMedia({
+      jellyfinMedia: jellyfinResult.media,
+      jellyfinStatus: jellyfinResult.providerStatus,
+      spotifyMedia: spotifyResult.media,
+      spotifyStatus: spotifyResult.providerStatus,
+      duneMedia: duneResult.media,
+      duneStatus: duneResult.providerStatus,
+    }),
+  );
 }
 
 let nowPlayingPollInFlight = false;
