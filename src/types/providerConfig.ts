@@ -2,6 +2,8 @@ export type ProviderSecretFieldStatus = {
   label: string;
   hasValue: boolean;
   updatedAt: number | null;
+  /** Only present for nonsecret Jellyfin User/Device Filter values. */
+  value?: string;
 };
 
 export type ProviderSecretFieldInput = {
