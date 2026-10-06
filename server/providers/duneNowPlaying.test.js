@@ -5,6 +5,8 @@ const {
   getDuneRelativePath,
   matchesJellyfinPath,
   getJellyfinSearchTerms,
+  getFileImdbId,
+  findUniqueCandidate,
 } = require("./duneNowPlaying");
 
 const filename =
@@ -46,4 +48,44 @@ test("extracts the Jellyfin episode title for SearchTerm", () => {
 test("supports movie filenames and decodes XML entities", () => {
   assert.deepEqual(getJellyfinSearchTerms("/tmp/mnt/smb/2/Movie Name (2024) 2160p.mkv"), ["Movie Name"]);
   assert.equal(parseDuneStatus('<param name="playback_url" value="Movie &amp; Film.mkv"/>').playback_url, "Movie & Film.mkv");
+});
+
+
+test("finds extended Lord of the Rings metadata despite punctuation and release tags", () => {
+  const filename =
+    "The Lord of the Rings The Fellowship of the Ring (2001) [imdbid-tt0120737] - Extended [Remux-2160p] [DV HDR10][TrueHD Atmos 7 1][HEVC]-FrameSToR.mkv";
+  const path = "/tmp/mnt/smb/2/" + filename;
+
+  assert.deepEqual(getJellyfinSearchTerms(path), [
+    "The Lord of the Rings The Fellowship of the Ring",
+    "Fellowship of the Ring",
+  ]);
+  assert.equal(getFileImdbId(path), "tt0120737");
+
+  const movie = {
+    Id: "lord-of-the-rings-movie",
+    Name: "The Lord of the Rings: The Fellowship of the Ring",
+    Path: "/movies/LOTR/Theatrical Edition.mkv",
+    ProviderIds: { Imdb: "tt0120737" },
+  };
+  const unrelated = {
+    Id: "wrong-movie",
+    Name: "Fellowship",
+    Path: "/movies/Other.mkv",
+    ProviderIds: { Imdb: "tt9999999" },
+  };
+
+  assert.equal(findUniqueCandidate([unrelated, movie], path), movie);
+  assert.equal(findUniqueCandidate([unrelated], path), null);
+  assert.equal(findUniqueCandidate([movie, { ...movie, Id: "duplicate" }], path), null);
+});
+
+test("prefers exact Jellyfin media source path and never guesses by title alone", () => {
+  const item = {
+    Name: "The Gentlemen",
+    Path: "/tv/Other Version.mkv",
+    MediaSources: [{ Path: jellyfinPath }],
+  };
+  assert.equal(findUniqueCandidate([item], dunePath), item);
+  assert.equal(findUniqueCandidate([{ Name: "The Gentlemen", Path: "/tv/Other.mkv" }], dunePath), null);
 });
