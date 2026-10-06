@@ -465,8 +465,14 @@ function getRedactedProviderSecrets() {
     jellyfin: {
       baseUrl: toFieldSummary(jellyfin.baseUrl),
       apiKey: toFieldSummary(jellyfin.apiKey),
-      userName: toFieldSummary(jellyfin.userName),
-      deviceName: toFieldSummary(jellyfin.deviceName),
+      userName: {
+        ...toFieldSummary(jellyfin.userName),
+        value: jellyfin.userName.value,
+      },
+      deviceName: {
+        ...toFieldSummary(jellyfin.deviceName),
+        value: jellyfin.deviceName.value,
+      },
     },
     spotify: {
       clientId: toFieldSummary(spotify.clientId),
