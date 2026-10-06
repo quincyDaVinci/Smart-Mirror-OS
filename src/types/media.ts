@@ -1,4 +1,4 @@
-export type MediaSource = "jellyfin" | "spotify";
+export type MediaSource = "jellyfin" | "spotify" | "dune";
 export type MediaStatus = "idle" | "playing" | "paused" | "error";
 export type MediaKind = "movie" | "episode" | "track" | "podcast" | "unknown";
 
@@ -66,6 +66,7 @@ export type MediaState = {
   sourceState: {
     jellyfin: ProviderStatus;
     spotify: ProviderStatus;
+    dune: ProviderStatus;
   };
 };
 
@@ -106,6 +107,12 @@ export const defaultMediaState: MediaState = {
       lastCheckedAt: null,
     },
     spotify: {
+      enabled: true,
+      status: "idle",
+      message: null,
+      lastCheckedAt: null,
+    },
+    dune: {
       enabled: true,
       status: "idle",
       message: null,
