@@ -217,6 +217,55 @@ function getEffectivePlaybackStatus({
   return "playing";
 }
 
+// Shared formatter: Dune playback uses the same Jellyfin metadata representation.
+function createMediaFromJellyfinItem({
+  item,
+  baseUrl,
+  apiKey,
+  source = "jellyfin",
+  status,
+  progressMs,
+  playSessionId = null,
+  durationMs = null,
+  deviceName = null,
+  userName = null,
+  checkedAt = Date.now(),
+}) {
+  return {
+    status,
+    source,
+    kind: getMediaKind(item.Type),
+    title: item.Name ?? "Onbekende titel",
+    subtitle: buildSubtitle(item),
+    secondaryText: buildSecondaryText(item),
+    sourceItemId: typeof item.Id === "string" ? item.Id : null,
+    playSessionId,
+    seriesTitle:
+      item.Type === "Episode" && typeof item.SeriesName === "string"
+        ? item.SeriesName
+        : null,
+    seasonNumber:
+      item.Type === "Episode" && typeof item.ParentIndexNumber === "number"
+        ? item.ParentIndexNumber
+        : null,
+    episodeNumber:
+      item.Type === "Episode" && typeof item.IndexNumber === "number"
+        ? item.IndexNumber
+        : null,
+    providerIds: normalizeProviderIds(item),
+    productionYear: item.ProductionYear ?? null,
+    genres: Array.isArray(item.Genres) ? item.Genres : [],
+    communityRating:
+      typeof item.CommunityRating === "number" ? item.CommunityRating : null,
+    artworkUrl: buildArtworkUrl(baseUrl, item, apiKey),
+    progressMs,
+    durationMs: durationMs ?? ticksToMs(item.RunTimeTicks ?? null),
+    deviceName,
+    userName,
+    lastUpdatedAt: checkedAt,
+  };
+}
+
 async function fetchJellyfinNowPlaying() {
   const jellyfinSecrets = getJellyfinSecrets();
 
@@ -294,39 +343,18 @@ async function fetchJellyfinNowPlaying() {
   });
 
   return {
-    media: {
+    media: createMediaFromJellyfinItem({
+      item,
+      baseUrl,
+      apiKey,
       status,
       source: "jellyfin",
-      kind: getMediaKind(item.Type),
-      title: item.Name ?? "Onbekende titel",
-      subtitle: buildSubtitle(item),
-      secondaryText: buildSecondaryText(item),
-      sourceItemId: typeof item.Id === "string" ? item.Id : null,
-      playSessionId,
-      seriesTitle:
-        item.Type === "Episode" && typeof item.SeriesName === "string"
-          ? item.SeriesName
-          : null,
-      seasonNumber:
-        item.Type === "Episode" && typeof item.ParentIndexNumber === "number"
-          ? item.ParentIndexNumber
-          : null,
-      episodeNumber:
-        item.Type === "Episode" && typeof item.IndexNumber === "number"
-          ? item.IndexNumber
-          : null,
-      providerIds: normalizeProviderIds(item),
-      productionYear: item.ProductionYear ?? null,
-      genres: Array.isArray(item.Genres) ? item.Genres : [],
-      communityRating:
-        typeof item.CommunityRating === "number" ? item.CommunityRating : null,
-      artworkUrl: buildArtworkUrl(baseUrl, item, apiKey),
       progressMs,
-      durationMs: ticksToMs(item.RunTimeTicks ?? null),
+      playSessionId,
       deviceName: bestSession.DeviceName ?? null,
       userName: bestSession.UserName ?? null,
-      lastUpdatedAt: checkedAt,
-    },
+      checkedAt,
+    }),
     providerStatus: {
       enabled: true,
       status: "ok",
@@ -338,4 +366,5 @@ async function fetchJellyfinNowPlaying() {
 
 module.exports = {
   fetchJellyfinNowPlaying,
+  createMediaFromJellyfinItem,
 };
