@@ -3760,6 +3760,111 @@ app.get("/media/jellyfin-trivia", async (req, res) => {
   res.json(body);
 });
 
+// Only these known systemd units can be controlled; never accept raw commands.
+const MANAGED_SERVICE_TARGETS = Object.freeze({
+  frontend: ["smart-mirror-frontend"],
+  backend: ["smart-mirror-backend"],
+  both: ["smart-mirror-backend", "smart-mirror-frontend"],
+});
+
+function isTrustedServiceControlOrigin(req) {
+  const origin = req.get("origin");
+  if (!origin) {
+    return false;
+  }
+
+  if (process.env.ADMIN_ALLOWED_ORIGIN && origin === process.env.ADMIN_ALLOWED_ORIGIN) {
+    return true;
+  }
+
+  try {
+    const source = new URL(origin);
+    const destination = new URL(`http://${req.get("host")}`);
+    const localDev =
+      (source.hostname === "localhost" || source.hostname === "127.0.0.1") &&
+      source.port === "5173";
+
+    return (
+      source.protocol === "http:" &&
+      source.hostname === destination.hostname &&
+      (source.port === "4173" || localDev)
+    );
+  } catch {
+    return false;
+  }
+}
+
+function getManagedServiceState(unit) {
+  return new Promise((resolve) => {
+    execFile("systemctl", ["is-active", unit], { timeout: 3500 }, (_error, stdout) => {
+      resolve(stdout.trim() || "onbekend");
+    });
+  });
+}
+
+app.get("/admin/services", async (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  const [frontend, backend] = await Promise.all([
+    getManagedServiceState("smart-mirror-frontend.service"),
+    getManagedServiceState("smart-mirror-backend.service"),
+  ]);
+  res.json({ ok: true, services: { frontend, backend } });
+});
+
+app.post("/admin/services", (req, res) => {
+  if (!isTrustedServiceControlOrigin(req)) {
+    res.status(403).json({ ok: false, error: "Niet-toegestane admin origin." });
+    return;
+  }
+
+  const { target, operation } = req.body ?? {};
+  if (
+    typeof target !== "string" ||
+    !Object.hasOwn(MANAGED_SERVICE_TARGETS, target) ||
+    (operation !== "start" && operation !== "restart")
+  ) {
+    res.status(400).json({ ok: false, error: "Ongeldige service-actie." });
+    return;
+  }
+
+  const unitNames = MANAGED_SERVICE_TARGETS[target];
+  const args = ["-n", "systemctl", operation, ...unitNames];
+
+  const runCommand = (respondOnCompletion) => {
+    execFile("sudo", args, { timeout: 15000 }, (error, _stdout, stderr) => {
+      if (error) {
+        appendLog(
+          "error",
+          "services",
+          "Service-actie mislukt",
+          `${operation} ${target}: ${(stderr || error.message).trim()}`,
+        );
+        if (respondOnCompletion) {
+          res.status(503).json({
+            ok: false,
+            error: "systemctl geweigerd of mislukt. Controleer sudoers en serverlogs.",
+          });
+        }
+        return;
+      }
+
+      appendLog("info", "services", "Service-actie uitgevoerd", `${operation} ${target}`);
+      if (respondOnCompletion) {
+        res.json({ ok: true });
+      }
+    });
+  };
+
+  // Respond before restarting this API process, otherwise the request is cut off.
+  if (operation === "restart" && (target === "backend" || target === "both")) {
+    res.status(202).json({ ok: true, pending: true });
+    setTimeout(() => runCommand(false), 700);
+    return;
+  }
+
+  runCommand(true);
+});
+
 console.log("[boot] registering action route");
 app.post("/action", (req, res) => {
   const handled = handleClientMessage(req.body);
