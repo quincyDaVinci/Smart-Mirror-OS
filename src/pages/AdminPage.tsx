@@ -524,6 +524,7 @@ export function AdminPage({
       const result = (await response.json()) as {
         ok: boolean;
         pending?: boolean;
+        alreadyRunning?: boolean;
         error?: string;
       };
 
@@ -532,9 +533,11 @@ export function AdminPage({
       }
 
       setServiceFeedback(
-        result.pending
-          ? "Herstart aangevraagd. De backend kan kort offline gaan; controleer de servicestatus hieronder."
-          : "Service-actie uitgevoerd. De status wordt automatisch bijgewerkt.",
+        result.alreadyRunning
+          ? "Service draait al. Er is niets herstart."
+          : result.pending
+            ? "Herstart aangevraagd. De backend kan kort offline gaan; controleer de servicestatus hieronder."
+            : "Service-actie uitgevoerd. De status wordt automatisch bijgewerkt.",
       );
     } catch (error) {
       setServiceError(
