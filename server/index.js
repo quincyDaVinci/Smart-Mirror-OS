@@ -3788,7 +3788,7 @@ function isTrustedServiceControlOrigin(req) {
       destination.hostname === "127.0.0.1" ||
       destination.hostname.startsWith("192.168.") ||
       destination.hostname.startsWith("10.") ||
-      /^172\\.(1[6-9]|2\\d|3[0-1])\\./.test(destination.hostname);
+      /^172\.(1[6-9]|2\d|3[0-1])\./.test(destination.hostname);
 
     return (
       source.protocol === "http:" &&
