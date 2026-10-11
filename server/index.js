@@ -3,7 +3,7 @@ const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
 
-const { exec, execFile, spawn } = require("child_process");
+const { exec, execFile } = require("child_process");
 const util = require("util");
 
 const execAsync = util.promisify(exec);
@@ -3919,7 +3919,6 @@ app.post("/admin/services", (req, res) => {
 
 // Firefox kiosk runs in the existing X11 user session, not as a systemd frontend.
 const KIOSK_LAUNCHER = "/home/quincy/bin/open-smartmirroros.sh";
-const KIOSK_ADMIN_LOG = path.join(path.dirname(STATE_FILE), "kiosk-admin.log");
 let kioskLaunchBusy = false;
 
 function isKioskBrowserRunning() {
@@ -3981,47 +3980,52 @@ app.post("/admin/kiosk", async (req, res) => {
       return;
     }
 
-    // Use exactly the existing desktop shortcut launcher. It owns Firefox
-    // startup and preserves DISPLAY, DPMS, unclutter and XRandR safe-area.
-    const logFd = fs.openSync(KIOSK_ADMIN_LOG, "a", 0o600);
-    let child;
-    try {
-      child = spawn(KIOSK_LAUNCHER, [], {
-        cwd: "/home/quincy",
-        detached: true,
-        env: {
-          ...process.env,
-          DISPLAY: ":0",
-          XAUTHORITY: "/home/quincy/.Xauthority",
-        },
-        stdio: ["ignore", logFd, logFd],
+    // A detached child of the backend would still live in its systemd cgroup.
+    // Start the trusted desktop launcher in the GUI user's systemd manager, so
+    // a later backend restart does not kill the Firefox kiosk.
+    const sessionRuntimeDir = "/run/user/1000";
+    const env = {
+      ...process.env,
+      XDG_RUNTIME_DIR: sessionRuntimeDir,
+      DBUS_SESSION_BUS_ADDRESS: "unix:path=" + sessionRuntimeDir + "/bus",
+      DISPLAY: ":0",
+      XAUTHORITY: "/home/quincy/.Xauthority",
+    };
+    const args = [
+      "--user",
+      "--collect",
+      "--quiet",
+      "--service-type=exec",
+      "--unit=smart-mirror-admin-kiosk-" + Date.now(),
+      "--working-directory=/home/quincy",
+      "--setenv=DISPLAY=:0",
+      "--setenv=XAUTHORITY=/home/quincy/.Xauthority",
+      KIOSK_LAUNCHER,
+    ];
+
+    await new Promise((resolve, reject) => {
+      execFile("systemd-run", args, { timeout: 10000, env }, (error, _stdout, stderr) => {
+        if (error) {
+          reject(new Error((stderr || error.message).trim()));
+        } else {
+          resolve();
+        }
       });
-    } finally {
-      fs.closeSync(logFd);
-    }
-
-    child.on("error", (error) => {
-      appendLog("error", "kiosk", "Kiosk-launcher starten mislukt", error.message);
     });
-    child.on("exit", (code, signal) => {
-      if (code !== 0 && code !== null) {
-        appendLog("error", "kiosk", "Kiosk-launcher gestopt", "code=" + code);
-      } else if (signal) {
-        appendLog("warn", "kiosk", "Kiosk-launcher onderbroken", signal);
-      }
-    });
-    child.unref();
 
-    appendLog("info", "kiosk", "Kiosk-launcher aangeroepen", operation);
+    appendLog("info", "kiosk", "Kiosk-launcher gestart via user systemd", operation);
     res.status(202).json({ ok: true, pending: true });
   } catch (error) {
     appendLog("error", "kiosk", "Kiosk-actie mislukt", error.message);
     res.status(503).json({
       ok: false,
-      error: "Kiosk-launcher ontbreekt, is niet uitvoerbaar of kon niet starten. Controleer de ODROID launcher en kiosk-admin.log.",
+      error: "Kiosk-start mislukt. Controleer of de ODROID gebruikerssessie en bestaande kiosk-launcher actief zijn.",
     });
   } finally {
-    kioskLaunchBusy = false;
+    // Avoid overlapping launches before Firefox has time to appear.
+    setTimeout(() => {
+      kioskLaunchBusy = false;
+    }, 3000);
   }
 });
 
