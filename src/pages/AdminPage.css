@@ -357,6 +357,27 @@
   max-width: 760px;
 }
 
+.admin-service-list {
+  display: grid;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.admin-service-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 14px;
+}
+
+.admin-service-row .admin-muted {
+  margin-top: 4px;
+}
+
 .admin-sortable-item {
   display: flex;
   align-items: stretch;
