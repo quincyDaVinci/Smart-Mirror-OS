@@ -3811,6 +3811,8 @@ app.get("/admin/services", async (_req, res) => {
   res.json({ ok: true, services: { frontend, backend } });
 });
 
+let serviceControlBusy = false;
+
 app.post("/admin/services", (req, res) => {
   if (!isTrustedServiceControlOrigin(req)) {
     res.status(403).json({ ok: false, error: "Niet-toegestane admin origin." });
@@ -3827,11 +3829,17 @@ app.post("/admin/services", (req, res) => {
     return;
   }
 
+  if (serviceControlBusy || state.deployment.status === "deploying") {
+    res.status(409).json({ ok: false, error: "Er loopt al een service-actie of deploy." });
+    return;
+  }
+
   const unitNames = MANAGED_SERVICE_TARGETS[target];
   const args = ["-n", "systemctl", operation, ...unitNames];
 
   const runCommand = (respondOnCompletion) => {
     execFile("sudo", args, { timeout: 15000 }, (error, _stdout, stderr) => {
+      serviceControlBusy = false;
       if (error) {
         appendLog(
           "error",
@@ -3855,13 +3863,32 @@ app.post("/admin/services", (req, res) => {
     });
   };
 
-  // Respond before restarting this API process, otherwise the request is cut off.
+  // Verify passwordless permission before acknowledging a self-restart.
+  // The actual restart must run after the response because this API will exit.
   if (operation === "restart" && (target === "backend" || target === "both")) {
-    res.status(202).json({ ok: true, pending: true });
-    setTimeout(() => runCommand(false), 700);
+    execFile(
+      "sudo",
+      ["-n", "-l", "systemctl", operation, ...unitNames],
+      { timeout: 5000 },
+      (error) => {
+        if (error) {
+          appendLog("error", "services", "Geen sudo-rechten voor herstart", `${operation} ${target}`);
+          res.status(503).json({
+            ok: false,
+            error: "Geen passwordless sudo voor deze herstart. Controleer sudoers.",
+          });
+          return;
+        }
+
+        serviceControlBusy = true;
+        res.status(202).json({ ok: true, pending: true });
+        setTimeout(() => runCommand(false), 700);
+      },
+    );
     return;
   }
 
+  serviceControlBusy = true;
   runCommand(true);
 });
 
