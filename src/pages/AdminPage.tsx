@@ -1173,14 +1173,14 @@ export function AdminPage({
                 <div className="admin-button-row">
                   <button
                     type="button"
-                    disabled={!isConnected || serviceBusy || deployment.status === "deploying"}
+                    disabled={serviceBusy || deployment.status === "deploying"}
                     onClick={() => void controlService(service, "start")}
                   >
                     Start
                   </button>
                   <button
                     type="button"
-                    disabled={!isConnected || serviceBusy || deployment.status === "deploying"}
+                    disabled={serviceBusy || deployment.status === "deploying"}
                     onClick={() => void controlService(service, "restart")}
                   >
                     Herstart
@@ -1193,7 +1193,7 @@ export function AdminPage({
           <div className="admin-button-row">
             <button
               type="button"
-              disabled={!isConnected || serviceBusy || deployment.status === "deploying"}
+              disabled={serviceBusy || deployment.status === "deploying"}
               onClick={() => void controlService("both", "restart")}
             >
               Herstart beide services
