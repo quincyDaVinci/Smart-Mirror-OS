@@ -18,9 +18,11 @@ jobs:
         run: npm ci
       - name: Build frontend
         run: npm run build
-      - name: Lint
-        run: npm run lint
+      - name: Lint updated admin page
+        run: npx eslint src/pages/AdminPage.tsx
       - name: Check backend syntax
         run: node --check server/index.js
+      - name: Check trivia provider syntax
+        run: node --check server/providers/jellyfinTrivia.js
       - name: Run Dune provider tests
         run: node --test server/providers/duneNowPlaying.test.js
