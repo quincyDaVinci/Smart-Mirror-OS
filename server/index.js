@@ -3783,9 +3783,16 @@ function isTrustedServiceControlOrigin(req) {
     const localDev =
       (source.hostname === "localhost" || source.hostname === "127.0.0.1") &&
       source.port === "5173";
+    const trustedLanHost =
+      destination.hostname === "localhost" ||
+      destination.hostname === "127.0.0.1" ||
+      destination.hostname.startsWith("192.168.") ||
+      destination.hostname.startsWith("10.") ||
+      /^172\\.(1[6-9]|2\\d|3[0-1])\\./.test(destination.hostname);
 
     return (
       source.protocol === "http:" &&
+      trustedLanHost &&
       source.hostname === destination.hostname &&
       (source.port === "4173" || localDev)
     );
@@ -3834,6 +3841,7 @@ app.post("/admin/services", (req, res) => {
     return;
   }
 
+  serviceControlBusy = true;
   const unitNames = MANAGED_SERVICE_TARGETS[target];
   const args = ["-n", "systemctl", operation, ...unitNames];
 
@@ -3872,6 +3880,7 @@ app.post("/admin/services", (req, res) => {
       { timeout: 5000 },
       (error) => {
         if (error) {
+          serviceControlBusy = false;
           appendLog("error", "services", "Geen sudo-rechten voor herstart", `${operation} ${target}`);
           res.status(503).json({
             ok: false,
@@ -3880,7 +3889,6 @@ app.post("/admin/services", (req, res) => {
           return;
         }
 
-        serviceControlBusy = true;
         res.status(202).json({ ok: true, pending: true });
         setTimeout(() => runCommand(false), 700);
       },
@@ -3888,7 +3896,6 @@ app.post("/admin/services", (req, res) => {
     return;
   }
 
-  serviceControlBusy = true;
   runCommand(true);
 });
 
