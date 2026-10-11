@@ -18,6 +18,13 @@ import { CommitRange } from "../components/common/CommitRange";
 import type { MediaState } from "../types/media";
 import "./AdminPage.css";
 
+type ManagedService = "frontend" | "backend" | "both";
+type ServiceOperation = "start" | "restart";
+type ManagedServiceStatus = {
+  frontend: string;
+  backend: string;
+};
+
 type AdminPageProps = {
   layout: LayoutItem[];
   settings: MirrorSettings;
@@ -454,6 +461,90 @@ export function AdminPage({
   const lightLuxLabel = formatLux(light.lux);
   const lastMotionLabel = formatOptionalTime(presence.lastMotionAt);
   const lightUpdatedLabel = formatOptionalTime(light.updatedAt);
+  const [serviceStatus, setServiceStatus] = useState<ManagedServiceStatus>({
+    frontend: "onbekend",
+    backend: "onbekend",
+  });
+  const [serviceFeedback, setServiceFeedback] = useState<string | null>(null);
+  const [serviceError, setServiceError] = useState<string | null>(null);
+  const [serviceBusy, setServiceBusy] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    async function refreshServiceStatus() {
+      try {
+        const response = await fetch(`${apiBaseUrl}/admin/services`, {
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const result = (await response.json()) as {
+          ok: boolean;
+          services: ManagedServiceStatus;
+        };
+        if (mounted && result.ok) {
+          setServiceStatus(result.services);
+        }
+      } catch {
+        if (mounted) {
+          setServiceStatus({ frontend: "onbekend", backend: "onbekend" });
+        }
+      }
+    }
+
+    void refreshServiceStatus();
+    const timer = window.setInterval(() => void refreshServiceStatus(), 5000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+  }, [apiBaseUrl]);
+
+  async function controlService(target: ManagedService, operation: ServiceOperation) {
+    if (
+      operation === "restart" &&
+      !window.confirm(
+        `Weet je zeker dat je ${target === "both" ? "frontend en backend" : target} wilt herstarten? De verbinding kan tijdelijk wegvallen.`,
+      )
+    ) {
+      return;
+    }
+
+    setServiceBusy(true);
+    setServiceError(null);
+    setServiceFeedback(null);
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/admin/services`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target, operation }),
+      });
+      const result = (await response.json()) as {
+        ok: boolean;
+        pending?: boolean;
+        error?: string;
+      };
+
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error ?? `HTTP ${response.status}`);
+      }
+
+      setServiceFeedback(
+        result.pending
+          ? "Herstart aangevraagd. De backend kan kort offline gaan; controleer de servicestatus hieronder."
+          : "Service-actie uitgevoerd. De status wordt automatisch bijgewerkt.",
+      );
+    } catch (error) {
+      setServiceError(
+        error instanceof Error ? error.message : "Service-actie mislukt.",
+      );
+    } finally {
+      setServiceBusy(false);
+    }
+  }
+
   const [triviaState, setTriviaState] = useState<AdminTriviaState>({
     status: "idle",
     data: null,
@@ -1061,6 +1152,59 @@ export function AdminPage({
               Deploy update
             </button>
           </div>
+        </AccordionSection>
+
+        <AccordionSection
+          title="Services"
+          subtitle="Frontend en backend starten of herstarten zonder SSH"
+        >
+          <p className="admin-muted">
+            Servicebeheer werkt alleen als de backend bereikbaar is en sudo zonder
+            wachtwoord is toegestaan voor deze systemd-acties.
+          </p>
+
+          <div className="admin-service-list">
+            {(["frontend", "backend"] as const).map((service) => (
+              <div className="admin-service-row" key={service}>
+                <div>
+                  <strong>{service === "frontend" ? "Frontend" : "Backend"}</strong>
+                  <p className="admin-muted">Status: {serviceStatus[service]}</p>
+                </div>
+                <div className="admin-button-row">
+                  <button
+                    type="button"
+                    disabled={!isConnected || serviceBusy || deployment.status === "deploying"}
+                    onClick={() => void controlService(service, "start")}
+                  >
+                    Start
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!isConnected || serviceBusy || deployment.status === "deploying"}
+                    onClick={() => void controlService(service, "restart")}
+                  >
+                    Herstart
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="admin-button-row">
+            <button
+              type="button"
+              disabled={!isConnected || serviceBusy || deployment.status === "deploying"}
+              onClick={() => void controlService("both", "restart")}
+            >
+              Herstart beide services
+            </button>
+          </div>
+          {serviceFeedback ? <p className="admin-muted" role="status">{serviceFeedback}</p> : null}
+          {serviceError ? (
+            <p className="admin-status admin-status--error" role="alert">
+              {serviceError}
+            </p>
+          ) : null}
         </AccordionSection>
 
         <AccordionSection
