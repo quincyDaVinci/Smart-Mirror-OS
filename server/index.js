@@ -3,7 +3,7 @@ const os = require("os");
 const path = require("path");
 const crypto = require("crypto");
 
-const { exec, execFile } = require("child_process");
+const { exec, execFile, spawn } = require("child_process");
 const util = require("util");
 
 const execAsync = util.promisify(exec);
@@ -3915,6 +3915,114 @@ app.post("/admin/services", (req, res) => {
   }
 
   runCommand(true);
+});
+
+// Firefox kiosk runs in the existing X11 user session, not as a systemd frontend.
+const KIOSK_LAUNCHER = "/home/quincy/bin/open-smartmirroros.sh";
+const KIOSK_ADMIN_LOG = path.join(path.dirname(STATE_FILE), "kiosk-admin.log");
+let kioskLaunchBusy = false;
+
+function isKioskBrowserRunning() {
+  return new Promise((resolve, reject) => {
+    execFile("pgrep", ["-u", "quincy", "-x", "firefox"], { timeout: 3500 }, (error, stdout) => {
+      if (!error) {
+        resolve(Boolean(stdout.trim()));
+      } else if (error.code === 1) {
+        resolve(false);
+      } else {
+        reject(error);
+      }
+    });
+  });
+}
+
+app.get("/admin/kiosk", async (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  try {
+    const running = await isKioskBrowserRunning();
+    const launcherAvailable = fs.existsSync(KIOSK_LAUNCHER);
+    res.json({ ok: true, running, launcherAvailable });
+  } catch (error) {
+    appendLog("error", "kiosk", "Firefox-status ophalen mislukt", error.message);
+    res.status(503).json({ ok: false, error: "Firefox-status niet beschikbaar." });
+  }
+});
+
+app.post("/admin/kiosk", async (req, res) => {
+  if (!isTrustedServiceControlOrigin(req)) {
+    res.status(403).json({ ok: false, error: "Niet-toegestane admin origin." });
+    return;
+  }
+
+  const operation = req.body?.operation;
+  if (operation !== "start" && operation !== "restart") {
+    res.status(400).json({ ok: false, error: "Ongeldige kiosk-actie." });
+    return;
+  }
+
+  if (kioskLaunchBusy || state.deployment.status === "deploying") {
+    res.status(409).json({ ok: false, error: "Een kioskactie of deploy loopt al." });
+    return;
+  }
+
+  kioskLaunchBusy = true;
+  try {
+    if (os.userInfo().username !== "quincy") {
+      res.status(503).json({
+        ok: false,
+        error: "Backend draait niet als quincy; kiosk kan niet veilig gestart worden.",
+      });
+      return;
+    }
+
+    await fs.promises.access(KIOSK_LAUNCHER, fs.constants.X_OK);
+    if (operation === "start" && (await isKioskBrowserRunning())) {
+      res.json({ ok: true, alreadyRunning: true });
+      return;
+    }
+
+    // Use exactly the existing desktop shortcut launcher. It owns Firefox
+    // startup and preserves DISPLAY, DPMS, unclutter and XRandR safe-area.
+    const logFd = fs.openSync(KIOSK_ADMIN_LOG, "a", 0o600);
+    let child;
+    try {
+      child = spawn(KIOSK_LAUNCHER, [], {
+        cwd: "/home/quincy",
+        detached: true,
+        env: {
+          ...process.env,
+          DISPLAY: ":0",
+          XAUTHORITY: "/home/quincy/.Xauthority",
+        },
+        stdio: ["ignore", logFd, logFd],
+      });
+    } finally {
+      fs.closeSync(logFd);
+    }
+
+    child.on("error", (error) => {
+      appendLog("error", "kiosk", "Kiosk-launcher starten mislukt", error.message);
+    });
+    child.on("exit", (code, signal) => {
+      if (code !== 0 && code !== null) {
+        appendLog("error", "kiosk", "Kiosk-launcher gestopt", "code=" + code);
+      } else if (signal) {
+        appendLog("warn", "kiosk", "Kiosk-launcher onderbroken", signal);
+      }
+    });
+    child.unref();
+
+    appendLog("info", "kiosk", "Kiosk-launcher aangeroepen", operation);
+    res.status(202).json({ ok: true, pending: true });
+  } catch (error) {
+    appendLog("error", "kiosk", "Kiosk-actie mislukt", error.message);
+    res.status(503).json({
+      ok: false,
+      error: "Kiosk-launcher ontbreekt, is niet uitvoerbaar of kon niet starten. Controleer de ODROID launcher en kiosk-admin.log.",
+    });
+  } finally {
+    kioskLaunchBusy = false;
+  }
 });
 
 console.log("[boot] registering action route");
