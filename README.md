@@ -226,6 +226,51 @@ xrandr --fb 2560x1440 --output HDMI-1 --mode 2560x1440 --pos 0x0 --panning 2560x
 
 Do not run `xrandr --transform none` after this command, because that removes the safe-area correction.
 
+## Admin servicebeheer (ODROID)
+
+De Admin-pagina heeft onder **Services** de acties **Start** en **Herstart** voor
+`smart-mirror-frontend` en `smart-mirror-backend`, plus **Herstart beide services**.
+Status wordt iedere 5 seconden opgevraagd met `GET /admin/services`.
+De acties gaan via `POST /admin/services` met een vaste allowlist. Er worden
+geen vrije shellcommando's geaccepteerd.
+
+**Let op:** de backend draait zelf de start/herstartactie. Als de backend volledig
+gestopt is, werkt dit paneel niet; als de frontend gestopt is, kan een nieuw tabblad
+de Admin-pagina niet openen. De systemd-units hebben daarom ook `Restart=always`.
+De backend moet zonder interactieve wachtwoordprompt `systemctl` mogen uitvoeren.
+De endpoint controleert de browser-origin, maar is geen gebruikersauthenticatie:
+stel poort 8787 niet aan het openbare internet bloot.
+
+Eenmalige ODROID-configuratie (via de **ODROID terminal / SSH**, niet GitHub):
+
+```bash
+cd /home/quincy/Smart-Mirror-OS
+command -v systemctl
+sudo visudo -f /etc/sudoers.d/smart-mirror-services
+```
+
+Op de huidige Armbian/Ubuntu-installatie hoort `systemctl` op
+`/usr/bin/systemctl` te staan. Voeg in `visudo` deze exacte regel toe
+(als de eerste command een ander pad geeft, gebruik dat pad):
+
+```text
+quincy ALL=(root) NOPASSWD: /usr/bin/systemctl start smart-mirror-frontend, /usr/bin/systemctl restart smart-mirror-frontend, /usr/bin/systemctl start smart-mirror-backend, /usr/bin/systemctl restart smart-mirror-backend, /usr/bin/systemctl restart smart-mirror-backend smart-mirror-frontend
+```
+
+Controleer daarna zonder diensten te herstarten:
+
+```bash
+sudo visudo -cf /etc/sudoers.d/smart-mirror-services
+sudo -n -l systemctl restart smart-mirror-backend smart-mirror-frontend
+systemctl is-active smart-mirror-backend.service
+systemctl is-active smart-mirror-frontend.service
+```
+
+De eerste check moet `parsed OK` melden, de `sudo -n -l`-check moet
+zonder wachtwoord slagen, en beide statussen horen `active` te zijn.
+De bestaande **Deploy update** in Admin blijft nodig om nieuwe code van GitHub
+naar de ODROID te halen. GitHub pushen alleen start niets op de ODROID.
+
 ## Scripts
 
 Frontend:
