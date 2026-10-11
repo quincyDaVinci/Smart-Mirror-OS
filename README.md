@@ -226,23 +226,15 @@ xrandr --fb 2560x1440 --output HDMI-1 --mode 2560x1440 --pos 0x0 --panning 2560x
 
 Do not run `xrandr --transform none` after this command, because that removes the safe-area correction.
 
-## Admin servicebeheer (ODROID)
+## Admin servicebeheer en Firefox kiosk (ODROID)
 
-De Admin-pagina heeft onder **Services** de acties **Start** en **Herstart** voor
-`smart-mirror-frontend` en `smart-mirror-backend`, plus **Herstart beide services**.
-Status wordt iedere 5 seconden opgevraagd met `GET /admin/services`.
-De acties gaan via `POST /admin/services` met een vaste allowlist. Er worden
-geen vrije shellcommando's geaccepteerd.
+De Admin-pagina bevat onder **Services** de acties **Start** en **Herstart**
+voor `smart-mirror-frontend` en `smart-mirror-backend`, plus
+**Herstart beide services**. Status wordt elke vijf seconden opgevraagd via
+`GET /admin/services`. Alleen vaste systemd-doelen en operaties zijn toegestaan.
 
-**Let op:** de backend draait zelf de start/herstartactie. Als de backend volledig
-gestopt is, werkt dit paneel niet; als de frontend gestopt is, kan een nieuw tabblad
-de Admin-pagina niet openen. De systemd-units hebben daarom ook `Restart=always`.
-De backend moet zonder interactieve wachtwoordprompt `systemctl` mogen uitvoeren.
-De endpoint controleert de browser-origin, maar is geen gebruikersauthenticatie:
-stel poort 8787 niet aan het openbare internet bloot.
-
-**Sudoers-compatibiliteit (ODROID gecontroleerd):** `sudo -n -l` toont dat
-`quincy` deze commando's al zonder wachtwoord mag uitvoeren:
+Op de ODROID is met `sudo -n -l` gecontroleerd dat `quincy` deze
+drie restartcommando's zonder wachtwoord mag uitvoeren:
 
 ```bash
 sudo -n systemctl restart smart-mirror-frontend
@@ -250,18 +242,53 @@ sudo -n systemctl restart smart-mirror-backend
 sudo -n systemctl restart smart-mirror-backend smart-mirror-frontend
 ```
 
-Daarom voert het paneel altijd de bestaande toegestane `restart` uit.
-Bij **Start** wordt eerst de servicestatus opgevraagd: als de service al
-`active` is, gebeurt er niets; als de service niet draait, start
-`systemctl restart` deze ook op. Er is **geen sudoers-wijziging nodig**.
+**Start** doet niets als de service al `active` is. Als die gestopt is, gebruikt
+de backend de al toegestane `systemctl restart` om de service te starten.
+Er hoeft hiervoor niets in sudoers gewijzigd te worden.
 
-Dit lost geen volledig gestopte backend op: zonder draaiende backend kan
-de Admin-pagina immers geen serveractie versturen. De normale
-`Restart=always`-systemd-configuratie blijft daarvoor de basis.
+**Frontend is niet hetzelfde als Firefox:** de frontend-service serveert de
+app op poort 4173, terwijl de Firefox kiosk de app op het fysieke scherm toont.
+Daarom heeft Admin een aparte sectie **Firefox kiosk** met
+**Start Firefox kiosk** en **Herstart Firefox kiosk**. De browserstatus wordt
+elke vijf seconden opgevraagd via `GET /admin/kiosk`.
 
-De bestaande **Deploy update** in Admin haalt nieuwe code van GitHub naar
-de ODROID en gebruikt dezelfde gecombineerde systemd restart. GitHub pushen
-alleen verandert de draaiende ODROID-code niet.
+`POST /admin/kiosk` gebruikt alleen de bestaande launcher
+`/home/quincy/bin/open-smartmirroros.sh` en accepteert alleen de operaties
+`start` of `restart`. Er worden geen arbitraire shellopdrachten verwerkt.
+Bij **Start** wordt niets gedaan als Firefox al draait; **Herstart** herstart
+de bestaande kioskflow. De launcher bepaalt zelf hoe Firefox, de X11-display
+(`DISPLAY=:0`), DPMS, cursor hiding en de veilige XRandR-calibratie werken.
+De backend gebruikt `systemd-run --user` om de launcher buiten de backend-
+servicecgroup te starten, zodat een volgende backendrestart Firefox niet
+automatisch afsluit. Hiervoor moet de gebruikerssessie van `quincy`
+(`/run/user/1000/bus`) actief zijn.
+
+Als de kiosk niet opent, controleer op de ODROID (in een SSH-terminal):
+
+```bash
+cd /home/quincy/Smart-Mirror-OS
+ls -l /home/quincy/bin/open-smartmirroros.sh
+ls -l /home/quincy/bin/start-smart-mirror-browser.sh
+test -S /tmp/.X11-unix/X0 && echo "X11 actief" || echo "X11 niet actief"
+pgrep -a firefox || true
+systemctl --user status --no-pager
+journalctl --user -n 80 --no-pager
+```
+
+De verwachte situatie: beide launchers zijn uitvoerbaar, X11 is actief,
+en na de startactie verschijnt een Firefox-proces en de kiosk op het scherm.
+Controleer de daadwerkelijke weergave: een geslaagde startaanvraag bewijst
+nog niet dat Firefox zichtbaar is.
+
+**Beperkingen:** een volledig gestopte backend kan zichzelf niet via het
+Admin-paneel starten. Een volledig gestopte frontend kan geen nieuwe Admin-
+pagina serveren. De bestaande systemd `Restart=always` blijft nodig.
+De HTTP-origincheck is geen authenticatie; bied poort 8787 nooit openbaar aan.
+
+De bestaande **Deployment**-sectie haalt GitHub-code binnen, bouwt de frontend
+en herstart backend/frontend. Het herstarten van die services is niet hetzelfde
+als het starten van de Firefox kiosk. Een GitHub-push op zichzelf verandert de
+draaiende ODROID niet.
 
 ## Scripts
 
