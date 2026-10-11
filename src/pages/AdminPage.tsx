@@ -25,6 +25,11 @@ type ManagedServiceStatus = {
   backend: string;
 };
 
+type KioskStatus = {
+  running: boolean | null;
+  launcherAvailable: boolean | null;
+};
+
 type AdminPageProps = {
   layout: LayoutItem[];
   settings: MirrorSettings;
@@ -468,6 +473,91 @@ export function AdminPage({
   const [serviceFeedback, setServiceFeedback] = useState<string | null>(null);
   const [serviceError, setServiceError] = useState<string | null>(null);
   const [serviceBusy, setServiceBusy] = useState(false);
+  const [kioskStatus, setKioskStatus] = useState<KioskStatus>({
+    running: null,
+    launcherAvailable: null,
+  });
+  const [kioskFeedback, setKioskFeedback] = useState<string | null>(null);
+  const [kioskError, setKioskError] = useState<string | null>(null);
+  const [kioskBusy, setKioskBusy] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function refreshKioskStatus() {
+      try {
+        const response = await fetch(`${apiBaseUrl}/admin/kiosk`, {
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const result = (await response.json()) as {
+          ok: boolean;
+          running: boolean;
+          launcherAvailable: boolean;
+        };
+        if (mounted && result.ok) {
+          setKioskStatus({
+            running: result.running,
+            launcherAvailable: result.launcherAvailable,
+          });
+        }
+      } catch {
+        if (mounted) {
+          setKioskStatus({ running: null, launcherAvailable: null });
+        }
+      }
+    }
+
+    void refreshKioskStatus();
+    const timer = window.setInterval(() => void refreshKioskStatus(), 5000);
+    return () => {
+      mounted = false;
+      window.clearInterval(timer);
+    };
+  }, [apiBaseUrl]);
+
+  async function controlKiosk(operation: "start" | "restart") {
+    if (
+      operation === "restart" &&
+      !window.confirm("Firefox kiosk herstarten op de spiegel? De browser sluit kort.")
+    ) {
+      return;
+    }
+
+    setKioskBusy(true);
+    setKioskFeedback(null);
+    setKioskError(null);
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/admin/kiosk`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ operation }),
+      });
+      const result = (await response.json()) as {
+        ok: boolean;
+        pending?: boolean;
+        alreadyRunning?: boolean;
+        error?: string;
+      };
+      if (!response.ok || !result.ok) {
+        throw new Error(result.error ?? `HTTP ${response.status}`);
+      }
+      setKioskFeedback(
+        result.alreadyRunning
+          ? "Firefox draait al. Er is niets opnieuw gestart."
+          : "Kioskstart aangevraagd. Controleer of de Smart Mirror op het scherm verschijnt.",
+      );
+    } catch (error) {
+      setKioskError(
+        error instanceof Error ? error.message : "Firefox kiosk starten mislukt.",
+      );
+    } finally {
+      setKioskBusy(false);
+    }
+  }
 
   useEffect(() => {
     let mounted = true;
@@ -1207,6 +1297,56 @@ export function AdminPage({
             <p className="admin-status admin-status--error" role="alert">
               {serviceError}
             </p>
+          ) : null}
+        </AccordionSection>
+
+        <AccordionSection
+          title="Firefox kiosk"
+          subtitle="Smart Mirror op het fysieke scherm openen of herstarten"
+        >
+          <p className="admin-muted">
+            Browserstatus:{" "}
+            <strong>
+              {kioskStatus.running === null
+                ? "onbekend"
+                : kioskStatus.running
+                  ? "Firefox draait"
+                  : "Firefox draait niet"}
+            </strong>
+          </p>
+          {kioskStatus.launcherAvailable === false ? (
+            <p className="admin-status admin-status--error">
+              Bestaande kiosk-launcher ontbreekt op de ODROID.
+            </p>
+          ) : null}
+          <p className="admin-muted">
+            De frontend-service kan actief zijn terwijl Firefox gesloten is.
+            Deze knoppen gebruiken de bestaande SmartMirrorOS-desktoplauncher,
+            inclusief de ingestelde displaycorrectie.
+          </p>
+          <div className="admin-button-row">
+            <button
+              type="button"
+              onClick={() => void controlKiosk("start")}
+              disabled={kioskBusy || kioskStatus.launcherAvailable === false ||
+                deployment.status === "deploying"}
+            >
+              Start Firefox kiosk
+            </button>
+            <button
+              type="button"
+              onClick={() => void controlKiosk("restart")}
+              disabled={kioskBusy || kioskStatus.launcherAvailable === false ||
+                deployment.status === "deploying"}
+            >
+              Herstart Firefox kiosk
+            </button>
+          </div>
+          {kioskFeedback ? (
+            <p className="admin-muted" role="status">{kioskFeedback}</p>
+          ) : null}
+          {kioskError ? (
+            <p className="admin-status admin-status--error" role="alert">{kioskError}</p>
           ) : null}
         </AccordionSection>
 
