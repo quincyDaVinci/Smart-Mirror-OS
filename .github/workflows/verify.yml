@@ -1,0 +1,26 @@
+name: Verify Smart Mirror
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Build frontend
+        run: npm run build
+      - name: Lint
+        run: npm run lint
+      - name: Check backend syntax
+        run: node --check server/index.js
+      - name: Run Dune provider tests
+        run: node --test server/providers/duneNowPlaying.test.js
