@@ -3843,10 +3843,12 @@ app.post("/admin/services", (req, res) => {
 
   serviceControlBusy = true;
   const unitNames = MANAGED_SERVICE_TARGETS[target];
-  const args = ["-n", "systemctl", operation, ...unitNames];
 
+  // Sudoers on the ODROID already permits exact restart commands, not start.
+  // systemctl restart also starts an inactive unit. Keep "Start" idempotent
+  // by checking the unit state first instead of restarting a running service.
   const runCommand = (respondOnCompletion) => {
-    execFile("sudo", args, { timeout: 15000 }, (error, _stdout, stderr) => {
+    execFile("sudo", ["-n", "systemctl", "restart", ...unitNames], { timeout: 15000 }, (error, _stdout, stderr) => {
       serviceControlBusy = false;
       if (error) {
         appendLog(
@@ -3871,12 +3873,28 @@ app.post("/admin/services", (req, res) => {
     });
   };
 
+  if (operation === "start") {
+    // Only individual units have a Start button. If active, do nothing.
+    void getManagedServiceState(`${unitNames[0]}.service`).then((serviceStatus) => {
+      if (serviceStatus === "active") {
+        serviceControlBusy = false;
+        res.json({ ok: true, alreadyRunning: true });
+        return;
+      }
+
+      // A restart of an inactive service behaves like start and is already
+      // permitted by the existing narrowly scoped sudoers entries.
+      runCommand(true);
+    });
+    return;
+  }
+
   // Verify passwordless permission before acknowledging a self-restart.
   // The actual restart must run after the response because this API will exit.
-  if (operation === "restart" && (target === "backend" || target === "both")) {
+  if (target === "backend" || target === "both") {
     execFile(
       "sudo",
-      ["-n", "-l", "systemctl", operation, ...unitNames],
+      ["-n", "-l", "systemctl", "restart", ...unitNames],
       { timeout: 5000 },
       (error) => {
         if (error) {
