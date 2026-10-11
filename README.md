@@ -241,35 +241,27 @@ De backend moet zonder interactieve wachtwoordprompt `systemctl` mogen uitvoeren
 De endpoint controleert de browser-origin, maar is geen gebruikersauthenticatie:
 stel poort 8787 niet aan het openbare internet bloot.
 
-Eenmalige ODROID-configuratie (via de **ODROID terminal / SSH**, niet GitHub):
+**Sudoers-compatibiliteit (ODROID gecontroleerd):** `sudo -n -l` toont dat
+`quincy` deze commando's al zonder wachtwoord mag uitvoeren:
 
 ```bash
-cd /home/quincy/Smart-Mirror-OS
-command -v systemctl
-sudo visudo -f /etc/sudoers.d/smart-mirror-services
+sudo -n systemctl restart smart-mirror-frontend
+sudo -n systemctl restart smart-mirror-backend
+sudo -n systemctl restart smart-mirror-backend smart-mirror-frontend
 ```
 
-Op de huidige Armbian/Ubuntu-installatie hoort `systemctl` op
-`/usr/bin/systemctl` te staan. Voeg in `visudo` deze exacte regel toe
-(als de eerste command een ander pad geeft, gebruik dat pad):
+Daarom voert het paneel altijd de bestaande toegestane `restart` uit.
+Bij **Start** wordt eerst de servicestatus opgevraagd: als de service al
+`active` is, gebeurt er niets; als de service niet draait, start
+`systemctl restart` deze ook op. Er is **geen sudoers-wijziging nodig**.
 
-```text
-quincy ALL=(root) NOPASSWD: /usr/bin/systemctl start smart-mirror-frontend, /usr/bin/systemctl restart smart-mirror-frontend, /usr/bin/systemctl start smart-mirror-backend, /usr/bin/systemctl restart smart-mirror-backend, /usr/bin/systemctl restart smart-mirror-backend smart-mirror-frontend
-```
+Dit lost geen volledig gestopte backend op: zonder draaiende backend kan
+de Admin-pagina immers geen serveractie versturen. De normale
+`Restart=always`-systemd-configuratie blijft daarvoor de basis.
 
-Controleer daarna zonder diensten te herstarten:
-
-```bash
-sudo visudo -cf /etc/sudoers.d/smart-mirror-services
-sudo -n -l systemctl restart smart-mirror-backend smart-mirror-frontend
-systemctl is-active smart-mirror-backend.service
-systemctl is-active smart-mirror-frontend.service
-```
-
-De eerste check moet `parsed OK` melden, de `sudo -n -l`-check moet
-zonder wachtwoord slagen, en beide statussen horen `active` te zijn.
-De bestaande **Deploy update** in Admin blijft nodig om nieuwe code van GitHub
-naar de ODROID te halen. GitHub pushen alleen start niets op de ODROID.
+De bestaande **Deploy update** in Admin haalt nieuwe code van GitHub naar
+de ODROID en gebruikt dezelfde gecombineerde systemd restart. GitHub pushen
+alleen verandert de draaiende ODROID-code niet.
 
 ## Scripts
 
