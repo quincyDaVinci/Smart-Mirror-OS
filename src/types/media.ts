@@ -69,6 +69,8 @@ export type MediaState = {
   lastUpdatedAt: number | null;
   statusChangedAt: number | null;
   lastPlayed: MediaSnapshot | null;
+  activeSources: MediaSource[];
+  manualSourceOverride: MediaSource | null;
   sourceState: {
     jellyfin: ProviderStatus;
     spotify: ProviderStatus;
@@ -106,6 +108,8 @@ export const defaultMediaState: MediaState = {
   lastUpdatedAt: null,
   statusChangedAt: null,
   lastPlayed: null,
+  activeSources: [],
+  manualSourceOverride: null,
   sourceState: {
     jellyfin: {
       enabled: true,
