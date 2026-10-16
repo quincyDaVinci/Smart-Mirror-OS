@@ -1,3 +1,5 @@
+import type { MediaSource } from "./media";
+
 export type MirrorMode = "normal" | "portrait-left" | "portrait-right";
 
 export type MirrorSettings = {
@@ -15,6 +17,7 @@ export type MirrorSettings = {
   zoomPercent: number;
   focusIdleTimeoutSeconds: number;
   mediaFocusExitDelaySeconds: number;
+  mediaSourcePriority: MediaSource[];
   lightSensorEnabled: boolean;
   lightOffLuxThreshold: number;
   lightOnLuxThreshold: number;
@@ -40,6 +43,7 @@ export const defaultMirrorSettings: MirrorSettings = {
   zoomPercent: 150,
   focusIdleTimeoutSeconds: 45,
   mediaFocusExitDelaySeconds: 10,
+  mediaSourcePriority: ["dune", "jellyfin", "youtube", "spotify"],
   lightSensorEnabled: true,
   lightOnLuxThreshold: 20,
   lightOffLuxThreshold: 13.5,
