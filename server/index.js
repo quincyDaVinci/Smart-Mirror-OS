@@ -19,6 +19,7 @@ const http = require("http");
 const { WebSocketServer } = require("ws");
 const { fetchJellyfinNowPlaying } = require("./providers/jellyfinNowPlaying");
 const { fetchDuneNowPlaying } = require("./providers/duneNowPlaying");
+const { resolveMediaByPriority } = require("./mediaPriority");
 const {
   recordYouTubeHeartbeat,
   getYouTubeNowPlaying,
@@ -1884,18 +1885,14 @@ function buildResolvedMedia({
     youtube: youtubeStatus,
   };
 
-  // Visible YouTube playback has priority over the external media providers.
-  // Dune remains next because it is the authoritative local-video player.
-  const resolvedMedia =
-    youtubeMedia?.status === "playing" || youtubeMedia?.status === "paused"
-      ? youtubeMedia
-      : duneMedia?.status === "playing" || duneMedia?.status === "paused"
-        ? duneMedia
-        : jellyfinMedia?.status === "playing"
-          ? jellyfinMedia
-          : spotifyMedia?.status === "playing"
-            ? spotifyMedia
-            : (youtubeMedia ?? jellyfinMedia ?? spotifyMedia);
+  // Source priority: Dune > Jellyfin > YouTube > Spotify.
+  // Paused playback keeps the same priority as playing playback.
+  const resolvedMedia = resolveMediaByPriority({
+    duneMedia,
+    jellyfinMedia,
+    youtubeMedia,
+    spotifyMedia,
+  });
 
   if (resolvedMedia) {
     return {
