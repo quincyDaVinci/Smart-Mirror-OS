@@ -21,6 +21,9 @@ const { fetchJellyfinNowPlaying } = require("./providers/jellyfinNowPlaying");
 const { fetchDuneNowPlaying } = require("./providers/duneNowPlaying");
 const { resolveMediaByPriority } = require("./mediaPriority");
 const {
+  createSpotifyPauseTimeoutTracker,
+} = require("./spotifyPauseTimeout");
+const {
   recordYouTubeHeartbeat,
   getYouTubeNowPlaying,
 } = require("./providers/youtubeNowPlaying");
@@ -178,6 +181,7 @@ const lyricsCache = new Map();
 const lyricsPendingRequests = new Map();
 const animatedArtworkCache = new Map();
 const animatedArtworkPendingRequests = new Map();
+const spotifyPauseTimeoutTracker = createSpotifyPauseTimeoutTracker();
 
 function cleanupPendingSpotifyStates() {
   const now = Date.now();
@@ -2248,6 +2252,27 @@ async function pollNowPlayingProviders() {
     spotifyResult = {
       ...spotifyResult,
       media: createCurrentMediaFallback("spotify"),
+    };
+  }
+
+  const spotifyPauseResult = spotifyPauseTimeoutTracker.filter(
+    spotifyResult.media,
+    getMediaFocusExitDelayMs(),
+  );
+
+  if (spotifyPauseResult.timedOut) {
+    spotifyResult = {
+      ...spotifyResult,
+      media: null,
+      providerStatus: {
+        ...spotifyResult.providerStatus,
+        message: "Spotify gepauzeerd; media-timeout verstreken.",
+      },
+    };
+  } else {
+    spotifyResult = {
+      ...spotifyResult,
+      media: spotifyPauseResult.media,
     };
   }
 
