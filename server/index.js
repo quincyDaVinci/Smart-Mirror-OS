@@ -2296,6 +2296,7 @@ async function pollNowPlayingProviders() {
 }
 
 let nowPlayingPollInFlight = false;
+let nowPlayingPollRefreshPending = false;
 let nowPlayingPollTimeout = null;
 
 function getNowPlayingPollIntervalMs() {
@@ -2310,24 +2311,42 @@ function getNowPlayingPollIntervalMs() {
 
 async function runNowPlayingPollTick(trigger = "interval") {
   if (nowPlayingPollInFlight) {
-    console.log(
-      "[poll] now playing poll skipped, previous tick still running",
-      {
-        trigger,
-      },
-    );
+    if (trigger === "youtube-heartbeat") {
+      nowPlayingPollRefreshPending = true;
+      console.log(
+        "[poll] YouTube refresh queued behind active now-playing poll",
+      );
+    } else {
+      console.log(
+        "[poll] now playing poll skipped, previous tick still running",
+        {
+          trigger,
+        },
+      );
+    }
     return;
   }
 
   nowPlayingPollInFlight = true;
+  let activeTrigger = trigger;
 
   try {
-    await pollNowPlayingProviders();
-  } catch (error) {
-    console.error("[poll] now playing tick failed", {
-      trigger,
-      error,
-    });
+    do {
+      nowPlayingPollRefreshPending = false;
+
+      try {
+        await pollNowPlayingProviders();
+      } catch (error) {
+        console.error("[poll] now playing tick failed", {
+          trigger: activeTrigger,
+          error,
+        });
+      }
+
+      if (nowPlayingPollRefreshPending) {
+        activeTrigger = "youtube-heartbeat:queued";
+      }
+    } while (nowPlayingPollRefreshPending);
   } finally {
     nowPlayingPollInFlight = false;
   }
