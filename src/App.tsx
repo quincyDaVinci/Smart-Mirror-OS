@@ -21,6 +21,7 @@ function App() {
     updateSettings,
     focusWidget,
     clearWidgetFocus,
+    setMediaSourceOverride,
     setMediaLyricsVisible,
     setMediaJellyfinTriviaVisible,
     setSpotifyContextKeepAwake,
@@ -98,6 +99,7 @@ function App() {
               connectionError={connectionError}
               onFocusWidget={focusWidget}
               onClearFocus={clearWidgetFocus}
+              onSetMediaSourceOverride={setMediaSourceOverride}
               onSetMediaLyricsVisible={setMediaLyricsVisible}
               onSetMediaJellyfinTriviaVisible={setMediaJellyfinTriviaVisible}
               onSetSpotifyContextKeepAwake={setSpotifyContextKeepAwake}
