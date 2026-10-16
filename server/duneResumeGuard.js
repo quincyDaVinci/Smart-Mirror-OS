@@ -1,3 +1,5 @@
+const { normalizeCheckpointMedia } = require("./duneJellyfinProgress");
+
 const DUNE_RESUME_DIFFERENCE_MS = 4 * 60 * 1000;
 const DUNE_RESUME_CONFIRM_PLAYBACK_MS = 3 * 60 * 1000;
 const SEEK_TOLERANCE_MS = 10 * 1000;
@@ -131,6 +133,10 @@ function createDuneResumeGuard({ readPosition, seek, writeCheckpoint, now = Date
       if (session.watchedMs >= DUNE_RESUME_CONFIRM_PLAYBACK_MS) {
         session.approved = true;
         logger.log("[dune-resume] Three minutes of real playback confirmed", { itemId: media.sourceItemId });
+        const snapshot = normalizeCheckpointMedia(media);
+        if (snapshot && !session.blocked) {
+          await writeCheckpoint({ ...snapshot, reason: "resume-confirmed", observedAt: at });
+        }
       }
     }
 
