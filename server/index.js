@@ -2364,10 +2364,15 @@ function getNowPlayingPollIntervalMs() {
 
 async function runNowPlayingPollTick(trigger = "interval") {
   if (nowPlayingPollInFlight) {
-    if (trigger === "youtube-heartbeat") {
+    if (
+      trigger === "youtube-heartbeat" ||
+      trigger === "media-source-override" ||
+      trigger === "media-priority-settings"
+    ) {
       nowPlayingPollRefreshPending = true;
       console.log(
-        "[poll] YouTube refresh queued behind active now-playing poll",
+        "[poll] media refresh queued behind active now-playing poll",
+        { trigger },
       );
     } else {
       console.log(
@@ -2397,7 +2402,7 @@ async function runNowPlayingPollTick(trigger = "interval") {
       }
 
       if (nowPlayingPollRefreshPending) {
-        activeTrigger = "youtube-heartbeat:queued";
+        activeTrigger = "media-refresh:queued";
       }
     } while (nowPlayingPollRefreshPending);
   } finally {
@@ -2884,10 +2889,16 @@ function broadcastState() {
 }
 
 function updateSettings(partialSettings = {}) {
+  const previousMediaSourcePriority = state.settings.mediaSourcePriority;
+
   state.settings = normalizeSettings({
     ...state.settings,
     ...partialSettings,
   });
+
+  const mediaSourcePriorityChanged =
+    JSON.stringify(previousMediaSourcePriority) !==
+    JSON.stringify(state.settings.mediaSourcePriority);
 
   appendLog(
     "info",
@@ -2908,6 +2919,10 @@ function updateSettings(partialSettings = {}) {
   }
 
   persistAndBroadcast();
+
+  if (mediaSourcePriorityChanged) {
+    void runNowPlayingPollTick("media-priority-settings");
+  }
 }
 
 function reorderLayoutByIds(currentLayout, orderedIds) {
