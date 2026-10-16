@@ -15,8 +15,42 @@ import type {
 import { AccordionSection } from "../components/admin/AccordionSection";
 import type { LightSensorState } from "../types/light";
 import { CommitRange } from "../components/common/CommitRange";
-import type { MediaState } from "../types/media";
+import type { MediaSource, MediaState } from "../types/media";
 import "./AdminPage.css";
+
+
+const MEDIA_SOURCE_LABELS: Record<MediaSource, string> = {
+  dune: "Dune",
+  jellyfin: "Jellyfin",
+  youtube: "YouTube",
+  spotify: "Spotify",
+};
+
+function moveMediaSourcePriority(
+  priority: MediaSource[],
+  source: MediaSource,
+  direction: -1 | 1,
+) {
+  const currentIndex = priority.indexOf(source);
+
+  if (currentIndex < 0) {
+    return priority;
+  }
+
+  const nextIndex = currentIndex + direction;
+
+  if (nextIndex < 0 || nextIndex >= priority.length) {
+    return priority;
+  }
+
+  const nextPriority = [...priority];
+  [nextPriority[currentIndex], nextPriority[nextIndex]] = [
+    nextPriority[nextIndex],
+    nextPriority[currentIndex],
+  ];
+
+  return nextPriority;
+}
 
 type ManagedService = "frontend" | "backend" | "both";
 type ServiceOperation = "start" | "restart";
@@ -893,7 +927,66 @@ export function AdminPage({
           title="Media playback defaults"
           subtitle="Bepaal wat automatisch zichtbaar wordt bij media focus"
         >
-          <label className="admin-form-group">
+          <div className="admin-media-priority">
+            <div className="admin-media-priority__heading">
+              <strong>Standaard mediaprioriteit</strong>
+              <small>
+                Bovenaan heeft de hoogste prioriteit. Een handmatige keuze in
+                Remote geldt alleen voor de lopende mediasessie.
+              </small>
+            </div>
+
+            <div className="admin-media-priority__list">
+              {settings.mediaSourcePriority.map((source, index) => (
+                <div className="admin-media-priority__row" key={source}>
+                  <span className="admin-media-priority__rank">
+                    {index + 1}
+                  </span>
+                  <strong>{MEDIA_SOURCE_LABELS[source]}</strong>
+
+                  <div className="admin-media-priority__actions">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onUpdateSettings({
+                          mediaSourcePriority: moveMediaSourcePriority(
+                            settings.mediaSourcePriority,
+                            source,
+                            -1,
+                          ),
+                        });
+                      }}
+                      disabled={!isConnected || index === 0}
+                      aria-label={`${MEDIA_SOURCE_LABELS[source]} hogere prioriteit`}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onUpdateSettings({
+                          mediaSourcePriority: moveMediaSourcePriority(
+                            settings.mediaSourcePriority,
+                            source,
+                            1,
+                          ),
+                        });
+                      }}
+                      disabled={
+                        !isConnected ||
+                        index === settings.mediaSourcePriority.length - 1
+                      }
+                      aria-label={`${MEDIA_SOURCE_LABELS[source]} lagere prioriteit`}
+                    >
+                      ↓
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <label className="admin-form-group admin-form-group--spaced">
             Lyrics update interval (ms)
             <input
               className="admin-form-control"
