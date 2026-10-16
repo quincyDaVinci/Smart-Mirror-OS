@@ -6,6 +6,7 @@ const {
   matchesJellyfinPath,
   getJellyfinSearchTerms,
   getFileImdbId,
+  getJellyfinMatchType,
   findUniqueCandidate,
 } = require("./duneNowPlaying");
 
@@ -87,5 +88,19 @@ test("prefers exact Jellyfin media source path and never guesses by title alone"
     MediaSources: [{ Path: jellyfinPath }],
   };
   assert.equal(findUniqueCandidate([item], dunePath), item);
+  assert.equal(getJellyfinMatchType(item, dunePath), "path");
   assert.equal(findUniqueCandidate([{ Name: "The Gentlemen", Path: "/tv/Other.mkv" }], dunePath), null);
+});
+
+test("labels exact IMDb fallback separately from path matches", () => {
+  const path =
+    "/tmp/mnt/smb/2/Movie Name (2024) [imdbid-tt1234567] 2160p.mkv";
+  const item = {
+    Id: "movie-id",
+    Path: "/movies/Movie Name/alternate-version.mkv",
+    ProviderIds: { Imdb: "tt1234567" },
+  };
+
+  assert.equal(findUniqueCandidate([item], path), item);
+  assert.equal(getJellyfinMatchType(item, path), "imdb");
 });
