@@ -29,6 +29,13 @@ const {
   createSpotifyPauseTimeoutTracker,
 } = require("./spotifyPauseTimeout");
 const {
+  createDunePauseTimeoutTracker,
+} = require("./dunePauseTimeout");
+const {
+  createDuneProgressCheckpointTracker,
+  createDuneJellyfinProgressSync,
+} = require("./duneJellyfinProgress");
+const {
   isAllowedYouTubeHeartbeatRequest,
 } = require("./youtubeHeartbeatRequest");
 const {
@@ -190,6 +197,9 @@ const lyricsPendingRequests = new Map();
 const animatedArtworkCache = new Map();
 const animatedArtworkPendingRequests = new Map();
 const spotifyPauseTimeoutTracker = createSpotifyPauseTimeoutTracker();
+const dunePauseTimeoutTracker = createDunePauseTimeoutTracker();
+const duneProgressCheckpointTracker = createDuneProgressCheckpointTracker();
+const duneJellyfinProgressSync = createDuneJellyfinProgressSync();
 let manualMediaSourceOverride = null;
 
 function cleanupPendingSpotifyStates() {
@@ -2283,7 +2293,7 @@ async function pollNowPlayingProviders() {
           media: null,
           providerStatus: buildProviderErrorStatus("Spotify polling mislukt."),
         };
-  const duneResult =
+  let duneResult =
     duneResponse.status === "fulfilled"
       ? duneResponse.value
       : {
@@ -2299,6 +2309,35 @@ async function pollNowPlayingProviders() {
   }
   if (duneResponse.status === "rejected") {
     console.error("failed to poll Dune now playing", duneResponse.reason);
+  }
+
+  const duneProgressCheckpoints = duneProgressCheckpointTracker.observe(
+    duneResult.media,
+  );
+
+  for (const checkpoint of duneProgressCheckpoints) {
+    void duneJellyfinProgressSync.enqueue(checkpoint);
+  }
+
+  const dunePauseResult = dunePauseTimeoutTracker.filter(
+    duneResult.media,
+    getMediaFocusExitDelayMs(),
+  );
+
+  if (dunePauseResult.timedOut) {
+    duneResult = {
+      ...duneResult,
+      media: null,
+      providerStatus: {
+        ...duneResult.providerStatus,
+        message: "Dune gepauzeerd; media-timeout verstreken.",
+      },
+    };
+  } else {
+    duneResult = {
+      ...duneResult,
+      media: dunePauseResult.media,
+    };
   }
 
   if (
@@ -3408,6 +3447,7 @@ app.post("/config/providers/secrets", async (req, res) => {
 
   if (jellyfinInput) {
     saveJellyfinSecrets(jellyfinInput);
+    duneJellyfinProgressSync.clearUserCache();
   }
 
   if (spotifyInput) {
