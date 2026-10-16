@@ -241,8 +241,16 @@ async function fetchDuneNowPlaying() {
     playbackUrl.length > 0;
 
   if (!isActive) {
-    previousFile = null;
-    currentSessionId = null;
+    // Seeking/OSD transitions can briefly omit playback details.
+    // Only navigation out of the player or an explicit stop ends its session.
+    if (
+      params.player_state === "navigator" ||
+      params.playback_state === "stopped" ||
+      params.player_state === "standby"
+    ) {
+      previousFile = null;
+      currentSessionId = null;
+    }
     return {
       media: null,
       providerStatus: {

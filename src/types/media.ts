@@ -44,6 +44,12 @@ export type MediaSnapshot = {
   capturedAt: number;
 };
 
+export type DuneResumeNotice = {
+  status: "found" | "none" | "unmatched" | "error";
+  positionMs: number | null;
+  expiresAt: number;
+};
+
 export type MediaState = {
   status: MediaStatus;
   source: MediaSource | null;
@@ -69,6 +75,7 @@ export type MediaState = {
   lastUpdatedAt: number | null;
   statusChangedAt: number | null;
   lastPlayed: MediaSnapshot | null;
+  duneResumeNotice: DuneResumeNotice | null;
   activeSources: MediaSource[];
   manualSourceOverride: MediaSource | null;
   sourceState: {
@@ -108,6 +115,7 @@ export const defaultMediaState: MediaState = {
   lastUpdatedAt: null,
   statusChangedAt: null,
   lastPlayed: null,
+  duneResumeNotice: null,
   activeSources: [],
   manualSourceOverride: null,
   sourceState: {

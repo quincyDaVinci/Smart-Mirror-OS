@@ -247,6 +247,16 @@ function getScreenLabel(display: DisplayState) {
   }
 }
 
+function formatDuneResumeTime(positionMs: number): string {
+  const totalSeconds = Math.max(0, Math.floor(positionMs / 1000));
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  return [hours, minutes, seconds]
+    .map((value) => String(value).padStart(2, "0"))
+    .join(":");
+}
+
 export function MirrorPage({
   layout,
   settings,
@@ -290,6 +300,13 @@ export function MirrorPage({
   const isWeatherFocused = showWeather && focusedWidgetId === "weather";
   const isCalendarFocused = showCalendar && focusedWidgetId === "calendar";
   const isMediaFocused = showMedia && focusedWidgetId === "media";
+  const duneResumeNotice =
+    isMediaFocused &&
+    media.source === "dune" &&
+    media.duneResumeNotice &&
+    media.duneResumeNotice.expiresAt > currentTime.getTime()
+      ? media.duneResumeNotice
+      : null;
   const isAnyWidgetFocused =
     isClockFocused || isWeatherFocused || isCalendarFocused || isMediaFocused;
 
@@ -656,6 +673,27 @@ export function MirrorPage({
                 jellyfinTriviaSessionKey={display.mediaJellyfinTriviaSessionKey}
                 variant="focus"
               />
+              {duneResumeNotice ? (
+                <aside
+                  className="mirror-dune-resume-notice"
+                  aria-live="polite"
+                  aria-label="Jellyfin kijkvoortgang"
+                >
+                  <span className="mirror-dune-resume-notice__label">
+                    Jellyfin-voortgang
+                  </span>
+                  <strong className="mirror-dune-resume-notice__value">
+                    {duneResumeNotice.status === "found" &&
+                    duneResumeNotice.positionMs !== null
+                      ? formatDuneResumeTime(duneResumeNotice.positionMs)
+                      : duneResumeNotice.status === "none"
+                        ? "Geen opgeslagen voortgang"
+                        : duneResumeNotice.status === "unmatched"
+                          ? "Film niet gevonden in Jellyfin"
+                          : "Voortgang tijdelijk niet beschikbaar"}
+                  </strong>
+                </aside>
+              ) : null}
             </div>
           ) : null
         ) : null}

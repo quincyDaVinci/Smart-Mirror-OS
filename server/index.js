@@ -457,6 +457,7 @@ const defaultState = {
     lastUpdatedAt: null,
     statusChangedAt: null,
     lastPlayed: null,
+    duneResumeNotice: null,
     activeSources: [],
     manualSourceOverride: null,
     sourceState: {
@@ -1040,6 +1041,18 @@ function normalizeMediaState(mediaInput = {}) {
     lastUpdatedAt: normalizeOptionalTimestamp(mediaInput.lastUpdatedAt),
     statusChangedAt: normalizeOptionalTimestamp(mediaInput.statusChangedAt),
     lastPlayed: normalizeMediaSnapshot(mediaInput.lastPlayed),
+    duneResumeNotice:
+      mediaInput.source === "dune" &&
+      mediaInput.duneResumeNotice &&
+      ["found", "none", "unmatched", "error"].includes(mediaInput.duneResumeNotice.status) &&
+      Number.isFinite(mediaInput.duneResumeNotice.expiresAt) &&
+      Number.isFinite(mediaInput.duneResumeNotice.positionMs ?? 0)
+        ? {
+            status: mediaInput.duneResumeNotice.status,
+            positionMs: mediaInput.duneResumeNotice.positionMs ?? null,
+            expiresAt: mediaInput.duneResumeNotice.expiresAt,
+          }
+        : null,
     activeSources: Array.isArray(mediaInput.activeSources)
       ? Array.from(
           new Set(
@@ -2421,7 +2434,12 @@ async function pollNowPlayingProviders() {
       jellyfinStatus: jellyfinResult.providerStatus,
       spotifyMedia: spotifyResult.media,
       spotifyStatus: spotifyResult.providerStatus,
-      duneMedia: duneResult.media,
+      duneMedia: duneResult.media
+        ? {
+            ...duneResult.media,
+            duneResumeNotice: duneResumeGuard.getNotice(duneResult.media),
+          }
+        : null,
       duneStatus: duneResult.providerStatus,
       youtubeMedia: youtubeResult.media,
       youtubeStatus: youtubeResult.providerStatus,
