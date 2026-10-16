@@ -104,7 +104,7 @@ async function searchJellyfinItems(baseUrl, apiKey, searchTerm) {
   url.searchParams.set("Recursive", "true");
   url.searchParams.set("IncludeItemTypes", "Episode,Movie");
   url.searchParams.set("SearchTerm", searchTerm);
-  url.searchParams.set("Fields", "Path,Genres,ProviderIds");
+  url.searchParams.set("Fields", "Path,Genres,ProviderIds,RunTimeTicks");
   url.searchParams.set("EnableMediaSources", "true");
   url.searchParams.set("Limit", "100");
 
@@ -122,10 +122,31 @@ function getFileImdbId(playbackUrl) {
   return filename.match(/\bimdb(?:id)?[-_:\s]*(tt\d{6,10})\b/i)?.[1]?.toLowerCase() ?? null;
 }
 
+function getJellyfinMatchType(item, playbackUrl) {
+  if (!item) return null;
+
+  const pathMatches = [
+    item.Path,
+    ...(item.MediaSources ?? []).map((source) => source.Path),
+  ].some((path) => matchesJellyfinPath(playbackUrl, path));
+
+  if (pathMatches) return "path";
+
+  const imdbId = getFileImdbId(playbackUrl);
+  if (
+    imdbId &&
+    typeof item.ProviderIds?.Imdb === "string" &&
+    item.ProviderIds.Imdb.toLowerCase() === imdbId
+  ) {
+    return "imdb";
+  }
+
+  return null;
+}
+
 function findUniqueCandidate(items, playbackUrl) {
-  const byPath = items.filter((item) =>
-    [item.Path, ...(item.MediaSources ?? []).map((source) => source.Path)]
-      .some((path) => matchesJellyfinPath(playbackUrl, path)),
+  const byPath = items.filter(
+    (item) => getJellyfinMatchType(item, playbackUrl) === "path",
   );
   if (byPath.length > 1) return null;
   if (byPath.length === 1) return byPath[0];
@@ -135,9 +156,8 @@ function findUniqueCandidate(items, playbackUrl) {
   const imdbId = getFileImdbId(playbackUrl);
   if (!imdbId) return null;
 
-  const byImdb = items.filter((item) =>
-    typeof item.ProviderIds?.Imdb === "string" &&
-    item.ProviderIds.Imdb.toLowerCase() === imdbId,
+  const byImdb = items.filter(
+    (item) => getJellyfinMatchType(item, playbackUrl) === "imdb",
   );
   return byImdb.length === 1 ? byImdb[0] : null;
 }
@@ -177,6 +197,11 @@ function secondsToMs(value) {
   if (value === undefined || value === null || value === "") return null;
   const n = Number(value);
   return Number.isFinite(n) && n >= 0 ? Math.round(n * 1000) : null;
+}
+
+function ticksToMs(value) {
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n / 10000) : null;
 }
 
 async function fetchDuneNowPlaying() {
@@ -252,18 +277,22 @@ async function fetchDuneNowPlaying() {
   if (item) {
     const { baseUrl, apiKey } = getJellyfinSecrets();
     return {
-      media: createMediaFromJellyfinItem({
-        item,
-        baseUrl,
-        apiKey,
-        source: "dune",
-        status,
-        progressMs,
-        durationMs,
-        playSessionId: currentSessionId,
-        deviceName: "Dune HD (Real Vision 4K)",
-        checkedAt,
-      }),
+      media: {
+        ...createMediaFromJellyfinItem({
+          item,
+          baseUrl,
+          apiKey,
+          source: "dune",
+          status,
+          progressMs,
+          durationMs,
+          playSessionId: currentSessionId,
+          deviceName: "Dune HD (Real Vision 4K)",
+          checkedAt,
+        }),
+        _duneJellyfinMatchType: getJellyfinMatchType(item, playbackUrl),
+        _duneJellyfinDurationMs: ticksToMs(item.RunTimeTicks),
+      },
       providerStatus,
     };
   }
@@ -298,5 +327,6 @@ module.exports = {
   matchesJellyfinPath,
   getJellyfinSearchTerms,
   getFileImdbId,
+  getJellyfinMatchType,
   findUniqueCandidate,
 };
