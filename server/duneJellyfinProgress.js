@@ -291,13 +291,7 @@ function createDuneJellyfinProgressSync({
       };
     }
 
-    const url = new URL(
-      `/UserItems/${encodeURIComponent(checkpoint.sourceItemId)}/UserData`,
-      targetUser.baseUrl,
-    );
-    url.searchParams.set("userId", targetUser.userId);
-
-    const response = await fetchImpl(url, {
+    const requestOptions = {
       method: "POST",
       headers: {
         "X-MediaBrowser-Token": targetUser.apiKey,
@@ -308,7 +302,28 @@ function createDuneJellyfinProgressSync({
         PlaybackPositionTicks: positionTicks,
       }),
       signal: AbortSignal.timeout(JELLYFIN_PROGRESS_REQUEST_TIMEOUT_MS),
-    });
+    };
+
+    const currentUrl = new URL(
+      `/UserItems/${encodeURIComponent(checkpoint.sourceItemId)}/UserData`,
+      targetUser.baseUrl,
+    );
+    currentUrl.searchParams.set("userId", targetUser.userId);
+
+    let response = await fetchImpl(currentUrl, requestOptions);
+    let endpoint = "current";
+
+    if (response.status === 404 || response.status === 405) {
+      const legacyUrl = new URL(
+        `/Users/${encodeURIComponent(targetUser.userId)}/Items/${encodeURIComponent(checkpoint.sourceItemId)}/UserData`,
+        targetUser.baseUrl,
+      );
+      response = await fetchImpl(legacyUrl, {
+        ...requestOptions,
+        signal: AbortSignal.timeout(JELLYFIN_PROGRESS_REQUEST_TIMEOUT_MS),
+      });
+      endpoint = "legacy";
+    }
 
     if (!response.ok) {
       warnOnce(
@@ -341,11 +356,13 @@ function createDuneJellyfinProgressSync({
       reason: checkpoint.reason,
       progressMs: checkpoint.progressMs,
       savedPositionTicks,
+      endpoint,
     });
 
     return {
       ok: true,
       reason: checkpoint.reason,
+      endpoint,
       itemId: checkpoint.sourceItemId,
       progressMs: checkpoint.progressMs,
       positionTicks,
