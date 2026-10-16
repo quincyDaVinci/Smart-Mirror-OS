@@ -181,6 +181,29 @@ function getRemoteMediaTitle(media: MediaState) {
   return media.title;
 }
 
+type RemoteLyricsAvailability =
+  | { status: "idle"; label: string; available: false }
+  | { status: "loading"; label: string; available: false }
+  | { status: "available"; label: string; available: true }
+  | { status: "unavailable" | "error"; label: string; available: false };
+
+function getRemoteLyricsErrorLabel(status: number): string {
+  switch (status) {
+    case 404:
+      return "Geen lyrics gevonden voor dit nummer";
+    case 429:
+      return "Te veel verzoeken (HTTP 429)";
+    case 503:
+      return "Lyrics-dienst tijdelijk niet beschikbaar (HTTP 503)";
+    case 504:
+      return "Lyrics-dienst reageert te langzaam (HTTP 504)";
+    case 500:
+      return "Lyrics ophalen mislukt (HTTP 500)";
+    default:
+      return `Lyrics ophalen mislukt (HTTP ${status})`;
+  }
+}
+
 type RemoteTriviaAvailability =
   | { status: "idle"; available: false }
   | { status: "loading"; available: false }
@@ -242,6 +265,10 @@ export function RemoteControlPage({
 
   const [remoteTriviaAvailability, setRemoteTriviaAvailability] =
     useState<RemoteTriviaAvailability>({ status: "idle", available: false });
+  const [remoteLyricsAvailability, setRemoteLyricsAvailability] =
+    useState<RemoteLyricsAvailability>({
+      status: "idle", label: "Nog niet gecontroleerd", available: false,
+    });
 
   useEffect(() => {
     const intervalId = window.setInterval(() => {
@@ -297,6 +324,55 @@ export function RemoteControlPage({
     media.source === "spotify" &&
     media.kind === "track" &&
     (media.status === "playing" || media.status === "paused");
+
+  useEffect(() => {
+    if (!canToggleLyrics) {
+      setRemoteLyricsAvailability({
+        status: "idle", label: "Nog niet gecontroleerd", available: false,
+      });
+      return;
+    }
+    const controller = new AbortController();
+    const query = new URLSearchParams({
+      trackName: media.title,
+      artistName: media.subtitle,
+    });
+    if (media.secondaryText) query.set("albumName", media.secondaryText);
+    if (media.durationMs !== null) query.set("durationMs", String(media.durationMs));
+    setRemoteLyricsAvailability({
+      status: "loading", label: "Lyrics controleren…", available: false,
+    });
+    fetch(`${apiBaseUrl}/media/lyrics?${query.toString()}`, {
+      cache: "no-store", signal: controller.signal,
+    }).then(async response => {
+      const payload = (await response.json()) as {
+        ok?: boolean;
+        lyrics?: { instrumental?: boolean; syncedLyrics?: string | null; plainLyrics?: string | null } | null;
+      };
+      if (controller.signal.aborted) return;
+      if (!response.ok || payload.ok !== true) {
+        setRemoteLyricsAvailability({
+          status: "error", label: getRemoteLyricsErrorLabel(response.status), available: false,
+        });
+        return;
+      }
+      const available = Boolean(
+        payload.lyrics && !payload.lyrics.instrumental &&
+        (payload.lyrics.syncedLyrics?.trim() || payload.lyrics.plainLyrics?.trim()),
+      );
+      setRemoteLyricsAvailability(available
+        ? { status: "available", label: "Lyrics beschikbaar", available: true }
+        : { status: "unavailable", label: "Geen lyrics gevonden voor dit nummer", available: false },
+      );
+    }).catch(() => {
+      if (!controller.signal.aborted) {
+        setRemoteLyricsAvailability({
+          status: "error", label: "Lyrics-dienst niet bereikbaar", available: false,
+        });
+      }
+    });
+    return () => controller.abort();
+  }, [apiBaseUrl, canToggleLyrics, media.title, media.subtitle, media.secondaryText, media.durationMs]);
 
   useEffect(() => {
     if (!canToggleJellyfinTrivia) {
@@ -541,13 +617,16 @@ export function RemoteControlPage({
         <div className="remote-action-grid">
           <button
             type="button"
-            className="remote-action-button"
+            className="remote-action-button remote-action-button--stacked"
             onClick={() => {
               onSetMediaLyricsVisible(!display.mediaLyricsVisible);
             }}
-            disabled={!isConnected || !canToggleLyrics}
+            disabled={!isConnected || !canToggleLyrics || (!display.mediaLyricsVisible && !remoteLyricsAvailability.available)}
           >
-            Lyrics {display.mediaLyricsVisible ? "uitzetten" : "aanzetten"}
+            <span>Lyrics {display.mediaLyricsVisible ? "uitzetten" : "aanzetten"}</span>
+            <small className="remote-action-button__hint">
+              {remoteLyricsAvailability.label}
+            </small>
           </button>
 
           <button
