@@ -31,6 +31,8 @@ const {
 const {
   createDunePauseTimeoutTracker,
 } = require("./dunePauseTimeout");
+const { createMediaPauseTimeoutTracker } = require("./mediaPauseTimeout");
+const { createDuneResumeGuard } = require("./duneResumeGuard");
 const {
   createDuneProgressCheckpointTracker,
   createDuneJellyfinProgressSync,
@@ -198,8 +200,25 @@ const animatedArtworkCache = new Map();
 const animatedArtworkPendingRequests = new Map();
 const spotifyPauseTimeoutTracker = createSpotifyPauseTimeoutTracker();
 const dunePauseTimeoutTracker = createDunePauseTimeoutTracker();
+const jellyfinPauseTimeoutTracker = createMediaPauseTimeoutTracker("jellyfin");
+const youtubePauseTimeoutTracker = createMediaPauseTimeoutTracker("youtube");
 const duneProgressCheckpointTracker = createDuneProgressCheckpointTracker();
 const duneJellyfinProgressSync = createDuneJellyfinProgressSync();
+const duneResumeGuard = createDuneResumeGuard({
+  readPosition: (media) => duneJellyfinProgressSync.readSavedPosition(media),
+  seek: async (positionMs) => {
+    const statusUrl = process.env.DUNE_STATUS_URL ||
+      "http://192.168.68.112/cgi-bin/do?cmd=status";
+    const commandUrl = new URL(statusUrl);
+    commandUrl.searchParams.set("cmd", "set_playback_state");
+    commandUrl.searchParams.set("position", String(Math.floor(positionMs / 1000)));
+    const response = await fetch(commandUrl, { signal: AbortSignal.timeout(3000) });
+    if (!response.ok) return false;
+    const xml = await response.text();
+    return /<param\s+name="command_status"\s+value="ok"/.test(xml);
+  },
+  writeCheckpoint: (checkpoint) => duneJellyfinProgressSync.enqueue(checkpoint),
+});
 let manualMediaSourceOverride = null;
 
 function cleanupPendingSpotifyStates() {
@@ -2315,9 +2334,7 @@ async function pollNowPlayingProviders() {
     duneResult.media,
   );
 
-  for (const checkpoint of duneProgressCheckpoints) {
-    void duneJellyfinProgressSync.enqueue(checkpoint);
-  }
+  void duneResumeGuard.observe(duneResult.media, duneProgressCheckpoints);
 
   const dunePauseResult = dunePauseTimeoutTracker.filter(
     duneResult.media,
@@ -2371,7 +2388,32 @@ async function pollNowPlayingProviders() {
     };
   }
 
+  const jellyfinPauseResult = jellyfinPauseTimeoutTracker.filter(
+    jellyfinResult.media, getMediaFocusExitDelayMs(),
+  );
+  if (jellyfinPauseResult.timedOut) {
+    jellyfinResult.media = null;
+    jellyfinResult.providerStatus = {
+      ...jellyfinResult.providerStatus,
+      message: "Jellyfin gepauzeerd; media-timeout verstreken.",
+    };
+  } else {
+    jellyfinResult.media = jellyfinPauseResult.media;
+  }
+
   const youtubeResult = getYouTubeNowPlaying();
+  const youtubePauseResult = youtubePauseTimeoutTracker.filter(
+    youtubeResult.media, getMediaFocusExitDelayMs(),
+  );
+  if (youtubePauseResult.timedOut) {
+    youtubeResult.media = null;
+    youtubeResult.providerStatus = {
+      ...youtubeResult.providerStatus,
+      message: "YouTube gepauzeerd; media-timeout verstreken.",
+    };
+  } else {
+    youtubeResult.media = youtubePauseResult.media;
+  }
 
   updateRuntimeMedia(
     buildResolvedMedia({

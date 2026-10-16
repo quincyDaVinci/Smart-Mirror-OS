@@ -234,7 +234,7 @@ async function fetchDuneNowPlaying() {
 
   const playbackUrl = params.playback_url;
   const isActive =
-    params.player_state === "file_playback" &&
+    (params.player_state === "file_playback" || params.player_state === "osd_screen") &&
     (params.playback_state === "playing" ||
       params.playback_state === "paused") &&
     typeof playbackUrl === "string" &&

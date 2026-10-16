@@ -258,6 +258,36 @@ function createDuneJellyfinProgressSync({
     return userCache;
   }
 
+  async function readSavedPosition(media) {
+    if (!isSafeDuneJellyfinCheckpoint({
+      sourceItemId: media?.sourceItemId,
+      progressMs: Math.max(1000, Number(media?.progressMs) || 0),
+      matchType: media?._duneJellyfinMatchType,
+      durationMs: media?.durationMs,
+      jellyfinDurationMs: media?._duneJellyfinDurationMs,
+    })) return null;
+
+    const targetUser = await resolveTargetUser();
+    if (!targetUser) return null;
+
+    const url = new URL(
+      `/Users/${encodeURIComponent(targetUser.userId)}/Items/${encodeURIComponent(media.sourceItemId)}`,
+      targetUser.baseUrl,
+    );
+    const response = await fetchImpl(url, {
+      headers: {
+        "X-MediaBrowser-Token": targetUser.apiKey,
+        Accept: "application/json",
+      },
+      signal: AbortSignal.timeout(JELLYFIN_PROGRESS_REQUEST_TIMEOUT_MS),
+    });
+    if (!response.ok) return null;
+    const item = await response.json();
+    if (item?.Id !== media.sourceItemId) return null;
+    const ticks = Number(item?.UserData?.PlaybackPositionTicks);
+    return Number.isFinite(ticks) && ticks >= 0 ? Math.floor(ticks / 10000) : null;
+  }
+
   async function syncCheckpoint(checkpoint) {
     if (!isSafeDuneJellyfinCheckpoint(checkpoint)) {
       warnOnce(
@@ -397,6 +427,7 @@ function createDuneJellyfinProgressSync({
   return {
     enqueue,
     syncCheckpoint,
+    readSavedPosition,
     clearUserCache,
   };
 }
