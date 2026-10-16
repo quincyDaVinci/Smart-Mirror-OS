@@ -31,6 +31,7 @@ jobs:
             server/spotifyPauseTimeout.test.js \
             server/dunePauseTimeout.test.js \
             server/duneJellyfinProgress.test.js \
+            server/duneResumeGuard.test.js \
             server/providers/duneNowPlaying.test.js \
             server/providers/youtubeNowPlaying.test.js \
             server/youtubeHeartbeatRequest.test.js
