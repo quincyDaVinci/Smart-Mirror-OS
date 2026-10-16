@@ -20,6 +20,17 @@ function createDuneResumeGuard({ readPosition, seek, writeCheckpoint, now = Date
       typeof media.sourceItemId === "string" && media.sourceItemId;
     const key = valid ? media.playSessionId + ":" + media.sourceItemId : null;
 
+    // On a file change, the checkpoint tracker emits the OLD session's
+    // stop checkpoint alongside the NEW media. Handle it under the old gate.
+    if (key && session && session.key !== key) {
+      const oldCheckpoints = checkpoints.filter(checkpoint =>
+        session.key === checkpoint.playSessionId + ":" + checkpoint.sourceItemId
+      );
+      if (!session.blocked && session.approved) {
+        for (const checkpoint of oldCheckpoints) await writeCheckpoint(checkpoint);
+      }
+    }
+
     if (key && session?.key !== key) {
       session = {
         key, approved: false, blocked: true, initialized: false,
@@ -124,7 +135,9 @@ function createDuneResumeGuard({ readPosition, seek, writeCheckpoint, now = Date
     }
 
     if (!session.blocked && session.approved) {
-      for (const checkpoint of checkpoints) await writeCheckpoint(checkpoint);
+      for (const checkpoint of checkpoints.filter(checkpoint =>
+        session.key === checkpoint.playSessionId + ":" + checkpoint.sourceItemId
+      )) await writeCheckpoint(checkpoint);
     }
   }
 
