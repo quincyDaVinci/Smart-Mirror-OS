@@ -212,26 +212,32 @@ async function recordYouTubeHeartbeat(input) {
 
   const previous = latestHeartbeat;
   const receivedAt = Date.now();
-  latestHeartbeat = {
+  const heartbeat = {
     ...normalized,
     receivedAt,
   };
+  latestHeartbeat = heartbeat;
 
-  const active = isYouTubeHeartbeatActive(latestHeartbeat, receivedAt);
+  const active = isYouTubeHeartbeatActive(heartbeat, receivedAt);
 
   if (active) {
-    const metadata = await fetchYouTubeMetadata(latestHeartbeat.videoId);
-    latestMedia = createYouTubeMedia(latestHeartbeat, metadata);
-  } else {
+    const metadata = await fetchYouTubeMetadata(heartbeat.videoId);
+
+    // A metadata request can overlap a fast video switch. Never let an older
+    // request overwrite the media belonging to a newer heartbeat.
+    if (latestHeartbeat === heartbeat) {
+      latestMedia = createYouTubeMedia(heartbeat, metadata);
+    }
+  } else if (latestHeartbeat === heartbeat) {
     latestMedia = null;
   }
 
   const previousActive = isYouTubeHeartbeatActive(previous, receivedAt);
   const refreshNeeded =
     previousActive !== active ||
-    previous?.videoId !== latestHeartbeat.videoId ||
-    previous?.status !== latestHeartbeat.status ||
-    previous?.visible !== latestHeartbeat.visible;
+    previous?.videoId !== heartbeat.videoId ||
+    previous?.status !== heartbeat.status ||
+    previous?.visible !== heartbeat.visible;
 
   return {
     accepted: true,
