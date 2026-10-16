@@ -331,7 +331,9 @@ export function MediaWidget({
       ? Math.min(100, Math.max(0, (liveProgressMs / media.durationMs) * 100))
       : 0;
 
-  const isVideo = media.kind === "movie" || media.kind === "episode";
+  const isVideo =
+    media.kind === "movie" || media.kind === "episode" || media.kind === "video";
+  const isYouTubeVideo = media.source === "youtube" && media.kind === "video";
 
   const remainingMs =
     isVideo && liveProgressMs !== null && media.durationMs !== null
@@ -395,7 +397,15 @@ export function MediaWidget({
   const titleSize = variant === "focus" ? 44 : 24;
   const subtitleSize = variant === "focus" ? 22 : 16;
   const detailSize = variant === "focus" ? 17 : 14;
-  const artworkPadding = variant === "focus" ? (isVideo ? 12 : 8) : isVideo ? 8 : 4;
+  const artworkPadding = isYouTubeVideo
+    ? 0
+    : variant === "focus"
+      ? isVideo
+        ? 12
+        : 8
+      : isVideo
+        ? 8
+        : 4;
   const progressHeight = variant === "focus" ? 8 : 6;
 
   return (
@@ -413,7 +423,7 @@ export function MediaWidget({
       <div
         style={{
           width: "100%",
-          aspectRatio: isVideo ? "2 / 3" : "1 / 1",
+          aspectRatio: isYouTubeVideo ? "16 / 9" : isVideo ? "2 / 3" : "1 / 1",
           borderRadius: 14,
           overflow: "hidden",
           background: "rgba(255, 255, 255, 0.08)",
