@@ -19,6 +19,10 @@ const http = require("http");
 const { WebSocketServer } = require("ws");
 const { fetchJellyfinNowPlaying } = require("./providers/jellyfinNowPlaying");
 const { fetchDuneNowPlaying } = require("./providers/duneNowPlaying");
+const {
+  recordYouTubeHeartbeat,
+  getYouTubeNowPlaying,
+} = require("./providers/youtubeNowPlaying");
 const { fetchJellyfinTriviaForMedia } = require("./providers/jellyfinTrivia");
 const {
   fetchSpotifyNowPlaying,
@@ -114,6 +118,39 @@ app.post("/debug/perf", (req, res) => {
   console.log("[perf]", JSON.stringify(req.body));
   res.sendStatus(204);
 });
+
+app.post(
+  "/media/youtube-heartbeat",
+  express.text({ type: "text/plain", limit: "4kb" }),
+  async (req, res) => {
+    if (req.headers.origin !== "https://www.youtube.com") {
+      res.status(403).json({ ok: false, error: "origin-not-allowed" });
+      return;
+    }
+
+    let payload;
+
+    try {
+      payload = JSON.parse(typeof req.body === "string" ? req.body : "");
+    } catch {
+      res.status(400).json({ ok: false, error: "invalid-json" });
+      return;
+    }
+
+    const result = await recordYouTubeHeartbeat(payload);
+
+    if (!result.accepted) {
+      res.status(400).json({ ok: false, error: "invalid-heartbeat" });
+      return;
+    }
+
+    res.sendStatus(204);
+
+    if (result.refreshNeeded) {
+      void runNowPlayingPollTick("youtube-heartbeat");
+    }
+  },
+);
 
 const HEARTBEAT_INTERVAL_MS = 25000;
 const NOW_PLAYING_IDLE_POLL_INTERVAL_MS = 10000;
@@ -250,8 +287,8 @@ const WIDGET_DEFAULT_EDGE_POSITIONS = {
 
 const FOCUS_SOURCES = ["manual", "media-auto"];
 const MEDIA_STATUSES = ["idle", "playing", "paused", "error"];
-const MEDIA_KINDS = ["movie", "episode", "track", "podcast", "unknown"];
-const MEDIA_SOURCES = ["jellyfin", "spotify", "dune"];
+const MEDIA_KINDS = ["movie", "episode", "track", "podcast", "video", "unknown"];
+const MEDIA_SOURCES = ["jellyfin", "spotify", "dune", "youtube"];
 
 function isWidgetId(value) {
   return typeof value === "string" && WIDGET_IDS.includes(value);
@@ -393,6 +430,12 @@ const defaultState = {
         enabled: true,
         status: "idle",
         message: null,
+        lastCheckedAt: null,
+      },
+      youtube: {
+        enabled: true,
+        status: "idle",
+        message: "Nog geen YouTube heartbeat ontvangen.",
         lastCheckedAt: null,
       },
     },
@@ -893,6 +936,11 @@ function normalizeMediaState(mediaInput = {}) {
       ? mediaInput.sourceState.dune
       : undefined;
 
+  const youtubeInput =
+    mediaInput.sourceState && typeof mediaInput.sourceState === "object"
+      ? mediaInput.sourceState.youtube
+      : undefined;
+
   return {
     ...defaultState.media,
     status: normalizeMediaStatus(mediaInput.status),
@@ -956,6 +1004,10 @@ function normalizeMediaState(mediaInput = {}) {
       dune: normalizeProviderRuntimeStatus(
         duneInput,
         defaultState.media.sourceState.dune,
+      ),
+      youtube: normalizeProviderRuntimeStatus(
+        youtubeInput,
+        defaultState.media.sourceState.youtube,
       ),
     },
   };
@@ -1216,7 +1268,8 @@ function isMediaPlayableSource(mediaState) {
   return (
     mediaState.source === "jellyfin" ||
     mediaState.source === "spotify" ||
-    mediaState.source === "dune"
+    mediaState.source === "dune" ||
+    mediaState.source === "youtube"
   );
 }
 
@@ -1820,23 +1873,29 @@ function buildResolvedMedia({
   spotifyStatus,
   duneMedia,
   duneStatus,
+  youtubeMedia,
+  youtubeStatus,
 }) {
   const sourceState = {
     ...defaultState.media.sourceState,
     jellyfin: jellyfinStatus,
     spotify: spotifyStatus,
     dune: duneStatus,
+    youtube: youtubeStatus,
   };
 
-  // Dune takes priority while playing or paused.
+  // Visible YouTube playback has priority over the external media providers.
+  // Dune remains next because it is the authoritative local-video player.
   const resolvedMedia =
-    duneMedia?.status === "playing" || duneMedia?.status === "paused"
-      ? duneMedia
-      : jellyfinMedia?.status === "playing"
-        ? jellyfinMedia
-        : spotifyMedia?.status === "playing"
-          ? spotifyMedia
-          : (jellyfinMedia ?? spotifyMedia);
+    youtubeMedia?.status === "playing" || youtubeMedia?.status === "paused"
+      ? youtubeMedia
+      : duneMedia?.status === "playing" || duneMedia?.status === "paused"
+        ? duneMedia
+        : jellyfinMedia?.status === "playing"
+          ? jellyfinMedia
+          : spotifyMedia?.status === "playing"
+            ? spotifyMedia
+            : (youtubeMedia ?? jellyfinMedia ?? spotifyMedia);
 
   if (resolvedMedia) {
     return {
@@ -2195,6 +2254,8 @@ async function pollNowPlayingProviders() {
     };
   }
 
+  const youtubeResult = getYouTubeNowPlaying();
+
   updateRuntimeMedia(
     buildResolvedMedia({
       jellyfinMedia: jellyfinResult.media,
@@ -2203,6 +2264,8 @@ async function pollNowPlayingProviders() {
       spotifyStatus: spotifyResult.providerStatus,
       duneMedia: duneResult.media,
       duneStatus: duneResult.providerStatus,
+      youtubeMedia: youtubeResult.media,
+      youtubeStatus: youtubeResult.providerStatus,
     }),
   );
 }
