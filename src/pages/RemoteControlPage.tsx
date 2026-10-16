@@ -515,6 +515,7 @@ export function RemoteControlPage({
                     aria-pressed={isManual}
                     onClick={() => {
                       onSetMediaSourceOverride(source);
+                      onFocusWidget("media");
                     }}
                     disabled={!isConnected}
                   >
