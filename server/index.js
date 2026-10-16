@@ -19,7 +19,12 @@ const http = require("http");
 const { WebSocketServer } = require("ws");
 const { fetchJellyfinNowPlaying } = require("./providers/jellyfinNowPlaying");
 const { fetchDuneNowPlaying } = require("./providers/duneNowPlaying");
-const { resolveMediaByPriority } = require("./mediaPriority");
+const {
+  DEFAULT_MEDIA_SOURCE_PRIORITY,
+  getActiveMediaSources,
+  normalizeMediaSourcePriority,
+  resolveMediaByPriority,
+} = require("./mediaPriority");
 const {
   createSpotifyPauseTimeoutTracker,
 } = require("./spotifyPauseTimeout");
@@ -185,6 +190,7 @@ const lyricsPendingRequests = new Map();
 const animatedArtworkCache = new Map();
 const animatedArtworkPendingRequests = new Map();
 const spotifyPauseTimeoutTracker = createSpotifyPauseTimeoutTracker();
+let manualMediaSourceOverride = null;
 
 function cleanupPendingSpotifyStates() {
   const now = Date.now();
@@ -339,6 +345,7 @@ const defaultState = {
     zoomPercent: 100,
     focusIdleTimeoutSeconds: 45,
     mediaFocusExitDelaySeconds: 10,
+    mediaSourcePriority: [...DEFAULT_MEDIA_SOURCE_PRIORITY],
     lightSensorEnabled: true,
     lightOffLuxThreshold: 13.5,
     lightOnLuxThreshold: 28,
@@ -421,6 +428,8 @@ const defaultState = {
     lastUpdatedAt: null,
     statusChangedAt: null,
     lastPlayed: null,
+    activeSources: [],
+    manualSourceOverride: null,
     sourceState: {
       jellyfin: {
         enabled: true,
@@ -478,6 +487,7 @@ function normalizeSettings(input = {}) {
     zoomPercent,
     focusIdleTimeoutSeconds,
     mediaFocusExitDelaySeconds,
+    mediaSourcePriority,
     calibrationModeEnabled,
     mediaLyricsDefaultVisible,
     mediaLyricsUpdateIntervalMs,
@@ -597,6 +607,7 @@ function normalizeSettings(input = {}) {
       600,
       defaultState.settings.mediaFocusExitDelaySeconds,
     ),
+    mediaSourcePriority: normalizeMediaSourcePriority(mediaSourcePriority),
     lightSensorEnabled:
       typeof input.lightSensorEnabled === "boolean"
         ? input.lightSensorEnabled
@@ -1000,6 +1011,14 @@ function normalizeMediaState(mediaInput = {}) {
     lastUpdatedAt: normalizeOptionalTimestamp(mediaInput.lastUpdatedAt),
     statusChangedAt: normalizeOptionalTimestamp(mediaInput.statusChangedAt),
     lastPlayed: normalizeMediaSnapshot(mediaInput.lastPlayed),
+    activeSources: Array.isArray(mediaInput.activeSources)
+      ? normalizeMediaSourcePriority(state?.settings?.mediaSourcePriority).filter(
+          (source) => mediaInput.activeSources.includes(source),
+        )
+      : [],
+    manualSourceOverride: MEDIA_SOURCES.includes(mediaInput.manualSourceOverride)
+      ? mediaInput.manualSourceOverride
+      : null,
     sourceState: {
       jellyfin: normalizeProviderRuntimeStatus(
         jellyfinInput,
@@ -1042,7 +1061,11 @@ function normalizeLoadedState(parsedState = {}) {
       ...baseState.deployment,
       ...parsedState.deployment,
     },
-    media: normalizeMediaState(parsedState.media ?? {}),
+    media: {
+      ...normalizeMediaState(parsedState.media ?? {}),
+      activeSources: [],
+      manualSourceOverride: null,
+    },
   };
 }
 
@@ -1892,25 +1915,51 @@ function buildResolvedMedia({
     youtube: youtubeStatus,
   };
 
-  // Source priority: Dune > Jellyfin > YouTube > Spotify.
-  // Paused playback keeps the same priority as playing playback.
-  const resolvedMedia = resolveMediaByPriority({
+  const mediaSources = {
     duneMedia,
     jellyfinMedia,
     youtubeMedia,
     spotifyMedia,
+  };
+  const priority = state.settings.mediaSourcePriority;
+  const activeSources = getActiveMediaSources({
+    ...mediaSources,
+    priority,
+  });
+
+  if (
+    manualMediaSourceOverride !== null &&
+    !activeSources.includes(manualMediaSourceOverride)
+  ) {
+    appendLog(
+      "info",
+      "media",
+      "Handmatige mediabron-override beëindigd",
+      `${manualMediaSourceOverride} is niet meer actief`,
+    );
+    manualMediaSourceOverride = null;
+  }
+
+  const resolvedMedia = resolveMediaByPriority({
+    ...mediaSources,
+    priority,
+    overrideSource: manualMediaSourceOverride,
   });
 
   if (resolvedMedia) {
     return {
       ...defaultState.media,
       ...resolvedMedia,
+      activeSources,
+      manualSourceOverride: manualMediaSourceOverride,
       sourceState,
     };
   }
 
   return {
     ...defaultState.media,
+    activeSources,
+    manualSourceOverride: null,
     sourceState,
   };
 }
@@ -2958,6 +3007,43 @@ function handleClientMessage(message) {
 
   if (message.type === "settings:update") {
     updateSettings(message.payload ?? {});
+    return true;
+  }
+
+  if (message.type === "media:source-override") {
+    const { source } = message.payload ?? {};
+
+    if (source === null) {
+      manualMediaSourceOverride = null;
+      state.media = {
+        ...state.media,
+        manualSourceOverride: null,
+      };
+      broadcastState();
+      void runNowPlayingPollTick("media-source-override");
+      return true;
+    }
+
+    if (
+      !MEDIA_SOURCES.includes(source) ||
+      !state.media.activeSources.includes(source)
+    ) {
+      return false;
+    }
+
+    manualMediaSourceOverride = source;
+    state.media = {
+      ...state.media,
+      manualSourceOverride: source,
+    };
+    appendLog(
+      "info",
+      "media",
+      "Handmatige mediabron-override ingesteld",
+      source,
+    );
+    broadcastState();
+    void runNowPlayingPollTick("media-source-override");
     return true;
   }
 
