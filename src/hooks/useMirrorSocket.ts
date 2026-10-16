@@ -5,7 +5,11 @@ import type { PresenceState } from "../types/presence";
 import type { DisplayState } from "../types/display";
 import { getWebSocketUrl } from "../utils/getWebSocketUrl";
 import type { DeploymentState } from "../types/deployment";
-import { defaultMediaState, type MediaState } from "../types/media";
+import {
+  defaultMediaState,
+  type MediaSource,
+  type MediaState,
+} from "../types/media";
 import type { DebugLogEntry } from "../types/log";
 import type {
   ProviderConfigStatus,
@@ -813,6 +817,13 @@ export function useMirrorSocket() {
     });
   }
 
+  function setMediaSourceOverride(source: MediaSource | null) {
+    void sendAction({
+      type: "media:source-override",
+      payload: { source },
+    });
+  }
+
   function setMediaLyricsVisible(visible: boolean) {
     void sendAction({
       type: "display:media-lyrics",
@@ -874,6 +885,7 @@ export function useMirrorSocket() {
     updateSettings,
     focusWidget,
     clearWidgetFocus,
+    setMediaSourceOverride,
     setMediaLyricsVisible,
     setMediaJellyfinTriviaVisible,
     setSpotifyContextKeepAwake,
