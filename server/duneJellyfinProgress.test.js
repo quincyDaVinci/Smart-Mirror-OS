@@ -208,3 +208,61 @@ test("refuses to write when User Filter is missing", async () => {
   assert.equal(result.reason, "user-unresolved");
   assert.equal(fetchCalled, false);
 });
+
+test("falls back to legacy Jellyfin user-data route on 404", async () => {
+  const calls = [];
+  const responses = [
+    {
+      ok: true,
+      status: 200,
+      json: async () => [{ Id: "user-quincy", Name: "Quincy" }],
+    },
+    {
+      ok: false,
+      status: 404,
+      json: async () => ({}),
+    },
+    {
+      ok: true,
+      status: 200,
+      json: async () => ({
+        PlaybackPositionTicks: 3600000000,
+      }),
+    },
+  ];
+
+  const sync = createDuneJellyfinProgressSync({
+    getSecrets: () => ({
+      baseUrl: "http://jellyfin.local:8096",
+      apiKey: "test-key",
+      userName: "Quincy",
+    }),
+    fetchImpl: async (url, options = {}) => {
+      calls.push({ url: String(url), options });
+      return responses.shift();
+    },
+    logger: {
+      log() {},
+      warn() {},
+      error() {},
+    },
+  });
+
+  const result = await sync.syncCheckpoint({
+    sourceItemId: "item-1",
+    playSessionId: "dune-session-1",
+    progressMs: 360000,
+    durationMs: 7200000,
+    jellyfinDurationMs: 7200000,
+    matchType: "path",
+    reason: "stop",
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(result.endpoint, "legacy");
+  assert.equal(calls.length, 3);
+  assert.equal(
+    calls[2].url,
+    "http://jellyfin.local:8096/Users/user-quincy/Items/item-1/UserData",
+  );
+});
