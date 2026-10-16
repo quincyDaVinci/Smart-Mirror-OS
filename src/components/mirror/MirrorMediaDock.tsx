@@ -506,6 +506,10 @@ function getProviderMessage(media: MediaState, source: MediaState["source"]) {
     return media.sourceState.dune.message;
   }
 
+  if (source === "youtube") {
+    return media.sourceState.youtube.message;
+  }
+
   return null;
 }
 
@@ -843,7 +847,9 @@ export function MirrorMediaDock({
       displayMedia.source === "dune") &&
     (displayMedia.kind === "movie" || displayMedia.kind === "episode");
   const isVideo =
-    displayMedia.kind === "movie" || displayMedia.kind === "episode";
+    displayMedia.kind === "movie" ||
+    displayMedia.kind === "episode" ||
+    displayMedia.kind === "video";
   const finishTimeLabel =
     isVideo &&
     liveProgressMs !== null &&
@@ -1507,7 +1513,9 @@ export function MirrorMediaDock({
       ? "mirror-main-media--spotify"
       : displayMedia.source === "jellyfin" || displayMedia.source === "dune"
         ? "mirror-main-media--jellyfin"
-        : "",
+        : displayMedia.source === "youtube"
+          ? "mirror-main-media--youtube"
+          : "",
     isPosterArtwork ? "mirror-main-media--poster" : "mirror-main-media--cover",
     isVideo ? "mirror-main-media--video" : "",
     lyricsEnabled ? "mirror-main-media--lyrics" : "",
