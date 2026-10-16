@@ -1,6 +1,12 @@
-export type MediaSource = "jellyfin" | "spotify" | "dune";
+export type MediaSource = "jellyfin" | "spotify" | "dune" | "youtube";
 export type MediaStatus = "idle" | "playing" | "paused" | "error";
-export type MediaKind = "movie" | "episode" | "track" | "podcast" | "unknown";
+export type MediaKind =
+  | "movie"
+  | "episode"
+  | "track"
+  | "podcast"
+  | "video"
+  | "unknown";
 
 export type ProviderStatus = {
   enabled: boolean;
@@ -67,6 +73,7 @@ export type MediaState = {
     jellyfin: ProviderStatus;
     spotify: ProviderStatus;
     dune: ProviderStatus;
+    youtube: ProviderStatus;
   };
 };
 
@@ -116,6 +123,12 @@ export const defaultMediaState: MediaState = {
       enabled: true,
       status: "idle",
       message: null,
+      lastCheckedAt: null,
+    },
+    youtube: {
+      enabled: true,
+      status: "idle",
+      message: "Nog geen YouTube heartbeat ontvangen.",
       lastCheckedAt: null,
     },
   },
