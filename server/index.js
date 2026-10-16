@@ -1012,8 +1012,12 @@ function normalizeMediaState(mediaInput = {}) {
     statusChangedAt: normalizeOptionalTimestamp(mediaInput.statusChangedAt),
     lastPlayed: normalizeMediaSnapshot(mediaInput.lastPlayed),
     activeSources: Array.isArray(mediaInput.activeSources)
-      ? normalizeMediaSourcePriority(state?.settings?.mediaSourcePriority).filter(
-          (source) => mediaInput.activeSources.includes(source),
+      ? Array.from(
+          new Set(
+            mediaInput.activeSources.filter((source) =>
+              MEDIA_SOURCES.includes(source),
+            ),
+          ),
         )
       : [],
     manualSourceOverride: MEDIA_SOURCES.includes(mediaInput.manualSourceOverride)
