@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import type { DisplayState } from "../types/display";
 import type { LayoutItem, WidgetId } from "../types/layout";
 import type { PresenceState } from "../types/presence";
-import type { MediaState } from "../types/media";
+import type { MediaSource, MediaState } from "../types/media";
 import type { MirrorSettings } from "../types/settings";
 import { CommitRange } from "../components/common/CommitRange";
 import "./RemoteControlPage.css";
@@ -25,6 +25,7 @@ type RemoteControlPageProps = {
   onUpdateSettings: (nextSettings: Partial<MirrorSettings>) => void;
   onFocusWidget: (widgetId: WidgetId) => void;
   onClearFocus: () => void;
+  onSetMediaSourceOverride: (source: MediaSource | null) => void;
   onSetMediaLyricsVisible: (visible: boolean) => void;
   onSetMediaJellyfinTriviaVisible: (visible: boolean) => void;
   onSetSpotifyContextKeepAwake: (enabled: boolean) => void;
@@ -35,6 +36,13 @@ type FocusButtonDefinition = {
   id: WidgetId;
   label: string;
   subtitle: string;
+};
+
+const MEDIA_SOURCE_LABELS: Record<MediaSource, string> = {
+  dune: "Dune",
+  jellyfin: "Jellyfin",
+  youtube: "YouTube",
+  spotify: "Spotify",
 };
 
 const focusButtons: FocusButtonDefinition[] = [
@@ -224,6 +232,7 @@ export function RemoteControlPage({
   onUpdateSettings,
   onFocusWidget,
   onClearFocus,
+  onSetMediaSourceOverride,
   onSetMediaLyricsVisible,
   onSetMediaJellyfinTriviaVisible,
   onSetSpotifyContextKeepAwake,
@@ -466,6 +475,66 @@ export function RemoteControlPage({
             <h2>{remoteMediaTitle || "Geen actieve media"}</h2>
           </div>
           <span className="remote-status-pill">{media.status}</span>
+        </div>
+
+        <div className="remote-media-source-panel">
+          <div className="remote-media-source-panel__heading">
+            <div>
+              <strong>Actieve mediabronnen</strong>
+              <span>
+                Klik een bron om die voor de huidige afspeelsessie voorrang te
+                geven.
+              </span>
+            </div>
+
+            {media.manualSourceOverride ? (
+              <button
+                type="button"
+                className="remote-media-source-reset"
+                onClick={() => {
+                  onSetMediaSourceOverride(null);
+                }}
+                disabled={!isConnected}
+              >
+                Volg standaardprioriteit
+              </button>
+            ) : null}
+          </div>
+
+          {media.activeSources.length > 0 ? (
+            <div className="remote-media-source-grid">
+              {media.activeSources.map((source) => {
+                const isSelected = media.source === source;
+                const isManual = media.manualSourceOverride === source;
+
+                return (
+                  <button
+                    key={source}
+                    type="button"
+                    className={`remote-media-source-button${isSelected ? " remote-media-source-button--selected" : ""}${isManual ? " remote-media-source-button--manual" : ""}`}
+                    aria-pressed={isManual}
+                    onClick={() => {
+                      onSetMediaSourceOverride(source);
+                    }}
+                    disabled={!isConnected}
+                  >
+                    <strong>{MEDIA_SOURCE_LABELS[source]}</strong>
+                    <span>
+                      {isManual
+                        ? "Handmatig gekozen"
+                        : isSelected
+                          ? "Huidige focus"
+                          : "Actief"}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="remote-media-source-empty">
+              Er zijn nu geen actieve mediabronnen.
+            </p>
+          )}
         </div>
 
         <div className="remote-action-grid">
