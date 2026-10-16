@@ -49,10 +49,10 @@ function createDuneResumeGuard({ readPosition, seek, writeCheckpoint, now = Date
           const duneMs = Number(media.progressMs);
           if (Number.isFinite(duneMs) && duneMs >= 0) {
             const difference = Math.abs(savedMs - duneMs);
-            session.confirmRequired = savedMs > 0 && difference > DUNE_RESUME_DIFFERENCE_MS;
+            session.confirmRequired = difference > DUNE_RESUME_DIFFERENCE_MS;
             session.approved = !session.confirmRequired;
             session.blocked = false;
-            if (savedMs >= 1000 && difference > SEEK_TOLERANCE_MS) {
+            if (savedMs >= 0 && difference > SEEK_TOLERANCE_MS) {
               const accepted = await seek(savedMs);
               if (accepted) {
                 session.seekTarget = savedMs;
