@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { createDunePauseTimeoutTracker } = require("./dunePauseTimeout");
+const { resolveMediaByPriority } = require("./mediaPriority");
 
 function dune(status, playSessionId = "dune-session-1") {
   return {
@@ -55,4 +56,25 @@ test("new Dune session starts a fresh paused timeout", () => {
 
   assert.equal(next.media?.playSessionId, "dune-session-2");
   assert.equal(next.timedOut, false);
+});
+
+test("timed-out paused Dune lets active Spotify take over", () => {
+  const tracker = createDunePauseTimeoutTracker();
+
+  tracker.filter(dune("paused"), 60000, 1000);
+  const duneAfterTimeout = tracker.filter(dune("paused"), 60000, 61000).media;
+
+  const resolved = resolveMediaByPriority({
+    duneMedia: duneAfterTimeout,
+    jellyfinMedia: null,
+    youtubeMedia: null,
+    spotifyMedia: {
+      source: "spotify",
+      status: "playing",
+      kind: "track",
+      title: "Song",
+    },
+  });
+
+  assert.equal(resolved.source, "spotify");
 });
