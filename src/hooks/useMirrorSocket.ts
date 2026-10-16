@@ -180,6 +180,7 @@ export function useMirrorSocket() {
     zoomPercent: 150,
     focusIdleTimeoutSeconds: 45,
     mediaFocusExitDelaySeconds: 10,
+    mediaSourcePriority: ["dune", "jellyfin", "youtube", "spotify"],
     lightSensorEnabled: true,
     lightOnLuxThreshold: 50,
     lightOffLuxThreshold: 70,
