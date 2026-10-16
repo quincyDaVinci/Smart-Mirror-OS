@@ -652,6 +652,42 @@
   animation: focus-enter 280ms ease;
 }
 
+.mirror-dune-resume-notice {
+  position: absolute;
+  z-index: 6;
+  top: calc(var(--mirror-padding-top) + 16px);
+  left: calc(var(--mirror-padding-left) + 16px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+  max-width: min(520px, 44vw);
+  padding: 18px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-left: 3px solid var(--accent-amber);
+  border-radius: 16px;
+  background: rgba(13, 17, 24, 0.9);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(12px);
+  pointer-events: none;
+  text-align: left;
+}
+
+.mirror-dune-resume-notice__label {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: clamp(14px, 1.05vw, 18px);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.mirror-dune-resume-notice__value {
+  color: rgba(255, 255, 255, 0.98);
+  font-size: clamp(18px, 1.55vw, 27px);
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
 .mirror-portrait-shell {
   --mirror-main-column-height: min(56vh, 520px);
 
