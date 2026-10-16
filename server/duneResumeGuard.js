@@ -6,7 +6,6 @@ const DUNE_RESUME_NOTICE_MS = 15 * 1000;
 const SEEK_TOLERANCE_MS = 10 * 1000;
 const SEEK_VERIFY_TOLERANCE_MS = 12 * 1000;
 const SEEK_VERIFY_DEADLINE_MS = 20 * 1000;
-const TRANSIENT_GAP_MS = 15 * 1000;
 
 function getSessionKey(media) {
   return media?.source === "dune" &&
@@ -142,8 +141,7 @@ function createDuneResumeGuard({
       return;
     }
 
-    const isNewSession = !session || session.key !== key ||
-      (session.missingAt !== null && at - session.missingAt > TRANSIENT_GAP_MS);
+    const isNewSession = !session || session.key !== key;
 
     if (isNewSession) {
       if (session) {
