@@ -40,7 +40,7 @@ type FocusButtonDefinition = {
 const focusButtons: FocusButtonDefinition[] = [
   { id: "clock", label: "Klok", subtitle: "Tijd en datum" },
   { id: "weather", label: "Weer", subtitle: "Temperatuur en locatie" },
-  { id: "media", label: "Media", subtitle: "Jellyfin, Dune en Spotify" },
+  { id: "media", label: "Media", subtitle: "YouTube, Jellyfin, Dune en Spotify" },
   { id: "calendar", label: "Agenda", subtitle: "Volgende afspraak" },
 ];
 
