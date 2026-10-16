@@ -24,5 +24,13 @@ jobs:
         run: node --check server/index.js
       - name: Check trivia provider syntax
         run: node --check server/providers/jellyfinTrivia.js
-      - name: Run Dune provider tests
-        run: node --test server/providers/duneNowPlaying.test.js
+      - name: Run media backend tests
+        run: |
+          node --test \
+            server/mediaPriority.test.js \
+            server/spotifyPauseTimeout.test.js \
+            server/dunePauseTimeout.test.js \
+            server/duneJellyfinProgress.test.js \
+            server/providers/duneNowPlaying.test.js \
+            server/providers/youtubeNowPlaying.test.js \
+            server/youtubeHeartbeatRequest.test.js
