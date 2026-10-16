@@ -24,6 +24,9 @@ const {
   createSpotifyPauseTimeoutTracker,
 } = require("./spotifyPauseTimeout");
 const {
+  isAllowedYouTubeHeartbeatRequest,
+} = require("./youtubeHeartbeatRequest");
+const {
   recordYouTubeHeartbeat,
   getYouTubeNowPlaying,
 } = require("./providers/youtubeNowPlaying");
@@ -127,7 +130,7 @@ app.post(
   "/media/youtube-heartbeat",
   express.text({ type: "text/plain", limit: "4kb" }),
   async (req, res) => {
-    if (req.headers.origin !== "https://www.youtube.com") {
+    if (!isAllowedYouTubeHeartbeatRequest(req.headers)) {
       res.status(403).json({ ok: false, error: "origin-not-allowed" });
       return;
     }
